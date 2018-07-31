@@ -30,3 +30,12 @@
 *.exe
 *.out
 *.app
+
+# ADDED:
+*.res
+unused/
+.vs/
+Debug/
+Release/
+x64/
+imgui.ini
