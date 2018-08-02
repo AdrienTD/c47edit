@@ -1,3 +1,8 @@
+// c47edit - Scene editor for HM C47
+// Copyright (C) 2018 AdrienTD
+// Licensed under the GPL3+.
+// See LICENSE file for more details.
+
 #include "global.h"
 #include "video.h"
 #include <Windows.h>
@@ -16,6 +21,7 @@ float camspeed = 32;
 bool wireframe = false;
 bool findsel = false;
 uint32_t framesincursec = 0, framespersec = 0, lastfpscheck;
+Vector3 cursorpos(0, 0, 0);
 
 GameObject *bestpickobj = 0;
 float bestpickdist;
@@ -69,7 +75,10 @@ void IGOTNode(GameObject *o)
 		if (io.KeyShift)
 			viewobj = o;
 		else
+		{
 			selobj = o;
+			cursorpos = selobj->position;
+		}
 	}
 	if(op)
 	{
@@ -83,7 +92,7 @@ void IGObjectTree()
 {
 	ImGui::SetNextWindowPos(ImVec2(3, 3), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSize(ImVec2(316, 652), ImGuiCond_FirstUseEver);
-	ImGui::Begin("Object tree");
+	ImGui::Begin("Object tree", 0, ImGuiWindowFlags_HorizontalScrollbar);
 	IGOTNode(superroot);
 	findsel = false;
 	ImGui::End();
@@ -154,7 +163,7 @@ void IGObjectInfo()
 		}*/
 		Vector3 rota = GetYXZRotVecFromMatrix(&selobj->matrix);
 		rota *= 180.0f * M_1_PI;
-		if (ImGui::DragFloat3("Rotation", &rota.x))
+		if (ImGui::DragFloat3("Orientation", &rota.x))
 		{
 			rota *= M_PI / 180.0f;
 			Matrix my, mx, mz;
@@ -203,7 +212,7 @@ void IGMain()
 	ImGui::SetNextWindowPos(ImVec2(1005, 453), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSize(ImVec2(270, 203), ImGuiCond_FirstUseEver);
 	ImGui::Begin("c47edit");
-	ImGui::Text("c47edit Version 0.0.1");
+	ImGui::Text("c47edit - Version " APP_VERSION);
 	if (ImGui::Button("Save Scene"))
 	{
 		char newfn[300]; newfn[299] = 0;
@@ -234,12 +243,12 @@ void IGMain()
 	if(ImGui::Button("About..."))
 		MessageBox(hWindow, "c47edit\nUnofficial scene editor for \"Hitman: Codename 47\"\n\n"
 			"(C) 2018 AdrienTD\nLicensed under the GPL 3.\nSee LICENSE file for details.\n\n"
-			"3rd party library used:\n- Dear ImGui\n- miniz\nSee LICENSE_* files for copyright and licensing of these libraries.", "c47edit", 0);
+			"3rd party libraries used:\n- Dear ImGui (MIT license)\n- Miniz (MIT license)\nSee LICENSE_* files for copyright and licensing of these libraries.", "c47edit", 0);
 	//ImGui::DragFloat("Scale", &objviewscale, 0.1f);
 	ImGui::DragFloat("Cam speed", &camspeed, 0.1f);
 	ImGui::DragFloat3("Cam pos", &campos.x, 0.1f);
 	ImGui::DragFloat2("Cam ori", &camori.x, 0.1f);
-	ImGui::DragFloat3("Intersect point", &bestpickintersectionpnt.x);
+	ImGui::DragFloat3("Cursor pos", &cursorpos.x);
 	ImGui::Checkbox("Wireframe", &wireframe);
 	ImGui::Text("FPS: %u", framespersec);
 	ImGui::End();
@@ -428,7 +437,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 					wireframe = !wireframe;
 			}
 			campos += cammove * camspeed * (io.KeyShift ? 2 : 1);
-			if (io.MouseDown[0] && !io.WantCaptureMouse)
+			if (io.MouseDown[0] && !io.WantCaptureMouse && !(io.KeyAlt || io.KeyCtrl))
 			{
 				camori.y += io.MouseDelta.x * 0.01f;
 				camori.x += io.MouseDelta.y * 0.01f;
@@ -461,6 +470,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 				}
 				else
 					selobj = bestpickobj;
+				cursorpos = bestpickintersectionpnt;
 			}
 
 			ImGui_ImplOpenGL2_NewFrame();
@@ -501,7 +511,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			glPointSize(10);
 			glColor3f(1, 1, 1);
 			glBegin(GL_POINTS);
-			glVertex3f(bestpickintersectionpnt.x, bestpickintersectionpnt.y, bestpickintersectionpnt.z);
+			glVertex3f(cursorpos.x, cursorpos.y, cursorpos.z);
 			glEnd();
 			glPointSize(1);
 

@@ -1,3 +1,8 @@
+// c47edit - Scene editor for HM C47
+// Copyright (C) 2018 AdrienTD
+// Licensed under the GPL3+.
+// See LICENSE file for more details.
+
 #include "global.h"
 #include "miniz.h"
 #include <functional>
@@ -53,6 +58,7 @@ Chunk *spkchk;
 Chunk *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac;
 GameObject *rootobj, *cliprootobj, *superroot;
 char *lastspkfn = 0;
+void *zipmem = 0; uint zipsize = 0;
 
 char *GetObjTypeString(uint ot)
 {
@@ -63,10 +69,21 @@ char *GetObjTypeString(uint ot)
 
 void LoadSceneSPK(char *fn)
 {
+	FILE *zipfile = fopen(fn, "rb");
+	if (!zipfile) ferr("Could not open the ZIP file.");
+	fseek(zipfile, 0, SEEK_END);
+	zipsize = ftell(zipfile);
+	fseek(zipfile, 0, SEEK_SET);
+	zipmem = malloc(zipsize);
+	if (!zipmem) ferr("Could not allocate memory to load the ZIP file.");
+	fread(zipmem, zipsize, 1, zipfile);
+	fclose(zipfile);
+
 	mz_zip_archive zip; void *spkmem; size_t spksize;
 	spkchk = new Chunk;
 	mz_zip_zero_struct(&zip);
-	mz_bool mzreadok = mz_zip_reader_init_file(&zip, fn, 0);
+	//mz_bool mzreadok = mz_zip_reader_init_file(&zip, fn, 0);
+	mz_bool mzreadok = mz_zip_reader_init_mem(&zip, zipmem, zipsize, 0);
 	if (!mzreadok) ferr("Failed to initialize ZIP reading.");
 	spkmem = mz_zip_reader_extract_file_to_heap(&zip, "Pack.SPK", &spksize, 0);
 	if (!spkmem) ferr("Failed to extract Pack.SPK from ZIP archive.");
@@ -333,7 +350,8 @@ void SaveSceneSPK(char *fn)
 	mz_zip_zero_struct(&inzip);
 	mz_zip_zero_struct(&outzip);
 	mz_bool mzr;
-	mzr = mz_zip_reader_init_file(&inzip, lastspkfn, 0);
+	//mzr = mz_zip_reader_init_file(&inzip, lastspkfn, 0);
+	mzr = mz_zip_reader_init_mem(&inzip, zipmem, zipsize, 0);
 	if (!mzr) { warn("Couldn't reopen the original scene ZIP file."); free(spkmem); return; }
 	mzr = mz_zip_writer_init_file(&outzip, fn, 0);
 	if (!mzr) { warn("Couldn't create the new scene ZIP file for saving."); free(spkmem); return; }
