@@ -55,7 +55,7 @@ char *objtypenames[] = {
 };
 
 Chunk *spkchk;
-Chunk *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac;
+Chunk *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc;
 GameObject *rootobj, *cliprootobj, *superroot;
 char *lastspkfn = 0;
 void *zipmem = 0; uint zipsize = 0;
@@ -100,7 +100,9 @@ void LoadSceneSPK(char *fn)
 	pmtx = spkchk->findSubchunk('XTMP');
 	pver = spkchk->findSubchunk('REVP');
 	pfac = spkchk->findSubchunk('CAFP');
-	if (!(prot && pclp && phea && pnam && ppos && pmtx && pver && pfac))
+	pftx = spkchk->findSubchunk('XTFP');
+	puvc = spkchk->findSubchunk('CVUP');
+	if (!(prot && pclp && phea && pnam && ppos && pmtx && pver && pfac && pftx && puvc))
 		ferr("One or more important chunks were not found in Pack.SPK .");
 
 	rootobj = new GameObject("Root", 0x21 /*ZROOM*/);

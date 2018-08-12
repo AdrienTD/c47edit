@@ -32,10 +32,14 @@
 *.app
 
 # ADDED:
+*.lnk
+*.pdb
 *.res
+*.ilk
 unused/
 .vs/
 Debug/
 Release/
 x64/
 imgui.ini
+Repeat.*

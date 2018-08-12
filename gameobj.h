@@ -43,9 +43,11 @@ struct GameObject
 	~GameObject() { free(name); }
 };
 
-extern Chunk *spkchk, *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac;
+extern Chunk *spkchk, *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc;
 extern GameObject *rootobj, *cliprootobj, *superroot;
 extern char *lastspkfn;
+extern void *zipmem;
+extern uint zipsize;
 
 char* GetObjTypeString(uint ot);
 void LoadSceneSPK(char *fn);

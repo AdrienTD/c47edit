@@ -5,6 +5,8 @@
 
 #include "global.h"
 #include <sstream>
+#include <functional>
+#include <map>
 
 Chunk *Chunk::findSubchunk(uint tagkey)
 {
@@ -137,4 +139,59 @@ void SaveChunkToMem(Chunk *chk, void **pnt, size_t *size)
 	*pnt = malloc(l);
 	*size = l;
 	memcpy(*pnt, m.data(), l);
+}
+
+Chunk *ReconstructPackFromRepeat(void *packrep, uint packrepsize, void *repeat)
+{
+	Chunk *mainchk = new Chunk;
+
+	uint32_t *ppnt = (uint32_t*)packrep;
+	uint32_t reconsoff = *(ppnt + 1);
+	ppnt += 2;
+
+	uint32_t currp = 0;
+	std::map<uint32_t, Chunk*> rpmap;
+
+	std::function<void(Chunk*)> f;
+	f = [&f, &ppnt, &rpmap, &currp](Chunk *c)
+	{
+		uint32_t beg = currp;
+		c->num_datas = 0; c->num_subchunks = 0;
+		c->tag = *(ppnt++);
+		uint32_t info = *(ppnt++);
+		uint32_t csize = info & 0x3FFFFFFF;
+		uint32_t datoff = 8;
+		if (info & 0xC0000000)
+			datoff = *(ppnt++);
+
+		rpmap[currp + datoff] = c;
+
+		if (info & 0x80000000)
+		{
+			c->num_subchunks = *(ppnt++);
+			c->subchunks = new Chunk[c->num_subchunks];
+			currp += 16;
+			for (int i = 0; i < c->num_subchunks; i++)
+				f(&c->subchunks[i]);
+		}
+
+		currp = beg + csize;
+	};
+
+	f(mainchk);
+
+	char* reconspnt = (char*)packrep + 8 + reconsoff;
+	ppnt = (uint32_t*)reconspnt;
+	uint reconssize = packrepsize - reconsoff;
+	while ((char*)ppnt - reconspnt <= reconssize - 16)
+	{
+		uint32_t repeatoff = *(ppnt++);
+		Chunk *c = rpmap[*(ppnt++)];
+		c->maindata_size = *(ppnt++);
+		c->maindata = malloc(c->maindata_size);
+		memcpy(c->maindata, (char*)repeat + repeatoff, c->maindata_size);
+		*(uint32_t*)c->maindata = *(ppnt++);
+	}
+
+	return mainchk;
 }

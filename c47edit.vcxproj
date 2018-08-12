@@ -121,6 +121,7 @@
     <ClCompile Include="imgui\imgui_impl_win32.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="miniz.c" />
+    <ClCompile Include="texture.cpp" />
     <ClCompile Include="vecmat.cpp" />
     <ClCompile Include="video.cpp" />
     <ClCompile Include="window.cpp" />
@@ -133,6 +134,7 @@
     <ClInclude Include="imgui\imgui_impl_opengl2.h" />
     <ClInclude Include="imgui\imgui_impl_win32.h" />
     <ClInclude Include="miniz.h" />
+    <ClInclude Include="texture.h" />
     <ClInclude Include="vecmat.h" />
     <ClInclude Include="video.h" />
     <ClInclude Include="window.h" />

@@ -6,6 +6,7 @@
 #pragma once
 
 extern uint drawframes;
+extern bool rendertextures;
 
 void InitVideo();
 void BeginDrawing();

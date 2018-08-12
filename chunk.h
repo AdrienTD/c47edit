@@ -18,3 +18,4 @@ struct Chunk
 
 void LoadChunk(Chunk *chk, void *bytes);
 void SaveChunkToMem(Chunk *chk, void **pnt, size_t *size);
+Chunk *ReconstructPackFromRepeat(void *packrep, uint packrepsize, void *repeat);

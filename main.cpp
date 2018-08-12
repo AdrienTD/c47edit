@@ -5,6 +5,7 @@
 
 #include "global.h"
 #include "video.h"
+#include "texture.h"
 #include <Windows.h>
 #include <gl/GL.h>
 #include <gl/GLU.h>
@@ -250,7 +251,33 @@ void IGMain()
 	ImGui::DragFloat2("Cam ori", &camori.x, 0.1f);
 	ImGui::DragFloat3("Cursor pos", &cursorpos.x);
 	ImGui::Checkbox("Wireframe", &wireframe);
+	ImGui::SameLine();
+	ImGui::Checkbox("Textured", &rendertextures);
 	ImGui::Text("FPS: %u", framespersec);
+	ImGui::End();
+}
+
+uint curtexid = 0;
+
+void IGTest()
+{
+	ImGui::Begin("Debug/Test");
+	if (ImGui::Button("ReadTextures()"))
+		ReadTextures();
+	static const int one = 1;
+	ImGui::InputScalar("Texture ID", ImGuiDataType_U32, &curtexid, &one);
+	auto l = texmap.lower_bound(curtexid);
+	if(ImGui::Button("Next"))
+		if (l != texmap.end()) {
+			auto ln = std::next(l);
+			if (ln != texmap.end())
+				curtexid = ln->first;
+		}
+	auto t = texmap.find(curtexid);
+	if (t != texmap.end())
+		ImGui::Image(t->second, ImVec2(256, 256));
+	else
+		ImGui::Text("Texture %u not found.", curtexid);
 	ImGui::End();
 }
 
@@ -272,8 +299,10 @@ void RenderObject(GameObject *o)
 	glTranslatef(o->position.x, o->position.y, o->position.z);
 	glMultMatrixf(o->matrix.v);
 	if (o->mesh && (o->flags & 0x20)) {
-		uint clr = swap_rb(o->color);
-		glColor4ubv((uint8_t*)&clr);
+		if (!rendertextures) {
+			uint clr = swap_rb(o->color);
+			glColor4ubv((uint8_t*)&clr);
+		}
 		o->mesh->draw();
 	}
 	for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
@@ -435,6 +464,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 					cammove.y -= 1;
 				if (ImGui::IsKeyPressed('W'))
 					wireframe = !wireframe;
+				if (ImGui::IsKeyPressed('T'))
+					rendertextures = !rendertextures;
 			}
 			campos += cammove * camspeed * (io.KeyShift ? 2 : 1);
 			if (io.MouseDown[0] && !io.WantCaptureMouse && !(io.KeyAlt || io.KeyCtrl))
@@ -479,6 +510,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			IGMain();
 			IGObjectTree();
 			IGObjectInfo();
+//#if 1
+			IGTest();
+//#endif
 			ImGui::EndFrame();
 
 			BeginDrawing();
