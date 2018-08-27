@@ -16,6 +16,23 @@ struct Light
 	uint32_t param[7];
 };
 
+struct DBLEntry
+{
+	int type;
+	int flags;
+	union {
+		double dbl;
+		float flt;
+		uint32_t u32;
+		char *str;
+		struct {
+			size_t datsize;
+			void *datpnt;
+		};
+	};
+	DBLEntry() : type(0), flags(0), datsize(0), datpnt(0) {}
+};
+
 struct GameObject
 {
 	uint state;
@@ -25,15 +42,18 @@ struct GameObject
 	Vector3 position;
 	uint type, flags;
 
+	std::vector<GameObject*> subobj;
+	GameObject *parent;
+	GameObject *root;
+
 	// Mesh
 	Mesh *mesh;
 	uint color;
 
 	Light *light;
 
-	std::vector<GameObject*> subobj;
-	GameObject *parent;
-	GameObject *root;
+	std::vector<DBLEntry> dbl;
+	uint32_t dblflags;
 
 	GameObject(char *nName = "Unnamed", int nType = 0) : name(strdup(nName)), type(nType),
 		pdbloff(0), pexcoff(0), flags(0), mesh(0), color(0), position(0,0,0), light(0), state(0), parent(0), root(0)

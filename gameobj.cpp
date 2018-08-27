@@ -9,6 +9,7 @@
 #include <sstream>
 #include <array>
 #include <map>
+#include <unordered_map>
 
 char *objtypenames[] = {
 	// 0x00
@@ -55,7 +56,7 @@ char *objtypenames[] = {
 };
 
 Chunk *spkchk;
-Chunk *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc;
+Chunk *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc, *pdbl;
 GameObject *rootobj, *cliprootobj, *superroot;
 char *lastspkfn = 0;
 void *zipmem = 0; uint zipsize = 0;
@@ -102,7 +103,8 @@ void LoadSceneSPK(char *fn)
 	pfac = spkchk->findSubchunk('CAFP');
 	pftx = spkchk->findSubchunk('XTFP');
 	puvc = spkchk->findSubchunk('CVUP');
-	if (!(prot && pclp && phea && pnam && ppos && pmtx && pver && pfac && pftx && puvc))
+	pdbl = spkchk->findSubchunk('LBDP');
+	if (!(prot && pclp && phea && pnam && ppos && pmtx && pver && pfac && pftx && puvc && pdbl))
 		ferr("One or more important chunks were not found in Pack.SPK .");
 
 	rootobj = new GameObject("Root", 0x21 /*ZROOM*/);
@@ -164,6 +166,48 @@ void LoadSceneSPK(char *fn)
 				l->param[i] = p[6 + i];
 		}
 
+		char *dpbeg = (char*)pdbl->maindata + p[0];
+		uint32_t ds = *(uint32_t*)dpbeg & 0xFFFFFF;
+		o->dblflags = (*(uint32_t*)dpbeg >> 24) & 255;
+		char *dp = dpbeg + 4;
+		while (dp - dpbeg < ds)
+		{
+			DBLEntry e;
+			e.type = *dp & 0x3F;
+			e.flags = *dp & 0xC0;
+			dp++;
+			switch (e.type)
+			{
+			case 1:
+				e.dbl = *(double*)dp; dp += 8; break;
+			case 2:
+				e.flt = *(float*)dp; dp += 4; break;
+			case 3:
+			case 8:
+			case 0xA:
+			case 0xB:
+			case 0xC:
+				e.u32 = *(uint32_t*)dp; dp += 4; break;
+			case 4:
+			case 5:
+				e.str = strdup(dp); while (*(dp++)); break;
+			case 6:
+				break;
+			case 7:
+			case 9:
+				e.datsize = *(uint32_t*)dp - 4;
+				e.datpnt = malloc(e.datsize);
+				memcpy(e.datpnt, dp + 4, e.datsize);
+				dp += *(uint32_t*)dp;
+				break;
+			case 0x3F:
+				break;
+			default:
+				ferr("Unknown DBL entry type!");
+			}
+			o->dbl.push_back(e);
+		}
+
 		if (c->num_subchunks > 0)
 		{
 			for (uint i = 0; i < c->num_subchunks; i++)
@@ -181,11 +225,18 @@ void LoadSceneSPK(char *fn)
 	f(pclp, cliprootobj);
 }
 
-std::stringbuf heabuf, nambuf;
+struct DBLHash
+{
+	size_t operator() (std::pair<uint32_t, std::string> e) const
+	{
+		const std::hash<std::string> h;
+		return e.first + h(e.second);
+	}
+};
+
+std::stringbuf heabuf, nambuf, dblbuf;
 std::vector<std::array<float,3> > posbuf;
 std::vector<std::array<uint, 4> > mtxbuf;
-std::map<std::array<float, 3>, uint32_t> posmap;
-std::map<std::array<uint, 4>, uint32_t> mtxmap;
 
 uint sbtell(std::stringbuf *sb);
 
@@ -193,6 +244,10 @@ uint moc_objcount;
 
 void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 {
+	std::map<std::array<float, 3>, uint32_t> posmap;
+	std::map<std::array<uint, 4>, uint32_t> mtxmap;
+	std::unordered_map<std::pair<uint32_t, std::string>, uint32_t, DBLHash> dblmap;
+
 	moc_objcount++;
 	memset(c, 0, sizeof(Chunk));
 
@@ -226,13 +281,62 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	else
 		mtxoff = miter->second;
 
+	std::stringbuf dblsav;
+	for (auto e = o->dbl.begin(); e != o->dbl.end(); e++)
+	{
+		uint8_t typ = e->type | e->flags;
+		dblsav.sputc(typ);
+		switch (e->type)
+		{
+		case 1:
+			dblsav.sputn((char*)&e->dbl, 8); break;
+		case 2:
+			dblsav.sputn((char*)&e->flt, 4); break;
+		case 3:
+		case 8:
+		case 0xA:
+		case 0xB:
+		case 0xC:
+			dblsav.sputn((char*)&e->u32, 4); break;
+		case 4:
+		case 5:
+			dblsav.sputn(e->str, strlen(e->str) + 1); break;
+		case 6:
+		case 0x3f:
+			break;
+		case 7:
+		case 9:
+		{
+			uint32_t siz = e->datsize + 4;
+			dblsav.sputn((char*)&siz, 4);
+			dblsav.sputn((char*)e->datpnt, e->datsize);
+			break;
+		}
+		}
+	}
+	uint dbloff;
+	std::pair<uint32_t, std::string> cdbl(o->dblflags, dblsav.str());
+	auto diter = dblmap.find(cdbl);
+	if (diter == dblmap.end())
+	{
+		dbloff = sbtell(&dblbuf);
+		dblmap.insert(std::make_pair(cdbl, dbloff)); //dblmap[cdbl] = dbloff;
+
+		uint32_t siz = sbtell(&dblsav) + 4;
+		dblbuf.sputn((char*)&siz, 3);
+		dblbuf.sputn((char*)&o->dblflags, 1);
+		dblbuf.sputn(cdbl.second.data(), siz - 4);
+	}
+	else
+		dbloff = diter->second;
+
 	uint heaoff = sbtell(&heabuf);
 	uint namoff = sbtell(&nambuf);
 		
 	nambuf.sputn(o->name, strlen(o->name) + 1);
 	if(true)
 	{
-		heabuf.sputn((char*)&o->pdbloff, 4);
+		heabuf.sputn((char*)&dbloff, 4);
 		heabuf.sputn((char*)&o->pexcoff, 4);
 		heabuf.sputn((char*)&namoff, 4);
 		heabuf.sputn((char*)&mtxoff, 4);
@@ -310,7 +414,7 @@ void ModifySPK()
 		memcpy(nthg->maindata, st.data(), nthg->maindata_size);
 	};
 
-	Chunk *nhea, *nnam, *npos, *nmtx;
+	Chunk *nhea, *nnam, *npos, *nmtx, *ndbl;
 	nhea = new Chunk; memset(nhea, 0, sizeof(Chunk));
 	nnam = new Chunk; memset(nnam, 0, sizeof(Chunk));
 	nhea->tag = 'AEHP';
@@ -328,46 +432,53 @@ void ModifySPK()
 	nmtx->maindata = mtxbuf.data();
 	nmtx->maindata_size = mtxbuf.size() * 16;
 
+	ndbl = new Chunk; memset(ndbl, 0, sizeof(Chunk));
+	ndbl->tag = 'LBDP';
+	std::string dblstr = dblbuf.str();
+	ndbl->maindata = malloc(dblstr.size());
+	memcpy(ndbl->maindata, dblstr.data(), dblstr.size());
+	ndbl->maindata_size = dblstr.size();
+
 	*phea = *nhea;
 	*pnam = *nnam;
 	*ppos = *npos;
 	*pmtx = *nmtx;
+	*pdbl = *ndbl;
 
 	((uint32_t*)spkchk->maindata)[1] = 0x40000;
-
-	heabuf = std::stringbuf();
-	nambuf = std::stringbuf();
-	posbuf.clear(); mtxbuf.clear();
-	posmap.clear(); mtxmap.clear();
 }
 
 void SaveSceneSPK(char *fn)
 {
-	ModifySPK();
-
-	void *spkmem; size_t spksize;
-	SaveChunkToMem(spkchk, &spkmem, &spksize);
-
 	mz_zip_archive inzip, outzip;
 	mz_zip_zero_struct(&inzip);
 	mz_zip_zero_struct(&outzip);
+
 	mz_bool mzr;
-	//mzr = mz_zip_reader_init_file(&inzip, lastspkfn, 0);
 	mzr = mz_zip_reader_init_mem(&inzip, zipmem, zipsize, 0);
-	if (!mzr) { warn("Couldn't reopen the original scene ZIP file."); free(spkmem); return; }
+	if (!mzr) { warn("Couldn't reopen the original scene ZIP file."); return; }
 	mzr = mz_zip_writer_init_file(&outzip, fn, 0);
-	if (!mzr) { warn("Couldn't create the new scene ZIP file for saving."); free(spkmem); return; }
+	if (!mzr) { warn("Couldn't create the new scene ZIP file for saving."); return; }
+
 	int nfiles = mz_zip_reader_get_num_files(&inzip);
 	int spkindex = mz_zip_reader_locate_file(&inzip, "Pack.SPK", 0, 0);
 	assert(spkindex != -1);
 	for (int i = 0; i < nfiles; i++)
 		if (i != spkindex)
 			mz_zip_writer_add_from_zip_reader(&outzip, &inzip, i);
+
+	ModifySPK();
+	void *spkmem; size_t spksize;
+	SaveChunkToMem(spkchk, &spkmem, &spksize);
+
 	mz_zip_writer_add_mem(&outzip, "Pack.SPK", spkmem, spksize, MZ_DEFAULT_COMPRESSION);
 	mz_zip_writer_finalize_archive(&outzip);
 	mz_zip_writer_end(&outzip);
 	mz_zip_reader_end(&inzip);
 
+	heabuf = std::stringbuf();
+	nambuf = std::stringbuf();
+	posbuf.clear(); mtxbuf.clear(); dblbuf = std::stringbuf();
 	free(spkmem);
 }
 

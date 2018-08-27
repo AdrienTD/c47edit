@@ -173,10 +173,61 @@ void IGObjectInfo()
 			CreateRotationZMatrix(&mz, rota.z);
 			selobj->matrix = mz * mx * my;
 		}
-		if (selobj->mesh)
+		if (ImGui::CollapsingHeader("DBL"))
 		{
-			ImGui::Separator();
-			ImGui::Text("Mesh");
+			ImGui::InputScalar("Flags", ImGuiDataType_U32, &selobj->dblflags);
+			int i = 0;
+			for (auto e = selobj->dbl.begin(); e != selobj->dbl.end(); e++)
+			{
+				ImGui::PushID(i++);
+				ImGui::Text("%1X", e->flags >> 4);
+				ImGui::SameLine();
+				switch (e->type)
+				{
+				case 1:
+					ImGui::InputDouble("Double", &e->dbl); break;
+				case 2:
+					ImGui::InputFloat("Float", &e->flt); break;
+				case 3:
+				case 8:
+				case 0xA:
+				case 0xB:
+				case 0xC:
+				{
+					char sb[10];
+					sprintf(sb, "Int %X", e->type);
+					ImGui::InputInt(sb, (int*)&e->u32); break;
+				}
+				case 4:
+				case 5:
+				{
+					char sb[256];
+					strncpy(sb, e->str, 255); sb[255] = 0;
+					if (ImGui::InputText((e->type==5)?"Filename":"String", sb, 256))
+					{
+						free(e->str);
+						e->str = strdup(sb);
+					}
+					break;
+				}
+				case 6:
+					ImGui::Separator(); break;
+				case 7:
+				case 9:
+					ImGui::Text("Data (%X): %u bytes", e->type, e->datsize); break;
+				case 0x3F:
+					ImGui::Text("End"); break;
+				default:
+					ImGui::Text("Unknown type %u", e->type); break;
+				}
+				ImGui::PopID();
+			}
+		}
+		if (selobj->mesh)
+			if(ImGui::CollapsingHeader("Mesh"))
+		{
+			//ImGui::Separator();
+			//ImGui::Text("Mesh");
 			ImVec4 c = ImGui::ColorConvertU32ToFloat4(swap_rb(selobj->color));
 			if (ImGui::ColorEdit4("Color", &c.x, 0))
 				selobj->color = swap_rb(ImGui::ColorConvertFloat4ToU32(c));
@@ -189,9 +240,10 @@ void IGObjectInfo()
 			ImGui::Text("FTXO offset: 0x%X", selobj->mesh->ftxo);
 		}
 		if (selobj->light)
+			if(ImGui::CollapsingHeader("Light"))
 		{
-			ImGui::Separator();
-			ImGui::Text("Light");
+			//ImGui::Separator();
+			//ImGui::Text("Light");
 			char s[] = "Param ?\0";
 			for (int i = 0; i < 7; i++)
 			{
