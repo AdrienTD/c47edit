@@ -83,7 +83,6 @@ void LoadSceneSPK(char *fn)
 	mz_zip_archive zip; void *spkmem; size_t spksize;
 	spkchk = new Chunk;
 	mz_zip_zero_struct(&zip);
-	//mz_bool mzreadok = mz_zip_reader_init_file(&zip, fn, 0);
 	mz_bool mzreadok = mz_zip_reader_init_mem(&zip, zipmem, zipsize, 0);
 	if (!mzreadok) ferr("Failed to initialize ZIP reading.");
 	spkmem = mz_zip_reader_extract_file_to_heap(&zip, "Pack.SPK", &spksize, 0);
@@ -116,17 +115,45 @@ void LoadSceneSPK(char *fn)
 	rootobj->root = rootobj;
 	cliprootobj->root = cliprootobj;
 
+	// First, create the objects and an ID<->GameObject* map.
+	std::map<uint, GameObject*> idobjmap;
+	std::map<Chunk*, GameObject*> chkobjmap;
+	std::function<void(Chunk*,GameObject*)> z;
+	uint objid = 1;
+	z = [&z, &objid, &chkobjmap, &idobjmap](Chunk *c, GameObject *parentobj) {
+		uint pheaoff = c->tag & 0xFFFFFF;
+		uint *p = (uint*)((char*)phea->maindata + pheaoff);
+		uint ot = *(unsigned short*)(&p[5]);
+		char *objname = (char*)pnam->maindata + p[2];
+
+		GameObject *o = new GameObject(objname, ot);
+		chkobjmap[c] = o;
+		parentobj->subobj.push_back(o);
+		o->parent = parentobj;
+		idobjmap[objid++] = o;
+		if (c->num_subchunks > 0)
+			for (uint i = 0; i < c->num_subchunks; i++)
+				z(&c->subchunks[i], o);
+	};
+
+	auto y = [z](Chunk *c, GameObject *o) {
+		for (uint i = 0; i < c->num_subchunks; i++)
+			z(&c->subchunks[i], o);
+	};
+
+	y(pclp, cliprootobj);
+	y(prot, rootobj);
+
+	// Then read/load the object properties.
 	std::function<void(Chunk*, GameObject*)> g;
-	g = [&g](Chunk *c, GameObject *parentobj) {
+	g = [&g,&objid,&chkobjmap,&idobjmap](Chunk *c, GameObject *parentobj) {
 		uint pheaoff = c->tag & 0xFFFFFF;
 		uint *p = (uint*)((char*)phea->maindata + pheaoff);
 		uint ot = *(unsigned short*)(&p[5]);
 		char *otname = GetObjTypeString(ot);
 		char *objname = (char*)pnam->maindata + p[2];
 
-		GameObject *o = new GameObject(objname, ot);
-		parentobj->subobj.push_back(o);
-		o->parent = parentobj;
+		GameObject *o = chkobjmap[c];
 		o->state = (c->tag >> 24) & 255;
 		o->pdbloff = p[0];
 		o->pexcoff = p[1];
@@ -183,7 +210,6 @@ void LoadSceneSPK(char *fn)
 			case 2:
 				e.flt = *(float*)dp; dp += 4; break;
 			case 3:
-			case 8:
 			case 0xA:
 			case 0xB:
 			case 0xC:
@@ -194,10 +220,18 @@ void LoadSceneSPK(char *fn)
 			case 6:
 				break;
 			case 7:
-			case 9:
 				e.datsize = *(uint32_t*)dp - 4;
 				e.datpnt = malloc(e.datsize);
 				memcpy(e.datpnt, dp + 4, e.datsize);
+				dp += *(uint32_t*)dp;
+				break;
+			case 8:
+				e.obj = idobjmap[*(uint32_t*)dp]; dp += 4; break;
+			case 9:
+				e.nobjs = (*(uint32_t*)dp - 4) / 4;
+				e.objlist = new goref[e.nobjs];
+				for (int i = 0; i < e.nobjs; i++)
+					e.objlist[i] = idobjmap[*(uint32_t*)(dp+4+4*i)];
 				dp += *(uint32_t*)dp;
 				break;
 			case 0x3F:
@@ -216,13 +250,12 @@ void LoadSceneSPK(char *fn)
 	};
 
 	auto f = [g](Chunk *c, GameObject *o) {
-		char s[5]; *(uint*)s = c->tag; s[4] = 0;
 		for (uint i = 0; i < c->num_subchunks; i++)
 			g(&c->subchunks[i], o);
 	};
 
-	f(prot, rootobj);
 	f(pclp, cliprootobj);
+	f(prot, rootobj);
 }
 
 struct DBLHash
@@ -241,6 +274,7 @@ std::vector<std::array<uint, 4> > mtxbuf;
 uint sbtell(std::stringbuf *sb);
 
 uint moc_objcount;
+std::map<GameObject*, uint32_t> objidmap;
 
 void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 {
@@ -293,7 +327,6 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		case 2:
 			dblsav.sputn((char*)&e->flt, 4); break;
 		case 3:
-		case 8:
 		case 0xA:
 		case 0xB:
 		case 0xC:
@@ -305,11 +338,23 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		case 0x3f:
 			break;
 		case 7:
-		case 9:
 		{
 			uint32_t siz = e->datsize + 4;
 			dblsav.sputn((char*)&siz, 4);
 			dblsav.sputn((char*)e->datpnt, e->datsize);
+			break;
+		}
+		case 8:
+		{
+			uint32_t x = objidmap[e->obj.get()];
+			dblsav.sputn((char*)&x, 4); break;
+		}
+		case 9:
+		{
+			uint32_t siz = e->nobjs * 4 + 4;
+			dblsav.sputn((char*)&siz, 4);
+			for (int i = 0; i < e->nobjs; i++)
+				dblsav.sputn((char*)&(objidmap[e->objlist[i].get()]), 4);
 			break;
 		}
 		}
@@ -387,6 +432,18 @@ void ModifySPK()
 	nrot->tag = 'TORP';
 	nclp->tag = 'PLCP';
 
+	uint objid = 1;
+	std::function<void(GameObject*)> z;
+	z = [&z,&objid](GameObject *o) {
+		for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
+		{
+			objidmap[*e] = objid++;
+			z(*e);
+		}
+	};
+	z(cliprootobj);
+	z(rootobj);
+
 	auto f = [](Chunk *c, GameObject *o) {
 		c->num_subchunks = o->subobj.size();
 		c->subchunks = new Chunk[c->num_subchunks];
@@ -446,6 +503,8 @@ void ModifySPK()
 	*pdbl = *ndbl;
 
 	((uint32_t*)spkchk->maindata)[1] = 0x40000;
+
+	objidmap.clear();
 }
 
 void SaveSceneSPK(char *fn)
@@ -491,6 +550,24 @@ void RemoveObject(GameObject *o)
 		if (it != o->parent->subobj.end())
 			o->parent->subobj.erase(it);
 	}
+	for (auto e = o->dbl.begin(); e != o->dbl.end(); e++)
+	{
+		switch (e->type)
+		{
+		case 4:
+		case 5:
+			free(e->str); break;
+		case 7:
+			free(e->datpnt); break;
+		case 8:
+			e->obj.deref(); break;
+		case 9:
+			for (int i = 0; i < e->nobjs; i++)
+				e->objlist[i].deref();
+			delete[] e->objlist;
+			break;
+		}
+	}
 	delete o;
 }
 
@@ -500,10 +577,44 @@ GameObject* DuplicateObject(GameObject *o, GameObject *parent)
 	GameObject *d = new GameObject;
 	*d = *o;
 	d->name = strdup(o->name);
+	
+	d->dbl.clear();
+	for (auto e = o->dbl.begin(); e != o->dbl.end(); e++)
+	{
+		DBLEntry n;
+		n.type = e->type; n.flags = e->flags;
+		switch (n.type)
+		{
+		case 1:
+			n.dbl = e->dbl; break;
+		case 2:
+			n.flt = e->flt; break;
+		case 3: case 0xA: case 0xB: case 0xC:
+			n.u32 = e->u32; break;
+		case 4: case 5:
+			n.str = strdup(e->str); break;
+		case 7:
+			n.datsize = e->datsize;
+			n.datpnt = malloc(n.datsize);
+			memcpy(n.datpnt, e->datpnt, n.datsize);
+			break;
+		case 8:
+			n.obj = e->obj.get(); break;
+		case 9:
+			n.nobjs = e->nobjs;
+			n.objlist = new goref[n.nobjs];
+			for (int i = 0; i < n.nobjs; i++)
+				n.objlist[i] = e->objlist[i].get();
+			break;
+		}
+		d->dbl.push_back(*e);
+	}
+
 	d->subobj.clear();
 	parent->subobj.push_back(d);
 	for (int i = 0; i < o->subobj.size(); i++)
 		DuplicateObject(o->subobj[i], d);
+
 	return d;
 }
 

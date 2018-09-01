@@ -11,6 +11,7 @@
 #include <gl/GLU.h>
 #include <commdlg.h>
 #include <ctime>
+#include <functional>
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_opengl2.h"
 #include "imgui/imgui_impl_win32.h"
@@ -65,13 +66,13 @@ void IGOTNode(GameObject *o)
 		colorpushed = 1;
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 1, 0, 1));
 	}
-	op = ImGui::TreeNodeEx(o, (o->subobj.empty() ? ImGuiTreeNodeFlags_Leaf : 0) | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ((o == selobj) ? ImGuiTreeNodeFlags_Selected : 0), "%s(0x%X)::%s\n", GetObjTypeString(o->type), o->type, o->name);
+	op = ImGui::TreeNodeEx(o, (o->subobj.empty() ? ImGuiTreeNodeFlags_Leaf : 0) | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ((o == selobj) ? ImGuiTreeNodeFlags_Selected : 0), "%s(0x%X)::%s", GetObjTypeString(o->type), o->type, o->name);
 	if (colorpushed)
 		ImGui::PopStyleColor();
 	if (findsel)
 		if (selobj == o)
 			ImGui::SetScrollHere();
-	if (ImGui::IsItemClicked()) {
+	if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0)) {
 		ImGuiIO& io = ImGui::GetIO();
 		if (io.KeyShift)
 			viewobj = o;
@@ -81,6 +82,12 @@ void IGOTNode(GameObject *o)
 			cursorpos = selobj->position;
 		}
 	}
+	if (ImGui::IsItemActive())
+		if (ImGui::BeginDragDropSource()) {
+			ImGui::SetDragDropPayload("GameObject", &o, sizeof(GameObject*));
+			ImGui::Text("GameObject: %s", o->name);
+			ImGui::EndDragDropSource();
+		}
 	if(op)
 	{
 		for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
@@ -126,14 +133,14 @@ void IGObjectInfo()
 		bool wannadel = 0;
 		if (ImGui::Button("Delete"))
 			wannadel = 1;
-		/*
+		
 		if (ImGui::Button("Set to be given"))
 			objtogive = selobj;
 		ImGui::SameLine();
 		if (ImGui::Button("Give it here!"))
 			if(objtogive)
 				GiveObject(objtogive, selobj);
-		*/
+		
 		if (ImGui::Button("Find in tree"))
 			findsel = true;
 		if (selobj->parent)
@@ -173,6 +180,7 @@ void IGObjectInfo()
 			CreateRotationZMatrix(&mz, rota.z);
 			selobj->matrix = mz * mx * my;
 		}
+		ImGui::Text("Num. references: %u", selobj->refcount);
 		if (ImGui::CollapsingHeader("DBL"))
 		{
 			ImGui::InputScalar("Flags", ImGuiDataType_U32, &selobj->dblflags);
@@ -189,7 +197,6 @@ void IGObjectInfo()
 				case 2:
 					ImGui::InputFloat("Float", &e->flt); break;
 				case 3:
-				case 8:
 				case 0xA:
 				case 0xB:
 				case 0xC:
@@ -213,8 +220,38 @@ void IGObjectInfo()
 				case 6:
 					ImGui::Separator(); break;
 				case 7:
-				case 9:
 					ImGui::Text("Data (%X): %u bytes", e->type, e->datsize); break;
+				case 8:
+					if (e->obj.valid())
+						ImGui::Text("Object: %s", e->obj->name);
+					else
+						ImGui::Text("Object: Invalid");
+					if (ImGui::BeginDragDropTarget())
+					{
+						if (const ImGuiPayload *pl = ImGui::AcceptDragDropPayload("GameObject"))
+						{
+							e->obj = *(GameObject**)pl->Data;
+						}
+						ImGui::EndDragDropTarget();
+					}
+					break;
+				case 9:
+					ImGui::Text("Objlist: %u objects", e->nobjs);
+					ImGui::ListBoxHeader("Objlist", ImVec2(0, 64));
+					for (int i = 0; i < e->nobjs; i++)
+					{
+						ImGui::Text("%s", e->objlist[i]->name);
+						if (ImGui::BeginDragDropTarget())
+						{
+							if (const ImGuiPayload *pl = ImGui::AcceptDragDropPayload("GameObject"))
+							{
+								e->objlist[i] = *(GameObject**)pl->Data;
+							}
+							ImGui::EndDragDropTarget();
+						}
+					}
+					ImGui::ListBoxFooter();
+					break;
 				case 0x3F:
 					ImGui::Text("End"); break;
 				default:
@@ -253,8 +290,12 @@ void IGObjectInfo()
 		}
 		if (wannadel)
 		{
-			RemoveObject(selobj);
-			selobj = 0;
+			if (selobj->refcount > 0)
+				warn("It's not possible to remove an object that is referenced by other objects!");
+			else {
+				RemoveObject(selobj);
+				selobj = 0;
+			}
 		}
 	}
 	ImGui::End();
@@ -330,6 +371,9 @@ void IGTest()
 		ImGui::Image(t->second, ImVec2(256, 256));
 	else
 		ImGui::Text("Texture %u not found.", curtexid);
+
+//#include "unused/moredebug.inc"
+
 	ImGui::End();
 }
 
