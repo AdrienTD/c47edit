@@ -120,6 +120,7 @@ GameObject *objtogive = 0;
 
 void IGObjectInfo()
 {
+	GameObject *nextobjtosel = 0;
 	ImGui::SetNextWindowPos(ImVec2(1005, 3), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSize(ImVec2(270, 445), ImGuiCond_FirstUseEver);
 	ImGui::Begin("Object information");
@@ -222,8 +223,11 @@ void IGObjectInfo()
 				case 7:
 					ImGui::Text("Data (%X): %u bytes", e->type, e->datsize); break;
 				case 8:
-					if (e->obj.valid())
+					if (e->obj.valid()) {
 						ImGui::Text("Object: %s", e->obj->name);
+						if (ImGui::IsItemClicked())
+							nextobjtosel = e->obj.get();
+					}
 					else
 						ImGui::Text("Object: Invalid");
 					if (ImGui::BeginDragDropTarget())
@@ -241,6 +245,8 @@ void IGObjectInfo()
 					for (int i = 0; i < e->nobjs; i++)
 					{
 						ImGui::Text("%s", e->objlist[i]->name);
+						if (ImGui::IsItemClicked())
+							nextobjtosel = e->objlist[i].get();
 						if (ImGui::BeginDragDropTarget())
 						{
 							if (const ImGuiPayload *pl = ImGui::AcceptDragDropPayload("GameObject"))
@@ -299,6 +305,7 @@ void IGObjectInfo()
 		}
 	}
 	ImGui::End();
+	if (nextobjtosel) selobj = nextobjtosel;
 }
 
 void IGMain()
