@@ -166,7 +166,7 @@ void LoadSceneSPK(char *fn)
 		float mc[4];
 		int32_t *mtxoff  = (int32_t*)pmtx->maindata + p[3] * 4;
 		for (int i = 0; i < 4; i++)
-			mc[i] = (float)mtxoff[i] / 1073741824.0f; // divide by 2^30
+			mc[i] = (float)((double)mtxoff[i] / 1073741824.0); // divide by 2^30
 		Vector3 rv[3];
 		rv[2] = Vector3(mc[0], mc[1], 1 - mc[0]*mc[0] - mc[1]*mc[1]);
 		rv[1] = Vector3(mc[2], mc[3], 1 - mc[2]*mc[2] - mc[3]*mc[3]);
@@ -276,23 +276,24 @@ uint sbtell(std::stringbuf *sb);
 uint moc_objcount;
 std::map<GameObject*, uint32_t> objidmap;
 
+std::map<std::array<float, 3>, uint32_t> g_sav_posmap;
+std::map<std::array<uint, 4>, uint32_t> g_sav_mtxmap;
+std::map<std::string, uint32_t> g_sav_nammap;
+std::unordered_map<std::pair<uint32_t, std::string>, uint32_t, DBLHash> g_sav_dblmap;
+
 void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 {
-	std::map<std::array<float, 3>, uint32_t> posmap;
-	std::map<std::array<uint, 4>, uint32_t> mtxmap;
-	std::unordered_map<std::pair<uint32_t, std::string>, uint32_t, DBLHash> dblmap;
-
 	moc_objcount++;
 	memset(c, 0, sizeof(Chunk));
 
 	uint posoff;
 	std::array<float, 3> cpos = { o->position.x, o->position.y, o->position.z };
-	auto piter = posmap.find(cpos);
-	if (piter == posmap.end())
+	auto piter = g_sav_posmap.find(cpos);
+	if (piter == g_sav_posmap.end())
 	{
 		posoff = posbuf.size() * 12;
 		posbuf.push_back(cpos);
-		posmap[cpos] = posoff;
+		g_sav_posmap[cpos] = posoff;
 	}
 	else
 		posoff = piter->second;
@@ -305,12 +306,12 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	cmtx[2] = (uint32_t)(o->matrix._21 * 1073741824.0f) & ~1;
 	cmtx[3] = o->matrix._22 * 1073741824.0f;
 	if (o->matrix._23 < 0) cmtx[2] |= 1;
-	auto miter = mtxmap.find(cmtx);
-	if (miter == mtxmap.end())
+	auto miter = g_sav_mtxmap.find(cmtx);
+	if (miter == g_sav_mtxmap.end())
 	{
 		mtxoff = mtxbuf.size();
 		mtxbuf.push_back(cmtx);
-		mtxmap[cmtx] = mtxoff;
+		g_sav_mtxmap[cmtx] = mtxoff;
 	}
 	else
 		mtxoff = miter->second;
@@ -361,11 +362,11 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	}
 	uint dbloff;
 	std::pair<uint32_t, std::string> cdbl(o->dblflags, dblsav.str());
-	auto diter = dblmap.find(cdbl);
-	if (diter == dblmap.end())
+	auto diter = g_sav_dblmap.find(cdbl);
+	if (diter == g_sav_dblmap.end())
 	{
 		dbloff = sbtell(&dblbuf);
-		dblmap.insert(std::make_pair(cdbl, dbloff)); //dblmap[cdbl] = dbloff;
+		g_sav_dblmap.insert(std::make_pair(cdbl, dbloff)); //dblmap[cdbl] = dbloff;
 
 		uint32_t siz = sbtell(&dblsav) + 4;
 		dblbuf.sputn((char*)&siz, 3);
@@ -376,9 +377,17 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		dbloff = diter->second;
 
 	uint heaoff = sbtell(&heabuf);
-	uint namoff = sbtell(&nambuf);
-		
-	nambuf.sputn(o->name, strlen(o->name) + 1);
+
+	auto itNammap = g_sav_nammap.find(o->name);
+	uint namoff = 0;
+	if (itNammap == g_sav_nammap.end()) {
+		namoff = sbtell(&nambuf);
+		g_sav_nammap.insert({ o->name, namoff });
+		nambuf.sputn(o->name, strlen(o->name) + 1);
+	}
+	else
+		namoff = itNammap->second;
+
 	if(true)
 	{
 		heabuf.sputn((char*)&dbloff, 4);
@@ -444,6 +453,11 @@ void ModifySPK()
 	z(cliprootobj);
 	z(rootobj);
 
+	g_sav_posmap.clear();
+	g_sav_mtxmap.clear();
+	g_sav_nammap.clear();
+	g_sav_dblmap.clear();
+
 	auto f = [](Chunk *c, GameObject *o) {
 		c->num_subchunks = o->subobj.size();
 		c->subchunks = new Chunk[c->num_subchunks];
@@ -495,6 +509,30 @@ void ModifySPK()
 	ndbl->maindata = malloc(dblstr.size());
 	memcpy(ndbl->maindata, dblstr.data(), dblstr.size());
 	ndbl->maindata_size = dblstr.size();
+
+	// Chunk comparison
+	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
+		printf("----- Comparison of old and new %s -----\n", name);
+		if (chka->tag != chkb->tag)
+			printf("Different tag\n");
+		if (chka->num_datas != chkb->num_datas)
+			printf("Different num_datas: %u -> %u\n", chka->num_datas, chkb->num_datas);
+		if (chka->maindata_size != chkb->maindata_size)
+			printf("Different maindata_size: %u -> %u\n", chka->maindata_size, chkb->maindata_size);
+		else if(chka->maindata_size) {
+			uint32_t mdcmp = 0;
+			for (size_t i = 0; i < (size_t)chka->maindata_size; i++)
+				if (((char*)chka->maindata)[i] != ((char*)chkb->maindata)[i])
+					mdcmp += 1;
+			if (mdcmp != 0)
+				printf("Different maindata content: %u bytes are different\n", mdcmp);
+		}
+	};
+	chkcmp(phea, nhea, "PHEA");
+	chkcmp(pnam, nnam, "PNAM");
+	chkcmp(ppos, npos, "PPOS");
+	chkcmp(pmtx, nmtx, "PMTX");
+	chkcmp(pdbl, ndbl, "PDBL");
 
 	*phea = *nhea;
 	*pnam = *nnam;

@@ -506,8 +506,8 @@ GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObje
 	return 0;
 }
 
-//int main(int argc, char* argv[])
-int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode)
+int main(int argc, char* argv[])
+//int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode)
 {
 	//SetProcessDPIAware();
 
