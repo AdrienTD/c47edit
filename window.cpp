@@ -9,7 +9,7 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
 
-char *apptitle = "c47edit", *appclassname = "AG_c47editWinClass";
+const char *apptitle = "c47edit", *appclassname = "AG_c47editWinClass";
 HWND hWindow;
 uint screen_width = 1280, screen_height = 660;
 bool win_minimized = false;

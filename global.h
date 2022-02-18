@@ -20,8 +20,8 @@
 
 typedef unsigned int uint;
 
-void ferr(char *str);
-void warn(char *str);
+void ferr(const char *str);
+void warn(const char *str);
 
 #include "vecmat.h"
 #include "chunk.h"

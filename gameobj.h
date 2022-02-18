@@ -62,7 +62,7 @@ struct GameObject
 {
 	uint state;
 	uint pdbloff, pexcoff;
-	char *name;
+	std::string name;
 	Matrix matrix;
 	Vector3 position;
 	uint type, flags;
@@ -82,13 +82,13 @@ struct GameObject
 
 	uint refcount;
 
-	GameObject(char *nName = "Unnamed", int nType = 0) : name(strdup(nName)), type(nType),
+	GameObject(const char *nName = "Unnamed", int nType = 0) : name(nName), type(nType),
 		pdbloff(0), pexcoff(0), flags(0), mesh(0), color(0), position(0,0,0), light(0), state(0), parent(0), root(0),
 		refcount(0)
 	{
 		CreateIdentityMatrix(&matrix);
 	}
-	~GameObject() { free(name); }
+	~GameObject() = default;
 };
 
 inline void goref::deref() { if (obj) { obj->refcount--; obj = 0; } }
@@ -96,14 +96,14 @@ inline void goref::set(GameObject * n) { deref(); obj = n; if (obj) obj->refcoun
 
 extern Chunk *spkchk, *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc;
 extern GameObject *rootobj, *cliprootobj, *superroot;
-extern char *lastspkfn;
+extern std::string lastspkfn;
 extern void *zipmem;
 extern uint zipsize;
 
-char* GetObjTypeString(uint ot);
-void LoadSceneSPK(char *fn);
+const char* GetObjTypeString(uint ot);
+void LoadSceneSPK(const char *fn);
 void ModifySPK();
-void SaveSceneSPK(char *fn);
+void SaveSceneSPK(const char *fn);
 void RemoveObject(GameObject *o);
 GameObject* DuplicateObject(GameObject *o, GameObject *parent = rootobj);
 void GiveObject(GameObject *o, GameObject *t);

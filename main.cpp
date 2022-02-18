@@ -31,14 +31,14 @@ Vector3 bestpickintersectionpnt(0, 0, 0);
 
 extern HWND hWindow;
 
-void ferr(char *str)
+void ferr(const char *str)
 {
 	//printf("Error: %s\n", str);
 	MessageBox(hWindow, str, "Fatal Error", 16);
 	exit(-1);
 }
 
-void warn(char *str)
+void warn(const char *str)
 {
 	MessageBox(hWindow, str, "Warning", 48);
 }
@@ -66,7 +66,7 @@ void IGOTNode(GameObject *o)
 		colorpushed = 1;
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 1, 0, 1));
 	}
-	op = ImGui::TreeNodeEx(o, (o->subobj.empty() ? ImGuiTreeNodeFlags_Leaf : 0) | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ((o == selobj) ? ImGuiTreeNodeFlags_Selected : 0), "%s(0x%X)::%s", GetObjTypeString(o->type), o->type, o->name);
+	op = ImGui::TreeNodeEx(o, (o->subobj.empty() ? ImGuiTreeNodeFlags_Leaf : 0) | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ((o == selobj) ? ImGuiTreeNodeFlags_Selected : 0), "%s(0x%X)::%s", GetObjTypeString(o->type), o->type, o->name.c_str());
 	if (colorpushed)
 		ImGui::PopStyleColor();
 	if (findsel)
@@ -85,7 +85,7 @@ void IGOTNode(GameObject *o)
 	if (ImGui::IsItemActive())
 		if (ImGui::BeginDragDropSource()) {
 			ImGui::SetDragDropPayload("GameObject", &o, sizeof(GameObject*));
-			ImGui::Text("GameObject: %s", o->name);
+			ImGui::Text("GameObject: %s", o->name.c_str());
 			ImGui::EndDragDropSource();
 		}
 	if(op)
@@ -152,11 +152,10 @@ void IGObjectInfo()
 		}
 		ImGui::Separator();
 
-		char tb[256]; tb[255] = 0; strcpy(tb, selobj->name);
-		if (ImGui::InputText("Name", tb, 255))
-		{
-			free(selobj->name);
-			selobj->name = strdup(tb);
+		char tb[256];
+		strcpy_s(tb, selobj->name.c_str());
+		if (ImGui::InputText("Name", tb, 255)) {
+			selobj->name = tb;
 		}
 		ImGui::InputScalar("State", ImGuiDataType_U32, &selobj->state);
 		ImGui::InputScalar("Type", ImGuiDataType_U32, &selobj->type);
@@ -224,7 +223,7 @@ void IGObjectInfo()
 					ImGui::Text("Data (%X): %u bytes", e->type, e->datsize); break;
 				case 8:
 					if (e->obj.valid()) {
-						ImGui::Text("Object: %s", e->obj->name);
+						ImGui::Text("Object: %s", e->obj->name.c_str());
 						if (ImGui::IsItemClicked())
 							nextobjtosel = e->obj.get();
 					}
@@ -244,7 +243,7 @@ void IGObjectInfo()
 					ImGui::ListBoxHeader("Objlist", ImVec2(0, 64));
 					for (int i = 0; i < e->nobjs; i++)
 					{
-						ImGui::Text("%s", e->objlist[i]->name);
+						ImGui::Text("%s", e->objlist[i]->name.c_str());
 						if (ImGui::IsItemClicked())
 							nextobjtosel = e->objlist[i].get();
 						if (ImGui::BeginDragDropTarget())
@@ -317,7 +316,7 @@ void IGMain()
 	if (ImGui::Button("Save Scene"))
 	{
 		char newfn[300]; newfn[299] = 0;
-		_splitpath(lastspkfn, 0, 0, newfn, 0);
+		_splitpath(lastspkfn.c_str(), 0, 0, newfn, 0);
 		strcat(newfn, ".zip");
 		char *s = strrchr(newfn, '@');
 		if (s)
@@ -384,9 +383,9 @@ void IGTest()
 	ImGui::End();
 }
 
-GameObject* FindObjectNamed(char *name, GameObject *sup = rootobj)
+GameObject* FindObjectNamed(const char *name, GameObject *sup = rootobj)
 {
-	if (!strcmp(sup->name, name))
+	if (!strcmp(sup->name.c_str(), name))
 		return sup;
 	else
 		for (auto e = sup->subobj.begin(); e != sup->subobj.end(); e++) {

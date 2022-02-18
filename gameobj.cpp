@@ -11,7 +11,7 @@
 #include <map>
 #include <unordered_map>
 
-char *objtypenames[] = {
+const char *objtypenames[] = {
 	// 0x00
 	"Z0", "ZGROUP", "ZSTDOBJ", "ZCAMERA",
 	"?", "?", "?", "?",
@@ -58,17 +58,17 @@ char *objtypenames[] = {
 Chunk *spkchk;
 Chunk *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc, *pdbl;
 GameObject *rootobj, *cliprootobj, *superroot;
-char *lastspkfn = 0;
+std::string lastspkfn;
 void *zipmem = 0; uint zipsize = 0;
 
-char *GetObjTypeString(uint ot)
+const char *GetObjTypeString(uint ot)
 {
-	char *otname = "?";
+	const char *otname = "?";
 	if (ot < 0x70) otname = objtypenames[ot];
 	return otname;
 }
 
-void LoadSceneSPK(char *fn)
+void LoadSceneSPK(const char *fn)
 {
 	FILE *zipfile = fopen(fn, "rb");
 	if (!zipfile) ferr("Could not open the ZIP file.");
@@ -90,7 +90,7 @@ void LoadSceneSPK(char *fn)
 	mz_zip_reader_end(&zip);
 	LoadChunk(spkchk, spkmem);
 	free(spkmem);
-	lastspkfn = strdup(fn);
+	lastspkfn = fn;
 
 	prot = spkchk->findSubchunk('TORP');
 	pclp = spkchk->findSubchunk('PLCP');
@@ -150,7 +150,7 @@ void LoadSceneSPK(char *fn)
 		uint pheaoff = c->tag & 0xFFFFFF;
 		uint *p = (uint*)((char*)phea->maindata + pheaoff);
 		uint ot = *(unsigned short*)(&p[5]);
-		char *otname = GetObjTypeString(ot);
+		const char *otname = GetObjTypeString(ot);
 		char *objname = (char*)pnam->maindata + p[2];
 
 		GameObject *o = chkobjmap[c];
@@ -383,7 +383,7 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	if (itNammap == g_sav_nammap.end()) {
 		namoff = sbtell(&nambuf);
 		g_sav_nammap.insert({ o->name, namoff });
-		nambuf.sputn(o->name, strlen(o->name) + 1);
+		nambuf.sputn(o->name.data(), o->name.size() + 1);
 	}
 	else
 		namoff = itNammap->second;
@@ -545,7 +545,7 @@ void ModifySPK()
 	objidmap.clear();
 }
 
-void SaveSceneSPK(char *fn)
+void SaveSceneSPK(const char *fn)
 {
 	mz_zip_archive inzip, outzip;
 	mz_zip_zero_struct(&inzip);
@@ -614,7 +614,7 @@ GameObject* DuplicateObject(GameObject *o, GameObject *parent)
 	if (!o->parent) return 0;
 	GameObject *d = new GameObject;
 	*d = *o;
-	d->name = strdup(o->name);
+	d->name = o->name;
 	
 	d->dbl.clear();
 	for (auto e = o->dbl.begin(); e != o->dbl.end(); e++)
