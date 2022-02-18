@@ -3,7 +3,7 @@
 // Licensed under the GPL3+.
 // See LICENSE file for more details.
 
-#include "global.h"
+#include "chunk.h"
 #include <sstream>
 #include <functional>
 #include <map>

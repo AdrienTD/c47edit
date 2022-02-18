@@ -3,8 +3,11 @@
 // Licensed under the GPL3+.
 // See LICENSE file for more details.
 
+#include "window.h"
 #include "global.h"
 #include "video.h"
+
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"

@@ -3,11 +3,9 @@
 // Licensed under the GPL3+.
 // See LICENSE file for more details.
 
-/*#include <stdio.h>
-#include <math.h>
-#include <string.h>
-#include "vecmat.h"*/
-#include "global.h"
+#include "vecmat.h"
+#include <cmath>
+#include <memory>
 
 #define determinant33(a, b, c, d, e, f, g, h, i) ((a)*(e)*(i) + (b)*(f)*(g) + (c)*(d)*(h) - (g)*(e)*(c) - (h)*(f)*(a) - (i)*(d)*(b))
 

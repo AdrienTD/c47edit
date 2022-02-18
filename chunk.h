@@ -3,6 +3,8 @@
 // Licensed under the GPL3+.
 // See LICENSE file for more details.
 
+#pragma once
+
 #include <cstdint>
 
 struct Chunk

@@ -3,6 +3,10 @@
 // Licensed under the GPL3+.
 // See LICENSE file for more details.
 
+#pragma once // will replace soon with something more epic ;)
+
+#include <cmath>
+
 struct Matrix;
 struct Vector3;
 
@@ -83,12 +87,12 @@ struct Vector3
 	bool operator==(Vector3 a) {return (x==a.x) && (y==a.y) && (z==a.z);}
 	bool operator!=(Vector3 a) {return !( (x==a.x) && (y==a.y) && (z==a.z) );}
 
-	void print() {printf("(%f, %f, %f)\n", x, y, z);}
-	float len2xy() {return sqrt(x*x + y*y);}
+	//void print() {printf("(%f, %f, %f)\n", x, y, z);}
+	float len2xy() {return std::sqrt(x*x + y*y);}
 	float sqlen2xy() {return x*x + y*y;}
-	float len2xz() {return sqrt(x*x + z*z);}
+	float len2xz() {return std::sqrt(x*x + z*z);}
 	float sqlen2xz() {return x*x + z*z;}
-	float len3() {return sqrt(x*x + y*y + z*z);}
+	float len3() {return std::sqrt(x*x + y*y + z*z);}
 	float sqlen3() {return x*x + y*y + z*z;}
 	Vector3 normal() { float l = len3(); if (l > 0) return Vector3(x / l, y / l, z / l); else return Vector3(0, 0, 0); }
 	Vector3 normal2xz() { float l = len2xz(); if (l > 0) return Vector3(x / l, 0, z / l); else return Vector3(0, 0, 0); }

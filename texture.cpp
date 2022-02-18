@@ -1,9 +1,16 @@
-#include "global.h"
-#include "miniz.h"
-#include <Windows.h>
-#include <GL/GL.h>
+#include "texture.h"
+
 #include <functional>
 #include <map>
+
+#include "global.h"
+#include "chunk.h"
+#include "gameobj.h"
+
+#include "miniz.h"
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <GL/GL.h>
 
 std::map<uint32_t, void*> texmap;
 

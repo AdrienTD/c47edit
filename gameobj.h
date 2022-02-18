@@ -6,8 +6,12 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
+
+#include "vecmat.h"
 
 struct GameObject;
+struct Chunk;
 
 class goref
 {

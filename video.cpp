@@ -3,8 +3,14 @@
 // Licensed under the GPL3+.
 // See LICENSE file for more details.
 
+#include "video.h"
 #include "global.h"
 #include "texture.h"
+#include "window.h"
+#include "gameobj.h"
+#include "chunk.h"
+
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <gl/GL.h>
 

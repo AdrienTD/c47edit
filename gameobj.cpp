@@ -3,13 +3,18 @@
 // Licensed under the GPL3+.
 // See LICENSE file for more details.
 
-#include "global.h"
-#include "miniz.h"
 #include <functional>
 #include <sstream>
 #include <array>
 #include <map>
 #include <unordered_map>
+
+#include "global.h"
+#include "gameobj.h"
+#include "chunk.h"
+#include "vecmat.h"
+
+#include "miniz.h"
 
 const char *objtypenames[] = {
 	// 0x00

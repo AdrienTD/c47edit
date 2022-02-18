@@ -3,15 +3,24 @@
 // Licensed under the GPL3+.
 // See LICENSE file for more details.
 
+#define _USE_MATH_DEFINES
+#include <cmath>
+#include <ctime>
+#include <functional>
+
+#include "chunk.h"
+#include "gameobj.h"
 #include "global.h"
-#include "video.h"
 #include "texture.h"
+#include "vecmat.h"
+#include "video.h"
+#include "window.h"
+
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <gl/GL.h>
 #include <gl/GLU.h>
 #include <commdlg.h>
-#include <ctime>
-#include <functional>
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_opengl2.h"
 #include "imgui/imgui_impl_win32.h"
