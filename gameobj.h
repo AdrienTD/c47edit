@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include <variant>
 #include <vector>
 
 #include "vecmat.h"
@@ -16,18 +17,19 @@ struct Chunk;
 class goref
 {
 private:
-	GameObject * obj;
+	GameObject * obj = nullptr;
 public:
 	GameObject * get() const { return obj; }
 
 	void deref();
 
-	void set(GameObject *n);
+	void set(GameObject* n);
 
 	bool valid() const { return obj; }
 
-	goref() : obj(0) {}
-	GameObject *operator->() { return obj; }
+	goref() : obj(nullptr) {}
+	goref(GameObject* obj) { set(obj); }
+	GameObject* operator->() { return obj; }
 	void operator=(GameObject* o) { set(o); }
 };
 
@@ -46,53 +48,38 @@ struct Light
 
 struct DBLEntry
 {
-	int type;
-	int flags;
-	union {
-		double dbl;
-		float flt;
-		uint32_t u32;
-		char *str;
-		struct {
-			size_t datsize;
-			void *datpnt;
-		};
-		goref obj;
-		struct {
-			uint32_t nobjs;
-			goref *objlist;
-		};
-	};
-	DBLEntry() : type(0), flags(0), datsize(0), datpnt(0) {}
+	int type = 0;
+	int flags = 0;
+	using VariantType = std::variant<std::monostate, double, float, uint32_t, std::string, std::vector<uint8_t>, goref, std::vector<goref>>;
+	VariantType value;
 };
 
 struct GameObject
 {
-	uint32_t state;
-	uint32_t pdbloff, pexcoff;
+	uint32_t state = 0;
+	uint32_t pdbloff = 0, pexcoff = 0;
 	std::string name;
 	Matrix matrix = Matrix::getIdentity();
-	Vector3 position;
-	uint32_t type, flags;
+	Vector3 position = Vector3(0.0f, 0.0f, 0.0f);
+	uint32_t type = 0, flags = 0;
 
 	std::vector<GameObject*> subobj;
-	GameObject *parent;
-	GameObject *root;
+	GameObject* parent = nullptr;
+	GameObject* root = nullptr;
 
 	// Mesh
-	Mesh *mesh;
-	uint32_t color;
+	Mesh* mesh = nullptr;
+	uint32_t color = 0;
 
-	Light *light;
+	Light *light = nullptr;
 
 	std::vector<DBLEntry> dbl;
-	uint32_t dblflags;
+	uint32_t dblflags = 0;
 
-	uint32_t refcount;
+	uint32_t refcount = 0;
 
-	GameObject(const char *nName = "Unnamed", int nType = 0) : name(nName), type(nType),
-		pdbloff(0), pexcoff(0), flags(0), mesh(0), color(0), position(0,0,0), light(0), state(0), parent(0), root(0),
-		refcount(0) {}
+	GameObject(const char *nName = "Unnamed", int nType = 0) : name(nName), type(nType) {}
+	GameObject(const GameObject& other) = default;
 	~GameObject() = default;
 };
 

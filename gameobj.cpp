@@ -211,34 +211,45 @@ void LoadSceneSPK(const char *fn)
 			switch (e.type)
 			{
 			case 1:
-				e.dbl = *(double*)dp; dp += 8; break;
+				e.value = *(double*)dp;
+				dp += 8;
+				break;
 			case 2:
-				e.flt = *(float*)dp; dp += 4; break;
+				e.value = *(float*)dp;
+				dp += 4;
+				break;
 			case 3:
 			case 0xA:
 			case 0xB:
 			case 0xC:
-				e.u32 = *(uint32_t*)dp; dp += 4; break;
+				e.value = *(uint32_t*)dp;
+				dp += 4;
+				break;
 			case 4:
 			case 5:
-				e.str = strdup(dp); while (*(dp++)); break;
+				e.value.emplace<std::string>(dp);
+				while (*(dp++));
+				break;
 			case 6:
 				break;
-			case 7:
-				e.datsize = *(uint32_t*)dp - 4;
-				e.datpnt = malloc(e.datsize);
-				memcpy(e.datpnt, dp + 4, e.datsize);
+			case 7: {
+				auto datsize = *(uint32_t*)dp - 4;
+				e.value.emplace<std::vector<uint8_t>>(dp + 4, dp + 4 + datsize);
 				dp += *(uint32_t*)dp;
 				break;
+			}
 			case 8:
-				e.obj = idobjmap[*(uint32_t*)dp]; dp += 4; break;
-			case 9:
-				e.nobjs = (*(uint32_t*)dp - 4) / 4;
-				e.objlist = new goref[e.nobjs];
-				for (int i = 0; i < e.nobjs; i++)
-					e.objlist[i] = idobjmap[*(uint32_t*)(dp+4+4*i)];
+				e.value.emplace<goref>(idobjmap[*(uint32_t*)dp]);
+				dp += 4;
+				break;
+			case 9: {
+				uint32_t nobjs = (*(uint32_t*)dp - 4) / 4;
+				std::vector<goref>& objlist = e.value.emplace<std::vector<goref>>();
+				for (uint32_t i = 0; i < nobjs; i++)
+					objlist.emplace_back(idobjmap[*(uint32_t*)(dp+4+4*i)]);
 				dp += *(uint32_t*)dp;
 				break;
+			}
 			case 0x3F:
 				break;
 			default:
@@ -329,38 +340,45 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		switch (e->type)
 		{
 		case 1:
-			dblsav.sputn((char*)&e->dbl, 8); break;
+			dblsav.sputn((char*)&std::get<double>(e->value), 8); break;
 		case 2:
-			dblsav.sputn((char*)&e->flt, 4); break;
+			dblsav.sputn((char*)&std::get<float>(e->value), 4); break;
 		case 3:
 		case 0xA:
 		case 0xB:
 		case 0xC:
-			dblsav.sputn((char*)&e->u32, 4); break;
+			dblsav.sputn((char*)&std::get<uint32_t>(e->value), 4); break;
 		case 4:
-		case 5:
-			dblsav.sputn(e->str, strlen(e->str) + 1); break;
+		case 5: {
+			auto& str = std::get<std::string>(e->value);
+			dblsav.sputn(str.data(), str.size() + 1); break;
+		}
 		case 6:
 		case 0x3f:
 			break;
 		case 7:
 		{
-			uint32_t siz = e->datsize + 4;
+			auto& vec = std::get<std::vector<uint8_t>>(e->value);
+			uint32_t siz = (uint32_t)vec.size() + 4;
 			dblsav.sputn((char*)&siz, 4);
-			dblsav.sputn((char*)e->datpnt, e->datsize);
+			dblsav.sputn((char*)vec.data(), vec.size());
 			break;
 		}
 		case 8:
 		{
-			uint32_t x = objidmap[e->obj.get()];
+			auto& obj = std::get<goref>(e->value);
+			uint32_t x = objidmap[obj.get()];
 			dblsav.sputn((char*)&x, 4); break;
 		}
 		case 9:
 		{
-			uint32_t siz = e->nobjs * 4 + 4;
+			auto& vec = std::get<std::vector<goref>>(e->value);
+			uint32_t siz = (uint32_t)vec.size() * 4 + 4;
 			dblsav.sputn((char*)&siz, 4);
-			for (int i = 0; i < e->nobjs; i++)
-				dblsav.sputn((char*)&(objidmap[e->objlist[i].get()]), 4);
+			for (auto& obj : vec) {
+				uint32_t x = objidmap[obj.get()];
+				dblsav.sputn((char*)&x, 4);
+			}
 			break;
 		}
 		}
@@ -597,18 +615,16 @@ void RemoveObject(GameObject *o)
 	{
 		switch (e->type)
 		{
-		case 4:
-		case 5:
-			free(e->str); break;
-		case 7:
-			free(e->datpnt); break;
-		case 8:
-			e->obj.deref(); break;
-		case 9:
-			for (int i = 0; i < e->nobjs; i++)
-				e->objlist[i].deref();
-			delete[] e->objlist;
+		case 8: {
+			auto& obj = std::get<goref>(e->value);
+			obj.deref(); break;
+		}
+		case 9: {
+			auto& vec = std::get<std::vector<goref>>(e->value);
+			for (auto& obj : vec)
+				obj.deref();
 			break;
+		}
 		}
 	}
 	delete o;
@@ -617,42 +633,8 @@ void RemoveObject(GameObject *o)
 GameObject* DuplicateObject(GameObject *o, GameObject *parent)
 {
 	if (!o->parent) return 0;
-	GameObject *d = new GameObject;
-	*d = *o;
-	d->name = o->name;
+	GameObject *d = new GameObject(*o);
 	
-	d->dbl.clear();
-	for (auto e = o->dbl.begin(); e != o->dbl.end(); e++)
-	{
-		DBLEntry n;
-		n.type = e->type; n.flags = e->flags;
-		switch (n.type)
-		{
-		case 1:
-			n.dbl = e->dbl; break;
-		case 2:
-			n.flt = e->flt; break;
-		case 3: case 0xA: case 0xB: case 0xC:
-			n.u32 = e->u32; break;
-		case 4: case 5:
-			n.str = strdup(e->str); break;
-		case 7:
-			n.datsize = e->datsize;
-			n.datpnt = malloc(n.datsize);
-			memcpy(n.datpnt, e->datpnt, n.datsize);
-			break;
-		case 8:
-			n.obj = e->obj.get(); break;
-		case 9:
-			n.nobjs = e->nobjs;
-			n.objlist = new goref[n.nobjs];
-			for (int i = 0; i < n.nobjs; i++)
-				n.objlist[i] = e->objlist[i].get();
-			break;
-		}
-		d->dbl.push_back(*e);
-	}
-
 	d->subobj.clear();
 	parent->subobj.push_back(d);
 	for (int i = 0; i < o->subobj.size(); i++)

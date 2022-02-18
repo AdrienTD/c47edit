@@ -201,39 +201,38 @@ void IGObjectInfo()
 				switch (e->type)
 				{
 				case 1:
-					ImGui::InputDouble("Double", &e->dbl); break;
+					ImGui::InputDouble("Double", &std::get<double>(e->value)); break;
 				case 2:
-					ImGui::InputFloat("Float", &e->flt); break;
+					ImGui::InputFloat("Float", &std::get<float>(e->value)); break;
 				case 3:
 				case 0xA:
 				case 0xB:
 				case 0xC:
 				{
 					char sb[10];
-					sprintf(sb, "Int %X", e->type);
-					ImGui::InputInt(sb, (int*)&e->u32); break;
+					sprintf_s(sb, "Int %X", e->type);
+					ImGui::InputInt(sb, (int*)&std::get<uint32_t>(e->value)); break;
 				}
 				case 4:
 				case 5:
 				{
 					char sb[256];
-					strncpy(sb, e->str, 255); sb[255] = 0;
-					if (ImGui::InputText((e->type==5)?"Filename":"String", sb, 256))
-					{
-						free(e->str);
-						e->str = strdup(sb);
+					auto& str = std::get<std::string>(e->value);
+					strcpy_s(sb, str.c_str());
+					if (ImGui::InputText((e->type==5)?"Filename":"String", sb, 256)) {
+						str = sb;
 					}
 					break;
 				}
 				case 6:
 					ImGui::Separator(); break;
 				case 7:
-					ImGui::Text("Data (%X): %u bytes", e->type, e->datsize); break;
+					ImGui::Text("Data (%X): %zu bytes", e->type, std::get<std::vector<uint8_t>>(e->value).size()); break;
 				case 8:
-					if (e->obj.valid()) {
-						ImGui::Text("Object: %s", e->obj->name.c_str());
+					if (auto& obj = std::get<goref>(e->value); obj.valid()) {
+						ImGui::Text("Object: %s", obj->name.c_str());
 						if (ImGui::IsItemClicked())
-							nextobjtosel = e->obj.get();
+							nextobjtosel = obj.get();
 					}
 					else
 						ImGui::Text("Object: Invalid");
@@ -241,30 +240,32 @@ void IGObjectInfo()
 					{
 						if (const ImGuiPayload *pl = ImGui::AcceptDragDropPayload("GameObject"))
 						{
-							e->obj = *(GameObject**)pl->Data;
+							e->value.emplace<goref>(*(GameObject**)pl->Data);
 						}
 						ImGui::EndDragDropTarget();
 					}
 					break;
-				case 9:
-					ImGui::Text("Objlist: %u objects", e->nobjs);
+				case 9: {
+					auto& vec = std::get<std::vector<goref>>(e->value);
+					ImGui::Text("Objlist: %zu objects", vec.size());
 					ImGui::ListBoxHeader("Objlist", ImVec2(0, 64));
-					for (int i = 0; i < e->nobjs; i++)
+					for (auto& obj : vec)
 					{
-						ImGui::Text("%s", e->objlist[i]->name.c_str());
+						ImGui::Text("%s", obj->name.c_str());
 						if (ImGui::IsItemClicked())
-							nextobjtosel = e->objlist[i].get();
+							nextobjtosel = obj.get();
 						if (ImGui::BeginDragDropTarget())
 						{
 							if (const ImGuiPayload *pl = ImGui::AcceptDragDropPayload("GameObject"))
 							{
-								e->objlist[i] = *(GameObject**)pl->Data;
+								obj = *(GameObject**)pl->Data;
 							}
 							ImGui::EndDragDropTarget();
 						}
 					}
 					ImGui::ListBoxFooter();
 					break;
+				}
 				case 0x3F:
 					ImGui::Text("End"); break;
 				default:
