@@ -229,7 +229,7 @@ void IGObjectInfo()
 				case 7:
 					ImGui::Text("Data (%X): %zu bytes", e->type, std::get<std::vector<uint8_t>>(e->value).size()); break;
 				case 8:
-					if (auto& obj = std::get<goref>(e->value); obj.valid()) {
+					if (auto& obj = std::get<GORef>(e->value); obj.valid()) {
 						ImGui::Text("Object: %s", obj->name.c_str());
 						if (ImGui::IsItemClicked())
 							nextobjtosel = obj.get();
@@ -240,13 +240,13 @@ void IGObjectInfo()
 					{
 						if (const ImGuiPayload *pl = ImGui::AcceptDragDropPayload("GameObject"))
 						{
-							e->value.emplace<goref>(*(GameObject**)pl->Data);
+							e->value.emplace<GORef>(*(GameObject**)pl->Data);
 						}
 						ImGui::EndDragDropTarget();
 					}
 					break;
 				case 9: {
-					auto& vec = std::get<std::vector<goref>>(e->value);
+					auto& vec = std::get<std::vector<GORef>>(e->value);
 					ImGui::Text("Objlist: %zu objects", vec.size());
 					ImGui::ListBoxHeader("Objlist", ImVec2(0, 64));
 					for (auto& obj : vec)

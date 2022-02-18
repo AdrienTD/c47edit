@@ -14,23 +14,27 @@
 struct GameObject;
 struct Chunk;
 
-class goref
+class GORef
 {
 private:
-	GameObject * obj = nullptr;
+	GameObject * m_obj = nullptr;
 public:
-	GameObject * get() const { return obj; }
+	GameObject * get() const noexcept { return m_obj; }
+	bool valid() const noexcept { return m_obj; }
+	GameObject* operator->() const noexcept { return m_obj; }
+	explicit operator bool() const noexcept { return valid(); }
 
-	void deref();
+	void set(GameObject* obj) noexcept;
+	void deref() noexcept;
+	void operator=(const GORef& ref) noexcept { set(ref.m_obj); }
+	void operator=(GORef&& ref) noexcept { deref(); m_obj = ref.m_obj; ref.m_obj = nullptr; }
+	void operator=(GameObject* obj) noexcept { set(obj); }
 
-	void set(GameObject* n);
-
-	bool valid() const { return obj; }
-
-	goref() : obj(nullptr) {}
-	goref(GameObject* obj) { set(obj); }
-	GameObject* operator->() { return obj; }
-	void operator=(GameObject* o) { set(o); }
+	GORef() noexcept : m_obj(nullptr) {}
+	GORef(const GORef& ref) noexcept { set(ref.m_obj); }
+	GORef(GORef&& ref) noexcept { m_obj = ref.m_obj; ref.m_obj = nullptr; }
+	GORef(GameObject* obj) noexcept { set(obj); }
+	~GORef() noexcept { deref(); }
 };
 
 struct Mesh
@@ -50,7 +54,7 @@ struct DBLEntry
 {
 	int type = 0;
 	int flags = 0;
-	using VariantType = std::variant<std::monostate, double, float, uint32_t, std::string, std::vector<uint8_t>, goref, std::vector<goref>>;
+	using VariantType = std::variant<std::monostate, double, float, uint32_t, std::string, std::vector<uint8_t>, GORef, std::vector<GORef>>;
 	VariantType value;
 };
 
@@ -83,8 +87,8 @@ struct GameObject
 	~GameObject() = default;
 };
 
-inline void goref::deref() { if (obj) { obj->refcount--; obj = 0; } }
-inline void goref::set(GameObject * n) { deref(); obj = n; if (obj) obj->refcount++; }
+inline void GORef::deref() noexcept { if (m_obj) { m_obj->refcount--; m_obj = nullptr; } }
+inline void GORef::set(GameObject * obj) noexcept { deref(); m_obj = obj; if (m_obj) m_obj->refcount++; }
 
 extern Chunk *spkchk, *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc;
 extern GameObject *rootobj, *cliprootobj, *superroot;

@@ -204,7 +204,7 @@ void LoadSceneSPK(const char *fn)
 		char *dp = dpbeg + 4;
 		while (dp - dpbeg < ds)
 		{
-			DBLEntry e;
+			DBLEntry &e = o->dbl.emplace_back();
 			e.type = *dp & 0x3F;
 			e.flags = *dp & 0xC0;
 			dp++;
@@ -239,12 +239,12 @@ void LoadSceneSPK(const char *fn)
 				break;
 			}
 			case 8:
-				e.value.emplace<goref>(idobjmap[*(uint32_t*)dp]);
+				e.value.emplace<GORef>(idobjmap[*(uint32_t*)dp]);
 				dp += 4;
 				break;
 			case 9: {
 				uint32_t nobjs = (*(uint32_t*)dp - 4) / 4;
-				std::vector<goref>& objlist = e.value.emplace<std::vector<goref>>();
+				std::vector<GORef>& objlist = e.value.emplace<std::vector<GORef>>();
 				for (uint32_t i = 0; i < nobjs; i++)
 					objlist.emplace_back(idobjmap[*(uint32_t*)(dp+4+4*i)]);
 				dp += *(uint32_t*)dp;
@@ -255,7 +255,6 @@ void LoadSceneSPK(const char *fn)
 			default:
 				ferr("Unknown DBL entry type!");
 			}
-			o->dbl.push_back(e);
 		}
 
 		if (c->num_subchunks > 0)
@@ -366,13 +365,13 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		}
 		case 8:
 		{
-			auto& obj = std::get<goref>(e->value);
+			auto& obj = std::get<GORef>(e->value);
 			uint32_t x = objidmap[obj.get()];
 			dblsav.sputn((char*)&x, 4); break;
 		}
 		case 9:
 		{
-			auto& vec = std::get<std::vector<goref>>(e->value);
+			auto& vec = std::get<std::vector<GORef>>(e->value);
 			uint32_t siz = (uint32_t)vec.size() * 4 + 4;
 			dblsav.sputn((char*)&siz, 4);
 			for (auto& obj : vec) {
@@ -608,24 +607,8 @@ void RemoveObject(GameObject *o)
 	{
 		auto &st = o->parent->subobj;
 		auto it = std::find(o->parent->subobj.begin(), o->parent->subobj.end(), o);
-		if (it != o->parent->subobj.end())
-			o->parent->subobj.erase(it);
-	}
-	for (auto e = o->dbl.begin(); e != o->dbl.end(); e++)
-	{
-		switch (e->type)
-		{
-		case 8: {
-			auto& obj = std::get<goref>(e->value);
-			obj.deref(); break;
-		}
-		case 9: {
-			auto& vec = std::get<std::vector<goref>>(e->value);
-			for (auto& obj : vec)
-				obj.deref();
-			break;
-		}
-		}
+		assert(it != o->parent->subobj.end());
+		o->parent->subobj.erase(it);
 	}
 	delete o;
 }
@@ -635,7 +618,9 @@ GameObject* DuplicateObject(GameObject *o, GameObject *parent)
 	if (!o->parent) return 0;
 	GameObject *d = new GameObject(*o);
 	
+	d->refcount = 0;
 	d->subobj.clear();
+	d->parent = parent;
 	parent->subobj.push_back(d);
 	for (int i = 0; i < o->subobj.size(); i++)
 		DuplicateObject(o->subobj[i], d);
