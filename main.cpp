@@ -428,14 +428,14 @@ bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, int startvertex, 
 	uint16_t *bfac = (uint16_t*)pfac->maindata + startface;
 	float *bver = (float*)pver->maindata + startvertex;
 
-	Vector3 *pnts = new Vector3[numverts];
+	std::unique_ptr<Vector3[]> pnts = std::make_unique<Vector3[]>(numverts);
 	for (int i = 0; i < 3; i++)
 	{
 		Vector3 v(bver[bfac[i] * 3 / 2], bver[bfac[i] * 3 / 2 + 1], bver[bfac[i] * 3 / 2 + 2]);
 		pnts[i] = v.transform(*worldmtx);
 	}
 
-	Vector3 *edges = new Vector3[numverts];
+	std::unique_ptr<Vector3[]> edges = std::make_unique<Vector3[]>(numverts);
 	for (int i = 0; i < 2; i++)
 		edges[i] = pnts[i + 1] - pnts[i];
 
@@ -443,10 +443,10 @@ bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, int startvertex, 
 	float planeord = -planenorm.dot(pnts[0]);
 
 	float planenorm_dot_raydir = planenorm.dot(*raydir);
-	if (planenorm_dot_raydir >= 0) goto irifend;
+	if (planenorm_dot_raydir >= 0) return false;
 
 	float param = -(planenorm.dot(*raystart) + planeord) / planenorm_dot_raydir;
-	if (param < 0) goto irifend;
+	if (param < 0) return false;
 
 	Vector3 interpnt = *raystart + *raydir * param;
 
@@ -467,18 +467,11 @@ bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, int startvertex, 
 		Vector3 edgenorm = -planenorm.cross(edges[i]);
 		Vector3 ptoi = interpnt - pnts[i];
 		if (edgenorm.dot(ptoi) < 0)
-			goto irifend;
+			return false;
 	}
 
 	finalintersectpnt = interpnt;
-	delete[] pnts;
-	delete[] edges;
 	return true;
-
-irifend:
-	delete[] pnts;
-	delete[] edges;
-	return false;
 }
 
 GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObject *o, Matrix *worldmtx)

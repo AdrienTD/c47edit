@@ -66,6 +66,80 @@ void EndDrawing()
 	SwapBuffers(whdc); drawframes++;
 }
 
+// Prepared+Optimized Mesh for rendering
+struct ProMesh {
+	using IndexType = uint16_t;
+	struct Part {
+		std::vector<Vector3> vertices;
+		std::vector<std::pair<float, float>> texcoords;
+		std::vector<IndexType> indices;
+	};
+	std::map<uint16_t, Part> parts;
+
+	inline static std::map<Mesh*, ProMesh> g_proMeshes;
+
+	// Get a prepared mesh from the cache, make one if not already done
+	static ProMesh* getProMesh(Mesh* mesh) {
+		// If ProMesh found in the cache, return it
+		auto it = g_proMeshes.find(mesh);
+		if (it != g_proMeshes.end())
+			return &it->second;
+
+		// Else make one and return it:
+
+		static const float defUvs[8] = { 0,0, 0,1, 1,1, 1,0 };
+		static const uint32_t defColors[4] = { 0xFF0000FF, 0xFF00FF00, 0xFFFF0000, 0xFF0000FF };
+		static const int uvit[4] = { 0,1,2,3 };
+
+		ProMesh pro;
+		uint16_t *faces = (uint16_t*)pfac->maindata;
+		float *verts = (float*)pver->maindata + mesh->vertstart;
+		uint8_t *ftxpnt = (uint8_t*)pftx->maindata + mesh->ftxo - 1;
+		uint16_t *ftxFace = (uint16_t*)(ftxpnt + 12);
+		bool hasFtx = mesh->ftxo && !(mesh->ftxo & 0x80000000);
+
+		float *uvCoords = (float*)defUvs;
+		if (hasFtx)
+			uvCoords = (float*)puvc->maindata + *(uint32_t*)(ftxpnt);
+
+		for (uint32_t i = 0; i < mesh->numtris; i++)
+		{
+			uint16_t texid = hasFtx ? ftxFace[2] : 65535;
+			auto& part = pro.parts[texid];
+			IndexType prostart = (IndexType)part.vertices.size();
+			for (int j = 0; j < 3; j++) {
+				float* uu = uvCoords + uvit[j] * 2;
+				part.texcoords.push_back({ uu[0], uu[1] });
+				float *v = verts + faces[mesh->tristart + i * 3 + j] * 3 / 2;
+				part.vertices.push_back({ v[0], v[1], v[2] });
+			}
+			for (int j : {0, 1, 2})
+				part.indices.push_back((IndexType)(prostart + j));
+			ftxFace += 6;
+			uvCoords += 8; // Ignore 4th UV.
+		}
+		for (uint32_t i = 0; i < mesh->numquads; i++)
+		{
+			uint16_t texid = hasFtx ? ftxFace[2] : 65535;
+			auto& part = pro.parts[texid];
+			IndexType prostart = (IndexType)part.vertices.size();
+			for (int j = 0; j < 4; j++) {
+				float* uu = uvCoords + uvit[j] * 2;
+				part.texcoords.push_back({ uu[0], uu[1] });
+				float *v = verts + faces[mesh->quadstart + i * 4 + j] * 3 / 2;
+				part.vertices.push_back({ v[0], v[1], v[2] });
+			}
+			for (int j : {0, 1, 3, 3, 1, 2 })
+				part.indices.push_back((IndexType)(prostart + j));
+			ftxFace += 6;
+			uvCoords += 8;
+		}
+
+		g_proMeshes[mesh] = std::move(pro);
+		return &g_proMeshes[mesh];
+	}
+};
+
 void Mesh::draw()
 {
 	if (!rendertextures)
@@ -76,57 +150,20 @@ void Mesh::draw()
 	}
 	else
 	{
-		uint16_t *f = (uint16_t*)pfac->maindata;
-		float *v = (float*)pver->maindata + this->vertstart;
-		static const float defu[8] = { 0,0, 0,1, 1,1, 1,0 };
-		static const uint32_t c[4] = { 0xFF0000FF, 0xFF00FF00, 0xFFFF0000, 0xFF0000FF };
-		uint8_t *ftxpnt = (uint8_t*)pftx->maindata + this->ftxo - 1;
-		uint16_t *x = (uint16_t*)(ftxpnt + 12);
-		static const int uvit[4] = { 0,1,2,3 };
-
-		float *u = (float*)defu;
-		if (this->ftxo && !(this->ftxo & 0x80000000))
-			u = (float*)puvc->maindata + *(uint32_t*)(ftxpnt);
-
-		for (int i = 0; i < this->numtris; i++)
-		{
-			if (this->ftxo && !(this->ftxo & 0x80000000)) {
-				auto t = texmap.find(x[2]);
-				if (t != texmap.end())
-					glBindTexture(GL_TEXTURE_2D, (GLuint)t->second);
-				else
-					goto next_tri; // glBindTexture(GL_TEXTURE_2D, 0);
-			}
-			glBegin(GL_TRIANGLES);
-			for (int j = 0; j < 3; j++) {
-				glTexCoord2fv((float*)u + uvit[j] * 2);
-				//glColor4ubv((uint8_t*)(c + j));
-				glVertex3fv(v + f[this->tristart + i * 3 + j] * 3 / 2);
-			}
-			glEnd();
-		next_tri:
-			x += 6;
-			u += 8; // Ignore 4th UV.
-		}
-		for (int i = 0; i < this->numquads; i++)
-		{
-			if (this->ftxo && !(this->ftxo & 0x80000000)) {
-				auto t = texmap.find(x[2]);
-				if (t != texmap.end())
-					glBindTexture(GL_TEXTURE_2D, (GLuint)t->second);
-				else
-					goto next_quad; // glBindTexture(GL_TEXTURE_2D, 0);
-			}
-			glBegin(GL_TRIANGLE_FAN);
-			for (int j = 0; j < 4; j++) {
-				glTexCoord2fv((float*)u + uvit[j] * 2);
-				//glColor4ubv((uint8_t*)(c + j));
-				glVertex3fv(v + f[this->quadstart + i * 4 + j] * 3 / 2);
-			}
-			glEnd();
-		next_quad:
-			x += 6;
-			u += 8;
+		ProMesh* pro = ProMesh::getProMesh(this);
+		for (auto& [texid,part] : pro->parts) {
+			if (texid == 65535)
+				continue;
+			auto t = texmap.find(texid);
+			if (t != texmap.end())
+				glBindTexture(GL_TEXTURE_2D, (GLuint)t->second);
+			else if (false)
+				glBindTexture(GL_TEXTURE_2D, 0);
+			else
+				continue;
+			glVertexPointer(3, GL_FLOAT, 12, part.vertices.data());
+			glTexCoordPointer(2, GL_FLOAT, 8, part.texcoords.data());
+			glDrawElements(GL_TRIANGLES, part.indices.size(), GL_UNSIGNED_SHORT, part.indices.data());
 		}
 	}
 }
@@ -135,10 +172,12 @@ void BeginMeshDraw()
 {
 	if (!rendertextures) {
 		glEnableClientState(GL_VERTEX_ARRAY);
+		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 		glDisable(GL_TEXTURE_2D);
 	}
 	else {
-		glDisableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 		glEnable(GL_TEXTURE_2D);
 	}
 	glColor4f(1, 1, 1, 1);
