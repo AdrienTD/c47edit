@@ -71,7 +71,7 @@ struct GameObject
 	uint32_t state;
 	uint32_t pdbloff, pexcoff;
 	std::string name;
-	Matrix matrix;
+	Matrix matrix = Matrix::getIdentity();
 	Vector3 position;
 	uint32_t type, flags;
 
@@ -92,10 +92,7 @@ struct GameObject
 
 	GameObject(const char *nName = "Unnamed", int nType = 0) : name(nName), type(nType),
 		pdbloff(0), pexcoff(0), flags(0), mesh(0), color(0), position(0,0,0), light(0), state(0), parent(0), root(0),
-		refcount(0)
-	{
-		CreateIdentityMatrix(&matrix);
-	}
+		refcount(0) {}
 	~GameObject() = default;
 };
 

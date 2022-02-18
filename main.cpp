@@ -179,14 +179,13 @@ void IGObjectInfo()
 			ImGui::PopID();
 		}*/
 		Vector3 rota = GetYXZRotVecFromMatrix(&selobj->matrix);
-		rota *= 180.0f * M_1_PI;
+		rota *= 180.0f * (float)M_1_PI;
 		if (ImGui::DragFloat3("Orientation", &rota.x))
 		{
-			rota *= M_PI / 180.0f;
-			Matrix my, mx, mz;
-			CreateRotationYMatrix(&my, rota.y);
-			CreateRotationXMatrix(&mx, rota.x);
-			CreateRotationZMatrix(&mz, rota.z);
+			rota *= (float)M_PI / 180.0f;
+			Matrix my = Matrix::getRotationYMatrix(rota.y);
+			Matrix mx = Matrix::getRotationXMatrix(rota.x);
+			Matrix mz = Matrix::getRotationZMatrix(rota.z);
 			selobj->matrix = mz * mx * my;
 		}
 		ImGui::Text("Num. references: %u", selobj->refcount);
@@ -394,7 +393,7 @@ void IGTest()
 
 GameObject* FindObjectNamed(const char *name, GameObject *sup = rootobj)
 {
-	if (!strcmp(sup->name.c_str(), name))
+	if (sup->name == name)
 		return sup;
 	else
 		for (auto e = sup->subobj.begin(); e != sup->subobj.end(); e++) {
@@ -432,7 +431,7 @@ bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, int startvertex, 
 	for (int i = 0; i < 3; i++)
 	{
 		Vector3 v(bver[bfac[i] * 3 / 2], bver[bfac[i] * 3 / 2 + 1], bver[bfac[i] * 3 / 2 + 2]);
-		TransformVector3(&pnts[i], &v, worldmtx);
+		pnts[i] = v.transform(*worldmtx);
 	}
 
 	Vector3 *edges = new Vector3[numverts];
@@ -453,7 +452,7 @@ bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, int startvertex, 
 	for (int i = 3; i < numverts; i++)
 	{
 		Vector3 v(bver[bfac[i] * 3 / 2], bver[bfac[i] * 3 / 2 + 1], bver[bfac[i] * 3 / 2 + 2]);
-		TransformVector3(&pnts[i], &v, worldmtx);
+		pnts[i] = v.transform(*worldmtx);
 	}
 
 	for (int i = 2; i < numverts - 1; i++)
@@ -547,14 +546,14 @@ int main(int argc, char* argv[])
 			Sleep(100);
 		else
 		{
-			Matrix m1, m2, crm; Vector3 cd(0, 0, 1), ncd;
-			CreateRotationXMatrix(&m1, camori.x);
-			CreateRotationYMatrix(&m2, camori.y);
-			MultiplyMatrices(&crm, &m1, &m2);
+			Vector3 cd(0, 0, 1), ncd;
+			Matrix m1 = Matrix::getRotationXMatrix(camori.x);
+			Matrix m2 = Matrix::getRotationYMatrix(camori.y);
+			Matrix crm = m1 * m2; // order?
 			//CreateRotationYXZMatrix(&crm, camori.y, camori.x, 0);
-			TransformVector3(&ncd, &cd, &crm);
+			ncd = cd.transform(crm);
 			Vector3 crabnn;
-			Vec3Cross(&crabnn, &Vector3(0, 1, 0), &ncd);
+			crabnn = Vector3(0, 1, 0).cross(ncd);
 			Vector3 crab = crabnn.normal();
 
 			Vector3 cammove(0, 0, 0);
@@ -587,13 +586,12 @@ int main(int argc, char* argv[])
 			if (!io.WantCaptureMouse && viewobj)
 			if (io.MouseClicked[1] || (io.MouseClicked[0] && (io.KeyAlt || io.KeyCtrl)))
 			{
-				Matrix lookat, persp;
-				CreatePerspectiveMatrix(&persp, 60 * 3.141 / 180, screen_width / screen_height, 1, 10000);
-				CreateLookAtLHViewMatrix(&lookat, &campos, &(campos + ncd), &Vector3(0, 1, 0));
-				Matrix matView = lookat * persp;
+				//Matrix persp = Matrix::getLHPerspectiveMatrix(60.0f * (float)M_PI / 180.0f, (float)screen_width / (float)screen_height, 1.0f, 10000.0f);
+				//Matrix lookat = Matrix::getLHLookAtViewMatrix(campos, campos + ncd, Vector3(0.0f, 1.0f, 0.0f));
+				//Matrix matView = lookat * persp;
 
 				Vector3 raystart, raydir;
-				float ys = 1 / tan(60 * 3.141 / 180 / 2);
+				float ys = 1 / tan(60.0f * (float)M_PI / 180.0f / 2.0f);
 				float xs = ys / ((float)screen_width / (float)screen_height);
 				ImVec2 mspos = ImGui::GetMousePos();
 				float msx = mspos.x * 2.0f / (float)screen_width - 1.0f;
@@ -604,7 +602,7 @@ int main(int argc, char* argv[])
 
 				bestpickobj = 0;
 				bestpickdist = HUGE_VAL; //100000000000000000.0f;
-				Matrix mtx; CreateIdentityMatrix(&mtx);
+				Matrix mtx = Matrix::getIdentity();
 				IsRayIntersectingObject(&raystart, &raydir, viewobj, &mtx);
 				if (io.KeyAlt) {
 					if (bestpickobj && selobj)
@@ -635,10 +633,9 @@ int main(int argc, char* argv[])
 			glClearDepth(1.0f);
 			glMatrixMode(GL_PROJECTION);
 			glLoadIdentity();
-			Matrix lookat, persp;
-			CreatePerspectiveMatrix(&persp, 60 * 3.141 / 180, (float)screen_width / (float)screen_height, 1, 10000);
+			Matrix persp = Matrix::getLHPerspectiveMatrix(60.0f * (float)M_PI / 180.0f, (float)screen_width / (float)screen_height, 1.0f, 10000.0f);
 			glMultMatrixf(persp.v);
-			CreateLookAtLHViewMatrix(&lookat, &campos, &(campos + ncd), &Vector3(0, 1, 0));
+			Matrix lookat = Matrix::getLHLookAtViewMatrix(campos, campos + ncd, Vector3(0.0f, 1.0f, 0.0f));
 			glMultMatrixf(lookat.v);
 			glMatrixMode(GL_MODELVIEW);
 			glLoadIdentity();

@@ -4,223 +4,214 @@
 // See LICENSE file for more details.
 
 #include "vecmat.h"
-#include <cmath>
-#include <memory>
 
-#define determinant33(a, b, c, d, e, f, g, h, i) ((a)*(e)*(i) + (b)*(f)*(g) + (c)*(d)*(h) - (g)*(e)*(c) - (h)*(f)*(a) - (i)*(d)*(b))
-
-void Vec3Cross(Vector3 *r, Vector3 *a, Vector3 *b)
+Matrix Matrix::getTranslationMatrix(const Vector3 & translation)
 {
-	r->x = a->y * b->z - a->z * b->y;
-	r->y = a->z * b->x - a->x * b->z;
-	r->z = a->x * b->y - a->y * b->x;
+	Matrix m = getIdentity();
+	m._41 = translation.x;
+	m._42 = translation.y;
+	m._43 = translation.z;
+	return m;
 }
 
-float Vec3Dot(Vector3 *a, Vector3 *b)
+Matrix Matrix::getRotationXMatrix(float radians)
 {
-	return a->x * b->x + a->y * b->y + a->z * b->z;
+	Matrix m = getIdentity();
+	m.m[1][1] = m.m[2][2] = cos(radians);
+	m.m[1][2] = sin(radians);
+	m.m[2][1] = -m.m[1][2];
+	return m;
 }
 
-void NormalizeVector3(Vector3 *o, Vector3 *i)
+Matrix Matrix::getRotationYMatrix(float radians)
 {
-	float l = sqrt(i->x*i->x + i->y*i->y + i->z*i->z);
-	o->x = i->x / l;
-	o->y = i->y / l;
-	o->z = i->z / l;
+	Matrix m = getIdentity();
+	m.m[0][0] = m.m[2][2] = cos(radians);
+	m.m[2][0] = sin(radians);
+	m.m[0][2] = -m.m[2][0];
+	return m;
 }
 
-void CreateIdentityMatrix(Matrix *m)
+Matrix Matrix::getRotationZMatrix(float radians)
 {
-	for(int i = 0; i < 4; i++)
-	for(int j = 0; j < 4; j++)
-		m->m[i][j] = (i==j) ? 1 : 0;
+	Matrix m = getIdentity();
+	m.m[0][0] = m.m[1][1] = cos(radians);
+	m.m[0][1] = sin(radians);
+	m.m[1][0] = -m.m[0][1];
+	return m;
 }
 
-void CreateZeroMatrix(Matrix *m)
+Matrix Matrix::getScaleMatrix(const Vector3 & scale)
 {
-	memset(m, 0, 16 * sizeof(float));
+	Matrix m = getZeroMatrix();
+	m._11 = scale.x;
+	m._22 = scale.y;
+	m._33 = scale.z;
+	m._44 = 1.0f;
+	return m;
 }
 
-void CreateTranslationMatrix(Matrix *m, float x, float y, float z)
+Matrix Matrix::getLHOrthoMatrix(float w, float h, float zn, float zf)
 {
-	CreateIdentityMatrix(m);
-	m->m[3][0] = x;
-	m->m[3][1] = y;
-	m->m[3][2] = z;
+	Matrix m = getZeroMatrix();
+	m._11 = 2.0f / w;
+	m._22 = 2.0f / h;
+	m._33 = 1.0f / (zn - zf);
+	m._43 = zn / (zn - zf);
+	m._44 = 1.0f;
+	return m;
 }
 
-void CreateScaleMatrix(Matrix *m, float x, float y, float z)
+Matrix Matrix::getLHPerspectiveMatrix(float fovy, float aspect, float zn, float zf)
 {
-	CreateIdentityMatrix(m);
-	m->m[0][0] = x;
-	m->m[1][1] = y;
-	m->m[2][2] = z;
-}
-
-void CreateRotationXMatrix(Matrix *m, float a)
-{
-	CreateIdentityMatrix(m);
-	m->m[1][1] = m->m[2][2] = cos(a);
-	m->m[1][2] = sin(a);
-	m->m[2][1] = -m->m[1][2];
-}
-
-void CreateRotationYMatrix(Matrix *m, float a)
-{
-	CreateIdentityMatrix(m);
-	m->m[0][0] = m->m[2][2] = cos(a);
-	m->m[2][0] = sin(a);
-	m->m[0][2] = -m->m[2][0];
-}
-
-void CreateRotationZMatrix(Matrix *m, float a)
-{
-	CreateIdentityMatrix(m);
-	m->m[0][0] = m->m[1][1] = cos(a);
-	m->m[0][1] = sin(a);
-	m->m[1][0] = -m->m[0][1];
-}
-
-void MultiplyMatrices(Matrix *m, Matrix *a, Matrix *b)
-{
-	for(int i = 0; i < 4; i++)
-	for(int j = 0; j < 4; j++)
-	{
-		m->m[i][j] = a->m[i][0] * b->m[0][j] + a->m[i][1] * b->m[1][j]
-				+ a->m[i][2] * b->m[2][j] + a->m[i][3] * b->m[3][j];
-	}
-}
-
-void TransposeMatrix(Matrix *m, Matrix *a)
-{
-	for(int i = 0; i < 4; i++)
-	for(int j = 0; j < 4; j++)
-		m->m[i][j] = a->m[j][i];
-}
-
-void TransformVector3(Vector3 *v, Vector3 *a, Matrix *m)
-{
-	v->x = a->x * m->m[0][0] + a->y * m->m[1][0]
-		 + a->z * m->m[2][0] + m->m[3][0];
-	v->y = a->x * m->m[0][1] + a->y * m->m[1][1]
-		 + a->z * m->m[2][1] + m->m[3][1];
-	v->z = a->x * m->m[0][2] + a->y * m->m[1][2]
-		 + a->z * m->m[2][2] + m->m[3][2];
-}
-
-/*void TransformVector3to4(D3DXVECTOR4 *v, Vector3 *a, Matrix *m)
-{
-	v->x = a->x * m->m[0][0] + a->y * m->m[1][0]
-		 + a->z * m->m[2][0] + m->m[3][0];
-	v->y = a->x * m->m[0][1] + a->y * m->m[1][1]
-		 + a->z * m->m[2][1] + m->m[3][1];
-	v->z = a->x * m->m[0][2] + a->y * m->m[1][2]
-		 + a->z * m->m[2][2] + m->m[3][2];
-	v->w = a->x * m->m[0][3] + a->y * m->m[1][3]
-		 + a->z * m->m[2][3] + m->m[3][3];
-}*/
-
-void TransformNormal3(Vector3 *v, Vector3 *a, Matrix *m)
-{
-	v->x = a->x * m->m[0][0] + a->y * m->m[1][0]
-		 + a->z * m->m[2][0];
-	v->y = a->x * m->m[0][1] + a->y * m->m[1][1]
-		 + a->z * m->m[2][1];
-	v->z = a->x * m->m[0][2] + a->y * m->m[1][2]
-		 + a->z * m->m[2][2];
-}
-
-void CreatePerspectiveMatrix(Matrix *m, float fovy, float aspect, float zn, float zf)
-{
-	float ys = 1 / tan(fovy/2);
+	float ys = 1 / tan(fovy / 2);
 	float xs = ys / aspect;
-	CreateZeroMatrix(m);
-	m->m[0][0] = xs;
-	m->m[1][1] = ys;
-	m->m[2][2] = zf / (zf-zn);
-	m->m[2][3] = 1;
-	m->m[3][2] = -zn*zf / (zf-zn);
+	Matrix m = getZeroMatrix();
+	m.m[0][0] = xs;
+	m.m[1][1] = ys;
+	m.m[2][2] = zf / (zf - zn);
+	m.m[2][3] = 1;
+	m.m[3][2] = zn * zf / (zn - zf);
+	return m;
 }
 
-void CreateLookAtLHViewMatrix(Matrix *m, Vector3 *eye, Vector3 *at, Vector3 *up)
+Matrix Matrix::getLHLookAtViewMatrix(const Vector3 & eye, const Vector3 & at, const Vector3 & up)
 {
-	Vector3 ax, ay, az, t;
-	NormalizeVector3(&az, &(*at - *eye));
-	//ax = (*up).cross(az).normal();
-	Vec3Cross(&t, up, &az);
-	NormalizeVector3(&ax, &t);
-	//ay = az.cross(ax);
-	Vec3Cross(&ay, &az, &ax);
+	Vector3 ax, ay, az;
+	az = (at - eye).normal();
+	ax = up.cross(az).normal();
+	ay = az.cross(ax);
 
-	CreateIdentityMatrix(m);
-	m->m[0][0] = ax.x; m->m[0][1] = ay.x; m->m[0][2] = az.x;
-	m->m[1][0] = ax.y; m->m[1][1] = ay.y; m->m[1][2] = az.y;
-	m->m[2][0] = ax.z; m->m[2][1] = ay.z; m->m[2][2] = az.z;
-	m->m[3][0] = -Vec3Dot(&ax, eye); // -ax.dot(*eye);
-	m->m[3][1] = -Vec3Dot(&ay, eye); // -ay.dot(*eye);
-	m->m[3][2] = -Vec3Dot(&az, eye); // -az.dot(*eye);
+	Matrix m = getZeroMatrix();
+	m.m[0][0] = ax.x; m.m[0][1] = ay.x; m.m[0][2] = az.x;
+	m.m[1][0] = ax.y; m.m[1][1] = ay.y; m.m[1][2] = az.y;
+	m.m[2][0] = ax.z; m.m[2][1] = ay.z; m.m[2][2] = az.z;
+	m.m[3][0] = -ax.dot(eye);
+	m.m[3][1] = -ay.dot(eye);
+	m.m[3][2] = -az.dot(eye);
+	m.m[3][3] = 1.0f;
+	return m;
 }
 
-void CreateRotationYXZMatrix(Matrix *m, float y, float x, float z)
+Matrix Matrix::getRHOrthoMatrix(float w, float h, float zn, float zf)
 {
-	Matrix a, b, c;
-	CreateRotationYMatrix(&a, y);
-	CreateRotationXMatrix(&b, x);
-	MultiplyMatrices(&c, &a, &b);
-	CreateRotationZMatrix(&a, z);
-	MultiplyMatrices(m, &c, &a);
+	Matrix m = getZeroMatrix();
+	m._11 = 2.0f / w;
+	m._22 = 2.0f / h;
+	m._33 = 1.0f / (zn - zf);
+	m._43 = zn / (zn - zf);
+	m._44 = 1.0f;
+	return m;
 }
 
-void TransformCoord3(Vector3 *r, Vector3 *v, Matrix *m)
-	{float w = v->x * m->_14 + v->y * m->_24 + v->z * m->_34 + m->_44;
-	r->x = (v->x * m->_11 + v->y * m->_21 + v->z * m->_31 + m->_41) / w;
-	r->y = (v->x * m->_12 + v->y * m->_22 + v->z * m->_32 + m->_42) / w;
-	r->z = (v->x * m->_13 + v->y * m->_23 + v->z * m->_33 + m->_43) / w;}
-
-// for LineIntersectsCircle, see wkbre21
-int LineIntersectsSquareRad(float cx, float cy, float r, float sx, float sy, float dx, float dy)
+Matrix Matrix::getRHPerspectiveMatrix(float fovy, float aspect, float zn, float zf)
 {
-	//if(dx == 0.0f) dx = 0.0001f;
-	//if(dy == 0.0f) dy = 0.0001f;
-	if(dx == 0.0f) if(fabs(sy-cy) < r) return 1;
-	if(dy == 0.0f) if(fabs(sx-cx) < r) return 1;
-	float p = sy - dy * sx / dx;
-	float t;
-	t = dy * (cx+r) / dx + p;
-	if(fabs(t-cy) < r) return 1;
-	t = dy * (cx-r) / dx + p;
-	if(fabs(t-cy) < r) return 1;
-	t = dx * (cy+r - p) / dy;
-	if(fabs(t-cx) < r) return 1;
-	t = dx * (cy-r - p) / dy;
-	if(fabs(t-cx) < r) return 1;
-	return 0;
-}
-int SphereIntersectsRay(Vector3 *sphpos, float r, Vector3 *raystart, Vector3 *raydir)
-{
-	if(LineIntersectsSquareRad(sphpos->x, sphpos->z, r, raystart->x, raystart->z, raydir->x, raydir->z))
-	if(LineIntersectsSquareRad(sphpos->x, sphpos->y, r, raystart->x, raystart->y, raydir->x, raydir->y))
-	if(LineIntersectsSquareRad(sphpos->y, sphpos->z, r, raystart->y, raystart->z, raydir->y, raydir->z))
-		return 1;
-	return 0;
+	float ys = 1 / tan(fovy / 2);
+	float xs = ys / aspect;
+	Matrix m = getZeroMatrix();
+	m.m[0][0] = xs;
+	m.m[1][1] = ys;
+	m.m[2][2] = zf / (zn - zf);
+	m.m[2][3] = -1;
+	m.m[3][2] = zn * zf / (zn - zf);
+	return m;
 }
 
-void TransformBackFromViewMatrix(Vector3 *r, Vector3 *o, Matrix *m)
+Matrix Matrix::getRHLookAtViewMatrix(const Vector3 & eye, const Vector3 & at, const Vector3 & up)
 {
-	Vector3 xa, ya, za;
-	xa.x = m->_11; ya.x = m->_12; za.x = m->_13;
-	xa.y = m->_21; ya.y = m->_22; za.y = m->_23;
-	xa.z = m->_31; ya.z = m->_32; za.z = m->_33;
+	Vector3 ax, ay, az;
+	az = (eye - at).normal();
+	ax = up.cross(az).normal();
+	ay = az.cross(ax);
 
-	float ex, ey, ez;
-	ex = /*D3DXVec3Dot(&xa, eye) +*/ o->x;
-	ey = /*D3DXVec3Dot(&ya, eye) +*/ o->y;
-	ez = /*D3DXVec3Dot(&za, eye) +*/ o->z;
+	Matrix m = getZeroMatrix();
+	m.m[0][0] = ax.x; m.m[0][1] = ay.x; m.m[0][2] = az.x;
+	m.m[1][0] = ax.y; m.m[1][1] = ay.y; m.m[1][2] = az.y;
+	m.m[2][0] = ax.z; m.m[2][1] = ay.z; m.m[2][2] = az.z;
+	m.m[3][0] = -ax.dot(eye);
+	m.m[3][1] = -ay.dot(eye);
+	m.m[3][2] = -az.dot(eye);
+	m.m[3][3] = 1.0f;
+	return m;
+}
 
-	float dt = determinant33(xa.x, xa.y, xa.z, ya.x, ya.y, ya.z, za.x, za.y, za.z);
-	//if(!dt) ferr("That's not possible! The determinant is null!");
+Matrix Matrix::multiplyMatrices(const Matrix & a, const Matrix & b)
+{
+	Matrix m;
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			m.m[i][j] = a.m[i][0] * b.m[0][j] + a.m[i][1] * b.m[1][j]
+				+ a.m[i][2] * b.m[2][j] + a.m[i][3] * b.m[3][j];
+		}
+	}
+	return m;
+}
 
-	r->x = determinant33(ex, xa.y, xa.z, ey, ya.y, ya.z, ez, za.y, za.z) / dt;
-	r->y = determinant33(xa.x, ex, xa.z, ya.x, ey, ya.z, za.x, ez, za.z) / dt;
-	r->z = determinant33(xa.x, xa.y, ex, ya.x, ya.y, ey, za.x, za.y, ez) / dt;
+Vector3 Matrix::getTranslationVector() const
+{
+	return Vector3(_41, _42, _43);
+}
+
+Vector3 Matrix::getScalingVector() const
+{
+	// NOTE: Result is positive, what about negative scaling?
+	Vector3 rvec;
+	for (int i = 0; i < 3; i++) {
+		Vector3 axis{ m[0][i], m[1][i], m[2][i] };
+		rvec.coord[i] = axis.len3();
+	}
+	return rvec;
+}
+
+Matrix Matrix::getInverse4x3() const
+{
+	Matrix inv = Matrix::getIdentity();
+	for (int i = 0; i < 3; i++) {
+		int i_1 = (i + 1) % 3, i_2 = (i + 2) % 3;
+		for (int j = 0; j < 3; j++) {
+			int j_1 = (j + 1) % 3, j_2 = (j + 2) % 3;
+			inv.m[j][i] = m[i_1][j_1] * m[i_2][j_2] - m[i_1][j_2] * m[i_2][j_1];
+		}
+	}
+	return Matrix::getTranslationMatrix(-getTranslationVector()) * inv;
+}
+
+Matrix Matrix::getTranspose() const
+{
+	Matrix t;
+	for (int r = 0; r < 4; r++)
+		for (int c = 0; c < 4; c++)
+			t.m[c][r] = m[r][c];
+	return t;
+}
+
+Vector3 Vector3::transform(const Matrix & m) const
+{
+	const Vector3 &a = *this;
+	Vector3 v;
+	v.x = a.x * m.m[0][0] + a.y * m.m[1][0] + a.z * m.m[2][0] + m.m[3][0];
+	v.y = a.x * m.m[0][1] + a.y * m.m[1][1] + a.z * m.m[2][1] + m.m[3][1];
+	v.z = a.x * m.m[0][2] + a.y * m.m[1][2] + a.z * m.m[2][2] + m.m[3][2];
+	return v;
+}
+
+Vector3 Vector3::transformNormal(const Matrix& m) const
+{
+	const Vector3& a = *this;
+	Vector3 v;
+	v.x = a.x * m.m[0][0] + a.y * m.m[1][0] + a.z * m.m[2][0];
+	v.y = a.x * m.m[0][1] + a.y * m.m[1][1] + a.z * m.m[2][1];
+	v.z = a.x * m.m[0][2] + a.y * m.m[1][2] + a.z * m.m[2][2];
+	return v;
+}
+
+Vector3 Vector3::transformScreenCoords(const Matrix &m) const
+{
+	const Vector3 &a = *this;
+	Vector3 v;
+	v.x = a.x * m.m[0][0] + a.y * m.m[1][0] + a.z * m.m[2][0] + m.m[3][0];
+	v.y = a.x * m.m[0][1] + a.y * m.m[1][1] + a.z * m.m[2][1] + m.m[3][1];
+	v.z = a.x * m.m[0][2] + a.y * m.m[1][2] + a.z * m.m[2][2] + m.m[3][2];
+	float w = a.x * m.m[0][3] + a.y * m.m[1][3] + a.z * m.m[2][3] + m.m[3][3];
+	return v / w;
 }
