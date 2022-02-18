@@ -18,8 +18,6 @@
 #define APP_VERSION "DEV"
 #endif
 
-typedef unsigned int uint;
-
 void ferr(const char *str);
 void warn(const char *str);
 

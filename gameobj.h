@@ -3,6 +3,10 @@
 // Licensed under the GPL3+.
 // See LICENSE file for more details.
 
+#pragma once
+
+#include <cstdint>
+
 struct GameObject;
 
 class goref
@@ -27,7 +31,7 @@ struct Mesh
 {
 	//float *vertices;
 	//uint16_t *quadindices, *triindices;
-	uint vertstart, quadstart, tristart, ftxo, numverts, numquads, numtris, weird;
+	uint32_t vertstart, quadstart, tristart, ftxo, numverts, numquads, numtris, weird;
 	void Mesh::draw();
 };
 
@@ -51,7 +55,7 @@ struct DBLEntry
 		};
 		goref obj;
 		struct {
-			uint nobjs;
+			uint32_t nobjs;
 			goref *objlist;
 		};
 	};
@@ -60,12 +64,12 @@ struct DBLEntry
 
 struct GameObject
 {
-	uint state;
-	uint pdbloff, pexcoff;
+	uint32_t state;
+	uint32_t pdbloff, pexcoff;
 	std::string name;
 	Matrix matrix;
 	Vector3 position;
-	uint type, flags;
+	uint32_t type, flags;
 
 	std::vector<GameObject*> subobj;
 	GameObject *parent;
@@ -73,14 +77,14 @@ struct GameObject
 
 	// Mesh
 	Mesh *mesh;
-	uint color;
+	uint32_t color;
 
 	Light *light;
 
 	std::vector<DBLEntry> dbl;
 	uint32_t dblflags;
 
-	uint refcount;
+	uint32_t refcount;
 
 	GameObject(const char *nName = "Unnamed", int nType = 0) : name(nName), type(nType),
 		pdbloff(0), pexcoff(0), flags(0), mesh(0), color(0), position(0,0,0), light(0), state(0), parent(0), root(0),
@@ -98,9 +102,9 @@ extern Chunk *spkchk, *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *p
 extern GameObject *rootobj, *cliprootobj, *superroot;
 extern std::string lastspkfn;
 extern void *zipmem;
-extern uint zipsize;
+extern uint32_t zipsize;
 
-const char* GetObjTypeString(uint ot);
+const char* GetObjTypeString(uint32_t ot);
 void LoadSceneSPK(const char *fn);
 void ModifySPK();
 void SaveSceneSPK(const char *fn);

@@ -12,7 +12,7 @@
 typedef BOOL(APIENTRY *gli_wglSwapIntervalEXT)(int n);
 
 HDC whdc; HGLRC glrc;
-uint drawframes = 0;
+int drawframes = 0;
 extern HWND hWindow;
 bool rendertextures = false;
 

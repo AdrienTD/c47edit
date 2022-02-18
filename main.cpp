@@ -356,7 +356,7 @@ void IGMain()
 	ImGui::End();
 }
 
-uint curtexid = 0;
+uint32_t curtexid = 0;
 
 void IGTest()
 {
@@ -402,7 +402,7 @@ void RenderObject(GameObject *o)
 	glMultMatrixf(o->matrix.v);
 	if (o->mesh && (o->flags & 0x20)) {
 		if (!rendertextures) {
-			uint clr = swap_rb(o->color);
+			uint32_t clr = swap_rb(o->color);
 			glColor4ubv((uint8_t*)&clr);
 		}
 		o->mesh->draw();

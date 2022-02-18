@@ -59,9 +59,9 @@ Chunk *spkchk;
 Chunk *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc, *pdbl;
 GameObject *rootobj, *cliprootobj, *superroot;
 std::string lastspkfn;
-void *zipmem = 0; uint zipsize = 0;
+void *zipmem = 0; uint32_t zipsize = 0;
 
-const char *GetObjTypeString(uint ot)
+const char *GetObjTypeString(uint32_t ot)
 {
 	const char *otname = "?";
 	if (ot < 0x70) otname = objtypenames[ot];
@@ -116,14 +116,14 @@ void LoadSceneSPK(const char *fn)
 	cliprootobj->root = cliprootobj;
 
 	// First, create the objects and an ID<->GameObject* map.
-	std::map<uint, GameObject*> idobjmap;
+	std::map<uint32_t, GameObject*> idobjmap;
 	std::map<Chunk*, GameObject*> chkobjmap;
 	std::function<void(Chunk*,GameObject*)> z;
-	uint objid = 1;
+	uint32_t objid = 1;
 	z = [&z, &objid, &chkobjmap, &idobjmap](Chunk *c, GameObject *parentobj) {
-		uint pheaoff = c->tag & 0xFFFFFF;
-		uint *p = (uint*)((char*)phea->maindata + pheaoff);
-		uint ot = *(unsigned short*)(&p[5]);
+		uint32_t pheaoff = c->tag & 0xFFFFFF;
+		uint32_t *p = (uint32_t*)((char*)phea->maindata + pheaoff);
+		uint32_t ot = *(unsigned short*)(&p[5]);
 		char *objname = (char*)pnam->maindata + p[2];
 
 		GameObject *o = new GameObject(objname, ot);
@@ -132,12 +132,12 @@ void LoadSceneSPK(const char *fn)
 		o->parent = parentobj;
 		idobjmap[objid++] = o;
 		if (c->num_subchunks > 0)
-			for (uint i = 0; i < c->num_subchunks; i++)
+			for (uint32_t i = 0; i < c->num_subchunks; i++)
 				z(&c->subchunks[i], o);
 	};
 
 	auto y = [z](Chunk *c, GameObject *o) {
-		for (uint i = 0; i < c->num_subchunks; i++)
+		for (uint32_t i = 0; i < c->num_subchunks; i++)
 			z(&c->subchunks[i], o);
 	};
 
@@ -147,9 +147,9 @@ void LoadSceneSPK(const char *fn)
 	// Then read/load the object properties.
 	std::function<void(Chunk*, GameObject*)> g;
 	g = [&g,&objid,&chkobjmap,&idobjmap](Chunk *c, GameObject *parentobj) {
-		uint pheaoff = c->tag & 0xFFFFFF;
-		uint *p = (uint*)((char*)phea->maindata + pheaoff);
-		uint ot = *(unsigned short*)(&p[5]);
+		uint32_t pheaoff = c->tag & 0xFFFFFF;
+		uint32_t *p = (uint32_t*)((char*)phea->maindata + pheaoff);
+		uint32_t ot = *(unsigned short*)(&p[5]);
 		const char *otname = GetObjTypeString(ot);
 		char *objname = (char*)pnam->maindata + p[2];
 
@@ -244,13 +244,13 @@ void LoadSceneSPK(const char *fn)
 
 		if (c->num_subchunks > 0)
 		{
-			for (uint i = 0; i < c->num_subchunks; i++)
+			for (uint32_t i = 0; i < c->num_subchunks; i++)
 				g(&c->subchunks[i], o);
 		}
 	};
 
 	auto f = [g](Chunk *c, GameObject *o) {
-		for (uint i = 0; i < c->num_subchunks; i++)
+		for (uint32_t i = 0; i < c->num_subchunks; i++)
 			g(&c->subchunks[i], o);
 	};
 
@@ -269,15 +269,15 @@ struct DBLHash
 
 std::stringbuf heabuf, nambuf, dblbuf;
 std::vector<std::array<float,3> > posbuf;
-std::vector<std::array<uint, 4> > mtxbuf;
+std::vector<std::array<uint32_t, 4> > mtxbuf;
 
-uint sbtell(std::stringbuf *sb);
+uint32_t sbtell(std::stringbuf *sb);
 
-uint moc_objcount;
+uint32_t moc_objcount;
 std::map<GameObject*, uint32_t> objidmap;
 
 std::map<std::array<float, 3>, uint32_t> g_sav_posmap;
-std::map<std::array<uint, 4>, uint32_t> g_sav_mtxmap;
+std::map<std::array<uint32_t, 4>, uint32_t> g_sav_mtxmap;
 std::map<std::string, uint32_t> g_sav_nammap;
 std::unordered_map<std::pair<uint32_t, std::string>, uint32_t, DBLHash> g_sav_dblmap;
 
@@ -286,7 +286,7 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	moc_objcount++;
 	memset(c, 0, sizeof(Chunk));
 
-	uint posoff;
+	uint32_t posoff;
 	std::array<float, 3> cpos = { o->position.x, o->position.y, o->position.z };
 	auto piter = g_sav_posmap.find(cpos);
 	if (piter == g_sav_posmap.end())
@@ -298,8 +298,8 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	else
 		posoff = piter->second;
 
-	uint mtxoff;
-	std::array<uint, 4> cmtx;
+	uint32_t mtxoff;
+	std::array<uint32_t, 4> cmtx;
 	cmtx[0] = (uint32_t)(o->matrix._31 * 1073741824.0f) & ~1; // multiply by 2^30
 	cmtx[1] = o->matrix._32 * 1073741824.0f;
 	if (o->matrix._33 < 0) cmtx[0] |= 1;
@@ -360,7 +360,7 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		}
 		}
 	}
-	uint dbloff;
+	uint32_t dbloff;
 	std::pair<uint32_t, std::string> cdbl(o->dblflags, dblsav.str());
 	auto diter = g_sav_dblmap.find(cdbl);
 	if (diter == g_sav_dblmap.end())
@@ -376,10 +376,10 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	else
 		dbloff = diter->second;
 
-	uint heaoff = sbtell(&heabuf);
+	uint32_t heaoff = sbtell(&heabuf);
 
 	auto itNammap = g_sav_nammap.find(o->name);
-	uint namoff = 0;
+	uint32_t namoff = 0;
 	if (itNammap == g_sav_nammap.end()) {
 		namoff = sbtell(&nambuf);
 		g_sav_nammap.insert({ o->name, namoff });
@@ -417,7 +417,7 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 				heabuf.sputn((char*)&o->light->param[i], 4);
 		}
 	}
-	uint tagstate = o->state | (isclp ? 1 : 0);
+	uint32_t tagstate = o->state | (isclp ? 1 : 0);
 	c->tag = heaoff | (tagstate << 24);
 	c->num_subchunks = o->subobj.size();
 	c->subchunks = new Chunk[c->num_subchunks];
@@ -441,7 +441,7 @@ void ModifySPK()
 	nrot->tag = 'TORP';
 	nclp->tag = 'PLCP';
 
-	uint objid = 1;
+	uint32_t objid = 1;
 	std::function<void(GameObject*)> z;
 	z = [&z,&objid](GameObject *o) {
 		for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
