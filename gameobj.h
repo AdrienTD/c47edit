@@ -56,6 +56,8 @@ struct DBLEntry
 	int flags = 0;
 	using VariantType = std::variant<std::monostate, double, float, uint32_t, std::string, std::vector<uint8_t>, GORef, std::vector<GORef>>;
 	VariantType value;
+
+	static const char* getTypeName(int type);
 };
 
 struct GameObject

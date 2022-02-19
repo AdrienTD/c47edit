@@ -69,7 +69,7 @@ void *zipmem = 0; uint32_t zipsize = 0;
 const char *GetObjTypeString(uint32_t ot)
 {
 	const char *otname = "?";
-	if (ot < 0x70) otname = objtypenames[ot];
+	if (ot < std::size(objtypenames)) otname = objtypenames[ot];
 	return otname;
 }
 
@@ -210,6 +210,8 @@ void LoadSceneSPK(const char *fn)
 			dp++;
 			switch (e.type)
 			{
+			case 0:
+				break;
 			case 1:
 				e.value = *(double*)dp;
 				dp += 8;
@@ -275,7 +277,7 @@ void LoadSceneSPK(const char *fn)
 
 struct DBLHash
 {
-	size_t operator() (std::pair<uint32_t, std::string> e) const
+	size_t operator() (const std::pair<uint32_t, std::string>& e) const
 	{
 		const std::hash<std::string> h;
 		return e.first + h(e.second);
@@ -338,6 +340,8 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		dblsav.sputc(typ);
 		switch (e->type)
 		{
+		case 0:
+			break;
 		case 1:
 			dblsav.sputn((char*)&std::get<double>(e->value), 8); break;
 		case 2:
@@ -638,4 +642,15 @@ void GiveObject(GameObject *o, GameObject *t)
 			st.erase(it);
 	}
 	t->subobj.push_back(o);
+}
+
+const char * DBLEntry::getTypeName(int type)
+{
+	type &= 0x3F;
+	static const char* names[] = { "0", "double", "float", "int", "char*", "5", "EndCpnt", "7", "ZGEOMREF", "ZGEOMREFTAB", "MSG", "SNDREF", "INTC" };
+	if (type == 0x3F)
+		return "EndDBL";
+	if (type < std::size(names))
+		return names[type];
+	return "?";
 }

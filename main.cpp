@@ -28,6 +28,7 @@
 GameObject *selobj = 0, *viewobj = 0;
 float objviewscale = 0.0f;
 Vector3 campos(0, 0, -50), camori(0,0,0);
+float camNearDist = 1.0f, camFarDist = 10000.0f;
 float camspeed = 32;
 bool wireframe = false;
 bool findsel = false;
@@ -208,6 +209,8 @@ void IGObjectInfo()
 				ImGui::SameLine();
 				switch (e->type)
 				{
+				case 0:
+					ImGui::Text("0"); break;
 				case 1:
 					ImGui::InputDouble("Double", &std::get<double>(e->value)); break;
 				case 2:
@@ -217,9 +220,7 @@ void IGObjectInfo()
 				case 0xB:
 				case 0xC:
 				{
-					char sb[10];
-					sprintf_s(sb, "Int %X", e->type);
-					ImGui::InputInt(sb, (int*)&std::get<uint32_t>(e->value)); break;
+					ImGui::InputInt(DBLEntry::getTypeName(e->type), (int*)&std::get<uint32_t>(e->value)); break;
 				}
 				case 4:
 				case 5:
@@ -360,8 +361,9 @@ void IGMain()
 			"3rd party libraries used:\n- Dear ImGui (MIT license)\n- Miniz (MIT license)\nSee LICENSE_* files for copyright and licensing of these libraries.", "c47edit", 0);
 	//ImGui::DragFloat("Scale", &objviewscale, 0.1f);
 	ImGui::DragFloat("Cam speed", &camspeed, 0.1f);
-	ImGui::DragFloat3("Cam pos", &campos.x, 0.1f);
+	ImGui::DragFloat3("Cam pos", &campos.x, 1.0f);
 	ImGui::DragFloat2("Cam ori", &camori.x, 0.1f);
+	ImGui::DragFloat2("Cam dist", &camNearDist, 1.0f);
 	ImGui::DragFloat3("Cursor pos", &cursorpos.x);
 	ImGui::Checkbox("Wireframe", &wireframe);
 	ImGui::SameLine();
@@ -589,10 +591,6 @@ int main(int argc, char* argv[])
 			if (!io.WantCaptureMouse && viewobj)
 			if (io.MouseClicked[1] || (io.MouseClicked[0] && (io.KeyAlt || io.KeyCtrl)))
 			{
-				//Matrix persp = Matrix::getLHPerspectiveMatrix(60.0f * (float)M_PI / 180.0f, (float)screen_width / (float)screen_height, 1.0f, 10000.0f);
-				//Matrix lookat = Matrix::getLHLookAtViewMatrix(campos, campos + ncd, Vector3(0.0f, 1.0f, 0.0f));
-				//Matrix matView = lookat * persp;
-
 				Vector3 raystart, raydir;
 				float ys = 1 / tan(60.0f * (float)M_PI / 180.0f / 2.0f);
 				float xs = ys / ((float)screen_width / (float)screen_height);
@@ -636,7 +634,7 @@ int main(int argc, char* argv[])
 			glClearDepth(1.0f);
 			glMatrixMode(GL_PROJECTION);
 			glLoadIdentity();
-			Matrix persp = Matrix::getLHPerspectiveMatrix(60.0f * (float)M_PI / 180.0f, (float)screen_width / (float)screen_height, 1.0f, 10000.0f);
+			Matrix persp = Matrix::getLHPerspectiveMatrix(60.0f * (float)M_PI / 180.0f, (float)screen_width / (float)screen_height, camNearDist, camFarDist);
 			glMultMatrixf(persp.v);
 			Matrix lookat = Matrix::getLHLookAtViewMatrix(campos, campos + ncd, Vector3(0.0f, 1.0f, 0.0f));
 			glMultMatrixf(lookat.v);
