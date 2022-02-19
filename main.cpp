@@ -63,14 +63,26 @@ bool ObjInObj(GameObject *a, GameObject *b)
 	return false;
 }
 
+int IGStdStringInputCallback(ImGuiInputTextCallbackData* data) {
+	if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+		std::string* str = (std::string*)data->UserData;
+		str->resize(data->BufTextLen);
+		data->Buf = (char*)str->data();
+	}
+	return 0;
+}
+bool IGStdStringInput(const char* label, std::string& str) {
+	return ImGui::InputText(label, str.data(), str.capacity() + 1, ImGuiInputTextFlags_CallbackResize, IGStdStringInputCallback, &str);
+}
+
 void IGOTNode(GameObject *o)
 {
 	bool op, colorpushed = 0;
 	if (o == superroot)
-		ImGui::SetNextTreeNodeOpen(true, ImGuiCond_Once);
+		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 	if (findsel)
 		if (ObjInObj(selobj, o))
-			ImGui::SetNextTreeNodeOpen(true, ImGuiCond_Always);
+			ImGui::SetNextItemOpen(true, ImGuiCond_Always);
 	if (o == viewobj) {
 		colorpushed = 1;
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 1, 0, 1));
@@ -80,7 +92,7 @@ void IGOTNode(GameObject *o)
 		ImGui::PopStyleColor();
 	if (findsel)
 		if (selobj == o)
-			ImGui::SetScrollHere();
+			ImGui::SetScrollHereY();
 	if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0)) {
 		ImGuiIO& io = ImGui::GetIO();
 		if (io.KeyShift)
@@ -161,11 +173,7 @@ void IGObjectInfo()
 		}
 		ImGui::Separator();
 
-		char tb[256];
-		strcpy_s(tb, selobj->name.c_str());
-		if (ImGui::InputText("Name", tb, 255)) {
-			selobj->name = tb;
-		}
+		IGStdStringInput("Name", selobj->name);
 		ImGui::InputScalar("State", ImGuiDataType_U32, &selobj->state);
 		ImGui::InputScalar("Type", ImGuiDataType_U32, &selobj->type);
 		ImGui::InputScalar("Flags", ImGuiDataType_U32, &selobj->flags);
@@ -216,12 +224,8 @@ void IGObjectInfo()
 				case 4:
 				case 5:
 				{
-					char sb[256];
 					auto& str = std::get<std::string>(e->value);
-					strcpy_s(sb, str.c_str());
-					if (ImGui::InputText((e->type==5)?"Filename":"String", sb, 256)) {
-						str = sb;
-					}
+					IGStdStringInput((e->type == 5) ? "Filename" : "String", str);
 					break;
 				}
 				case 6:
@@ -248,22 +252,23 @@ void IGObjectInfo()
 				case 9: {
 					auto& vec = std::get<std::vector<GORef>>(e->value);
 					ImGui::Text("Objlist: %zu objects", vec.size());
-					ImGui::ListBoxHeader("Objlist", ImVec2(0, 64));
-					for (auto& obj : vec)
-					{
-						ImGui::Text("%s", obj->name.c_str());
-						if (ImGui::IsItemClicked())
-							nextobjtosel = obj.get();
-						if (ImGui::BeginDragDropTarget())
+					if (ImGui::BeginListBox("Objlist", ImVec2(0, 64))) {
+						for (auto& obj : vec)
 						{
-							if (const ImGuiPayload *pl = ImGui::AcceptDragDropPayload("GameObject"))
+							ImGui::Text("%s", obj->name.c_str());
+							if (ImGui::IsItemClicked())
+								nextobjtosel = obj.get();
+							if (ImGui::BeginDragDropTarget())
 							{
-								obj = *(GameObject**)pl->Data;
+								if (const ImGuiPayload *pl = ImGui::AcceptDragDropPayload("GameObject"))
+								{
+									obj = *(GameObject**)pl->Data;
+								}
+								ImGui::EndDragDropTarget();
 							}
-							ImGui::EndDragDropTarget();
 						}
+						ImGui::EndListBox();
 					}
-					ImGui::ListBoxFooter();
 					break;
 				}
 				case 0x3F:
@@ -375,12 +380,15 @@ void IGTest()
 	static const int one = 1;
 	ImGui::InputScalar("Texture ID", ImGuiDataType_U32, &curtexid, &one);
 	auto l = texmap.lower_bound(curtexid);
-	if(ImGui::Button("Next"))
+	ImGui::PushButtonRepeat(true);
+	if (ImGui::Button("Next")) {
 		if (l != texmap.end()) {
 			auto ln = std::next(l);
 			if (ln != texmap.end())
 				curtexid = ln->first;
 		}
+	}
+	ImGui::PopButtonRepeat();
 	auto t = texmap.find(curtexid);
 	if (t != texmap.end())
 		ImGui::Image(t->second, ImVec2(256, 256));
@@ -530,6 +538,7 @@ int main(int argc, char* argv[])
 	InitWindow();
 
 	ImGui::CreateContext(0);
+	ImGui::GetStyle().WindowRounding = 7.0f;
 	ImGui_ImplWin32_Init((void*)hWindow);
 	ImGui_ImplOpenGL2_Init();
 	lastfpscheck = GetTickCount();
@@ -554,17 +563,17 @@ int main(int argc, char* argv[])
 			ImGuiIO& io = ImGui::GetIO();
 			if (!io.WantCaptureKeyboard)
 			{
-				if (io.KeysDown[VK_LEFT])
+				if (ImGui::IsKeyDown(VK_LEFT))
 					cammove -= crab;
-				if (io.KeysDown[VK_RIGHT])
+				if (ImGui::IsKeyDown(VK_RIGHT))
 					cammove += crab;
-				if (io.KeysDown[VK_UP])
+				if (ImGui::IsKeyDown(VK_UP))
 					cammove += ncd;
-				if (io.KeysDown[VK_DOWN])
+				if (ImGui::IsKeyDown(VK_DOWN))
 					cammove -= ncd;
-				if (io.KeysDown['E'])
+				if (ImGui::IsKeyDown('E'))
 					cammove.y += 1;
-				if (io.KeysDown['D'])
+				if (ImGui::IsKeyDown('D'))
 					cammove.y -= 1;
 				if (ImGui::IsKeyPressed('W'))
 					wireframe = !wireframe;
@@ -595,7 +604,7 @@ int main(int argc, char* argv[])
 				raydir = raystart - campos;
 
 				bestpickobj = 0;
-				bestpickdist = HUGE_VAL; //100000000000000000.0f;
+				bestpickdist = std::numeric_limits<float>::infinity();
 				Matrix mtx = Matrix::getIdentity();
 				IsRayIntersectingObject(&raystart, &raydir, viewobj, &mtx);
 				if (io.KeyAlt) {
