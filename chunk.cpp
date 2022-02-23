@@ -8,6 +8,19 @@
 #include <functional>
 #include <map>
 
+Chunk::~Chunk()
+{
+	for (uint32_t i = 0; i < num_datas; ++i)
+		free(multidata[i]);
+	if (num_datas) {
+		delete[] multidata;
+		delete[] multidata_sizes;
+	}
+	free(maindata);
+	if (num_subchunks)
+		delete[] subchunks;
+}
+
 Chunk *Chunk::findSubchunk(uint32_t tagkey)
 {
 	for (int i = 0; i < this->num_subchunks; i++)

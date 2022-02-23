@@ -34,6 +34,7 @@ bool wireframe = false;
 bool findsel = false;
 uint32_t framesincursec = 0, framespersec = 0, lastfpscheck;
 Vector3 cursorpos(0, 0, 0);
+bool renderExc = false;
 
 GameObject *bestpickobj = 0;
 float bestpickdist;
@@ -231,8 +232,29 @@ void IGObjectInfo()
 				}
 				case 6:
 					ImGui::Separator(); break;
-				case 7:
-					ImGui::Text("Data (%X): %zu bytes", e->type, std::get<std::vector<uint8_t>>(e->value).size()); break;
+				case 7: {
+					auto& data = std::get<std::vector<uint8_t>>(e->value);
+					ImGui::Text("Data (%X): %zu bytes", e->type, data.size());
+					ImGui::SameLine();
+					if (ImGui::SmallButton("Export")) {
+						FILE* file;
+						fopen_s(&file, "c47data.bin", "wb");
+						fwrite(data.data(), data.size(), 1, file);
+						fclose(file);
+					}
+					ImGui::SameLine();
+					if (ImGui::SmallButton("Import")) {
+						FILE* file;
+						fopen_s(&file, "c47data.bin", "rb");
+						fseek(file, 0, SEEK_END);
+						auto len = ftell(file);
+						fseek(file, 0, SEEK_SET);
+						data.resize(len);
+						fread(data.data(), data.size(), 1, file);
+						fclose(file);
+					}
+					break;
+				}
 				case 8:
 					if (auto& obj = std::get<GORef>(e->value); obj.valid()) {
 						ImGui::Text("Object: %s", obj->name.c_str());
@@ -368,6 +390,8 @@ void IGMain()
 	ImGui::Checkbox("Wireframe", &wireframe);
 	ImGui::SameLine();
 	ImGui::Checkbox("Textured", &rendertextures);
+	ImGui::SameLine();
+	ImGui::Checkbox("EXC", &renderExc);
 	ImGui::Text("FPS: %u", framespersec);
 	ImGui::End();
 }
@@ -651,6 +675,37 @@ int main(int argc, char* argv[])
 				//glTranslatef(-viewobj->position.x, -viewobj->position.y, -viewobj->position.z);
 				RenderObject(viewobj);
 			}
+
+			if (renderExc && viewobj) {
+				if (Chunk* pexc = spkchk->findSubchunk('CXEP')) {
+					glPointSize(5.0f);
+					glBegin(GL_POINTS);
+					auto renderAnim = [pexc](auto rec, GameObject* obj, const Matrix& prevmat) -> void {
+						Matrix mat = obj->matrix * Matrix::getTranslationMatrix(obj->position) * prevmat;
+						if (obj->pexcoff) {
+							uint8_t* excptr = (uint8_t*)pexc->maindata + obj->pexcoff - 1;
+							Chunk exchk;
+							LoadChunk(&exchk, excptr);
+							assert(exchk.tag == 'HEAD');
+							if (auto* keys = exchk.findSubchunk('KEYS')) {
+								uint32_t cnt = *(uint32_t*)(keys->multidata[0]);
+								for (uint32_t i = 1; i <= cnt; ++i) {
+									float* kpos = (float*)((char*)(keys->multidata[i]) + 4);
+									Vector3 vpos = Vector3(kpos[0], kpos[1], kpos[2]).transform(mat);
+									glVertex3fv(&vpos.x);
+								}
+							}
+						}
+						for (auto& child : obj->subobj) {
+							rec(rec, child, mat);
+						}
+					};
+					renderAnim(renderAnim, viewobj, Matrix::getIdentity());
+					glEnd();
+					glPointSize(1.0f);
+				}
+			}
+
 			glPointSize(10);
 			glColor3f(1, 1, 1);
 			glBegin(GL_POINTS);

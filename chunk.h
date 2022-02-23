@@ -17,6 +17,8 @@ struct Chunk
 	Chunk *subchunks;
 	void *maindata; uint32_t maindata_size;
 
+	~Chunk();
+
 	Chunk *findSubchunk(uint32_t tag);
 };
 
