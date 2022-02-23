@@ -139,6 +139,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="chunk.h" />
+    <ClInclude Include="DynArray.h" />
     <ClInclude Include="gameobj.h" />
     <ClInclude Include="global.h" />
     <ClInclude Include="imgui\imgui.h" />

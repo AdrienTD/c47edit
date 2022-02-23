@@ -459,8 +459,8 @@ Vector3 finalintersectpnt = Vector3(0, 0, 0);
 
 bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, int startvertex, int startface, int numverts, Matrix *worldmtx)
 {
-	uint16_t *bfac = (uint16_t*)pfac->maindata + startface;
-	float *bver = (float*)pver->maindata + startvertex;
+	uint16_t *bfac = (uint16_t*)pfac->maindata.data() + startface;
+	float *bver = (float*)pver->maindata.data() + startvertex;
 
 	std::unique_ptr<Vector3[]> pnts = std::make_unique<Vector3[]>(numverts);
 	for (int i = 0; i < 3; i++)
@@ -683,14 +683,14 @@ int main(int argc, char* argv[])
 					auto renderAnim = [pexc](auto rec, GameObject* obj, const Matrix& prevmat) -> void {
 						Matrix mat = obj->matrix * Matrix::getTranslationMatrix(obj->position) * prevmat;
 						if (obj->pexcoff) {
-							uint8_t* excptr = (uint8_t*)pexc->maindata + obj->pexcoff - 1;
+							uint8_t* excptr = (uint8_t*)pexc->maindata.data() + obj->pexcoff - 1;
 							Chunk exchk;
-							LoadChunk(&exchk, excptr);
+							exchk.load(excptr);
 							assert(exchk.tag == 'HEAD');
 							if (auto* keys = exchk.findSubchunk('KEYS')) {
-								uint32_t cnt = *(uint32_t*)(keys->multidata[0]);
+								uint32_t cnt = *(uint32_t*)(keys->multidata[0].data());
 								for (uint32_t i = 1; i <= cnt; ++i) {
-									float* kpos = (float*)((char*)(keys->multidata[i]) + 4);
+									float* kpos = (float*)((char*)(keys->multidata[i].data()) + 4);
 									Vector3 vpos = Vector3(kpos[0], kpos[1], kpos[2]).transform(mat);
 									glVertex3fv(&vpos.x);
 								}

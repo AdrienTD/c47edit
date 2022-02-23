@@ -5,37 +5,27 @@
 
 #include "chunk.h"
 #include <sstream>
-#include <functional>
 #include <map>
 
-Chunk::~Chunk()
-{
-	for (uint32_t i = 0; i < num_datas; ++i)
-		free(multidata[i]);
-	if (num_datas) {
-		delete[] multidata;
-		delete[] multidata_sizes;
-	}
-	free(maindata);
-	if (num_subchunks)
-		delete[] subchunks;
-}
+Chunk::~Chunk() = default;
 
 Chunk *Chunk::findSubchunk(uint32_t tagkey)
 {
-	for (int i = 0; i < this->num_subchunks; i++)
-		if (this->subchunks[i].tag == tagkey)
-			return &this->subchunks[i];
-	return 0;
+	for (Chunk& sub : subchunks)
+		if (sub.tag == tagkey)
+			return &sub;
+	return nullptr;
 }
 
-void LoadChunk(Chunk *chk, void *bytes)
+void Chunk::load(void *bytes)
 {
+	Chunk *chk = this;
+
 	uint32_t* pnt = (uint32_t*)bytes;
 
 	chk->tag = *(pnt++);
 	uint32_t it = *(pnt++);
-	chk->size = it & 0x3FFFFFFF;
+	uint32_t chksize = it & 0x3FFFFFFF;
 	bool has_subchunks = it & 0x80000000;
 	bool has_multidata = it & 0x40000000;
 
@@ -45,47 +35,47 @@ void LoadChunk(Chunk *chk, void *bytes)
 	else
 		odat = 8;
 
-	if(has_subchunks) chk->num_subchunks = *(pnt++);
-	else chk->num_subchunks = 0;
+	uint32_t num_subchunks;
+	if(has_subchunks) num_subchunks = *(pnt++);
+	else num_subchunks = 0;
 
 	if(has_multidata)
 	{
-		chk->num_datas = *(pnt++);
-		chk->multidata = new void*[chk->num_datas];
-		chk->multidata_sizes = new uint32_t[chk->num_datas];
-		for(int i = 0; i < chk->num_datas; i++)
+		uint32_t num_datas = *(pnt++);
+		chk->multidata.resize(num_datas);
+		for(auto& dat : chk->multidata)
 		{
-			chk->multidata_sizes[i] = *(pnt++);
-			chk->multidata[i] = malloc(chk->multidata_sizes[i]);
+			uint32_t datlen = *(pnt++);
+			dat.resize(datlen);
 		}
 	}
-	else	chk->num_datas = 0;
+	else	chk->multidata.clear();
 
 	// Subchunks
-	chk->subchunks = new Chunk[chk->num_subchunks];
-	for(int i = 0; i < chk->num_subchunks; i++)
+	chk->subchunks.resize(num_subchunks);
+	for(auto& subchunk : subchunks)
 	{
-		LoadChunk(&chk->subchunks[i], pnt);
-		pnt = (uint32_t*)( (char*)pnt + chk->subchunks[i].size );
+		subchunk.load(pnt);
+		uint32_t sublen = pnt[1] & 0x3FFFFFFF;
+		pnt = (uint32_t*)( (char*)pnt + sublen );
 	}
 
 	// Data / Multidata
 	char *dp = (char*)bytes + odat;
 	if(has_multidata)
 	{
-		for(int i = 0; i < chk->num_datas; i++)
+		for(auto& dat : multidata)
 		{
-			uint32_t siz = chk->multidata_sizes[i];
-			memcpy(chk->multidata[i], dp, siz);
-			dp += siz;
+			memcpy(dat.data(), dp, dat.size());
+			dp += dat.size();
 		}
-		chk->maindata = 0; chk->maindata_size = 0;
+		// clear maindata
 	}
 	else
 	{
-		chk->maindata_size = chk->size - odat;
-		chk->maindata = malloc(chk->maindata_size);
-		memcpy(chk->maindata, dp, chk->maindata_size);
+		uint32_t mainlen = chksize - odat;
+		maindata.resize(mainlen);
+		memcpy(maindata.data(), dp, maindata.size());
 	}
 }
 
@@ -99,34 +89,39 @@ void WriteChunkToStringBuf(std::stringbuf *sb, Chunk *chk)
 	// Header
 	uint32_t begoff = sbtell(sb);
 	sb->sputn((char*)&(chk->tag), 4);
-	bool hasmultidata = chk->num_datas > 0;
-	bool hassubchunks = chk->num_subchunks > 0;
+	bool hasmultidata = !chk->multidata.empty();
+	bool hassubchunks = !chk->subchunks.empty();
 	//int size = 8 + chk->maindata_size;
 	int iv = 0;
 	sb->sputn((char*)&iv, 4);
 	if (hasmultidata || hassubchunks)
 		sb->sputn((char*)&iv, 4);
-	if (hassubchunks)
-		sb->sputn((char*)&(chk->num_subchunks), 4);
+	if (hassubchunks) {
+		uint32_t num_subchunks = (uint32_t)chk->subchunks.size();
+		sb->sputn((char*)&num_subchunks, 4);
+	}
 	if (hasmultidata)
 	{
-		sb->sputn((char*)&(chk->num_datas), 4);
-		for(int i = 0; i < chk->num_datas; i++)
-			sb->sputn((char*)&(chk->multidata_sizes[i]), 4);
+		uint32_t num_datas = (uint32_t)chk->multidata.size();
+		sb->sputn((char*)&num_datas, 4);
+		for (auto& dat : chk->multidata) {
+			uint32_t len = (uint32_t)dat.size();
+			sb->sputn((char*)&len, 4);
+		}
 	}
 
 	// Subchunks
 	if (hassubchunks)
-		for (int i = 0; i < chk->num_subchunks; i++)
-			WriteChunkToStringBuf(sb, &(chk->subchunks[i]));
+		for (auto& subchunk : chk->subchunks)
+			WriteChunkToStringBuf(sb, &subchunk);
 
 	// Data / Multidata
 	uint32_t odat = sbtell(sb) - begoff;
 	if (hasmultidata)
-		for (int i = 0; i < chk->num_datas; i++)
-			sb->sputn((char*)chk->multidata[i], chk->multidata_sizes[i]);
+		for (auto& dat : chk->multidata)
+			sb->sputn((char*)dat.data(), dat.size());
 	else
-		sb->sputn((char*)chk->maindata, chk->maindata_size);
+		sb->sputn((char*)chk->maindata.data(), chk->maindata.size());
 	uint32_t endoff = sbtell(sb);
 
 	sb->pubseekpos(begoff + 4, std::ios_base::out);
@@ -137,10 +132,10 @@ void WriteChunkToStringBuf(std::stringbuf *sb, Chunk *chk)
 	sb->pubseekpos(endoff);
 }
 
-void SaveChunkToMem(Chunk *chk, void **pnt, size_t *size)
+void Chunk::saveToMem(void **pnt, size_t *size)
 {
 	std::stringbuf sb;
-	WriteChunkToStringBuf(&sb, chk);
+	WriteChunkToStringBuf(&sb, this);
 	std::string m = sb.str();
 	/*
 	FILE *f;
@@ -154,9 +149,9 @@ void SaveChunkToMem(Chunk *chk, void **pnt, size_t *size)
 	memcpy(*pnt, m.data(), l);
 }
 
-Chunk *ReconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void *repeat)
+Chunk Chunk::reconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void *repeat)
 {
-	Chunk *mainchk = new Chunk;
+	Chunk mainchk;
 
 	uint32_t *ppnt = (uint32_t*)packrep;
 	uint32_t reconsoff = *(ppnt + 1);
@@ -165,11 +160,9 @@ Chunk *ReconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void *repe
 	uint32_t currp = 0;
 	std::map<uint32_t, Chunk*> rpmap;
 
-	std::function<void(Chunk*)> f;
-	f = [&f, &ppnt, &rpmap, &currp](Chunk *c)
-	{
+	auto f = [&ppnt, &rpmap, &currp](Chunk *c, const auto& rec) -> void {
 		uint32_t beg = currp;
-		c->num_datas = 0; c->num_subchunks = 0;
+		//c->num_datas = 0; c->num_subchunks = 0;
 		c->tag = *(ppnt++);
 		uint32_t info = *(ppnt++);
 		uint32_t csize = info & 0x3FFFFFFF;
@@ -181,17 +174,17 @@ Chunk *ReconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void *repe
 
 		if (info & 0x80000000)
 		{
-			c->num_subchunks = *(ppnt++);
-			c->subchunks = new Chunk[c->num_subchunks];
+			uint32_t num_subchunks = *(ppnt++);
+			c->subchunks.resize(num_subchunks);
 			currp += 16;
-			for (int i = 0; i < c->num_subchunks; i++)
-				f(&c->subchunks[i]);
+			for (int i = 0; i < num_subchunks; i++)
+				rec(&c->subchunks[i], rec);
 		}
 
 		currp = beg + csize;
 	};
 
-	f(mainchk);
+	f(&mainchk, f);
 
 	char* reconspnt = (char*)packrep + 8 + reconsoff;
 	ppnt = (uint32_t*)reconspnt;
@@ -200,10 +193,10 @@ Chunk *ReconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void *repe
 	{
 		uint32_t repeatoff = *(ppnt++);
 		Chunk *c = rpmap[*(ppnt++)];
-		c->maindata_size = *(ppnt++);
-		c->maindata = malloc(c->maindata_size);
-		memcpy(c->maindata, (char*)repeat + repeatoff, c->maindata_size);
-		*(uint32_t*)c->maindata = *(ppnt++);
+		uint32_t maindata_size = *(ppnt++);
+		c->maindata.resize(maindata_size);
+		memcpy(c->maindata.data(), (char*)repeat + repeatoff, c->maindata.size());
+		*(uint32_t*)c->maindata.data() = *(ppnt++);
 	}
 
 	return mainchk;

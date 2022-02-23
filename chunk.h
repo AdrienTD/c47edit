@@ -6,22 +6,23 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
+#include "DynArray.h"
 
 struct Chunk
 {
-	uint32_t tag;
-	uint32_t size;
-	//boolean has_multidata, has_subchunks;
-	uint32_t num_datas, num_subchunks;
-	void **multidata; uint32_t* multidata_sizes;
-	Chunk *subchunks;
-	void *maindata; uint32_t maindata_size;
+	using DataBuffer = DynArray<uint8_t>;
+
+	uint32_t tag = 0;
+	std::vector<DataBuffer> multidata;
+	std::vector<Chunk> subchunks;
+	DataBuffer maindata;
 
 	~Chunk();
 
 	Chunk *findSubchunk(uint32_t tag);
-};
 
-void LoadChunk(Chunk *chk, void *bytes);
-void SaveChunkToMem(Chunk *chk, void **pnt, size_t *size);
-Chunk *ReconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void *repeat);
+	void load(void *bytes);
+	void saveToMem(void **pnt, size_t *size);
+	static Chunk reconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void *repeat);
+};

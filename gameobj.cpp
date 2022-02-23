@@ -93,7 +93,7 @@ void LoadSceneSPK(const char *fn)
 	spkmem = mz_zip_reader_extract_file_to_heap(&zip, "Pack.SPK", &spksize, 0);
 	if (!spkmem) ferr("Failed to extract Pack.SPK from ZIP archive.");
 	mz_zip_reader_end(&zip);
-	LoadChunk(spkchk, spkmem);
+	spkchk->load(spkmem);
 	free(spkmem);
 	lastspkfn = fn;
 
@@ -127,22 +127,22 @@ void LoadSceneSPK(const char *fn)
 	uint32_t objid = 1;
 	z = [&z, &objid, &chkobjmap, &idobjmap](Chunk *c, GameObject *parentobj) {
 		uint32_t pheaoff = c->tag & 0xFFFFFF;
-		uint32_t *p = (uint32_t*)((char*)phea->maindata + pheaoff);
+		uint32_t *p = (uint32_t*)((char*)phea->maindata.data() + pheaoff);
 		uint32_t ot = *(unsigned short*)(&p[5]);
-		char *objname = (char*)pnam->maindata + p[2];
+		char *objname = (char*)pnam->maindata.data() + p[2];
 
 		GameObject *o = new GameObject(objname, ot);
 		chkobjmap[c] = o;
 		parentobj->subobj.push_back(o);
 		o->parent = parentobj;
 		idobjmap[objid++] = o;
-		if (c->num_subchunks > 0)
-			for (uint32_t i = 0; i < c->num_subchunks; i++)
+		if (c->subchunks.size() > 0)
+			for (uint32_t i = 0; i < (uint32_t)c->subchunks.size(); i++)
 				z(&c->subchunks[i], o);
 	};
 
 	auto y = [z](Chunk *c, GameObject *o) {
-		for (uint32_t i = 0; i < c->num_subchunks; i++)
+		for (uint32_t i = 0; i < (uint32_t)c->subchunks.size(); i++)
 			z(&c->subchunks[i], o);
 	};
 
@@ -153,10 +153,10 @@ void LoadSceneSPK(const char *fn)
 	std::function<void(Chunk*, GameObject*)> g;
 	g = [&g,&objid,&chkobjmap,&idobjmap](Chunk *c, GameObject *parentobj) {
 		uint32_t pheaoff = c->tag & 0xFFFFFF;
-		uint32_t *p = (uint32_t*)((char*)phea->maindata + pheaoff);
+		uint32_t *p = (uint32_t*)((char*)phea->maindata.data() + pheaoff);
 		uint32_t ot = *(unsigned short*)(&p[5]);
 		const char *otname = GetObjTypeString(ot);
-		char *objname = (char*)pnam->maindata + p[2];
+		char *objname = (char*)pnam->maindata.data() + p[2];
 
 		GameObject *o = chkobjmap[c];
 		o->state = (c->tag >> 24) & 255;
@@ -166,10 +166,10 @@ void LoadSceneSPK(const char *fn)
 		o->color = p[13];
 		o->root = o->parent->root;
 
-		o->position = *(Vector3*)((char*)ppos->maindata + p[4]);
+		o->position = *(Vector3*)((char*)ppos->maindata.data() + p[4]);
 		o->matrix = Matrix::getIdentity();
 		float mc[4];
-		int32_t *mtxoff  = (int32_t*)pmtx->maindata + p[3] * 4;
+		int32_t *mtxoff  = (int32_t*)pmtx->maindata.data() + p[3] * 4;
 		for (int i = 0; i < 4; i++)
 			mc[i] = (float)((double)mtxoff[i] / 1073741824.0); // divide by 2^30
 		Vector3 rv[3];
@@ -198,7 +198,7 @@ void LoadSceneSPK(const char *fn)
 				l->param[i] = p[6 + i];
 		}
 
-		char *dpbeg = (char*)pdbl->maindata + p[0];
+		char *dpbeg = (char*)pdbl->maindata.data() + p[0];
 		uint32_t ds = *(uint32_t*)dpbeg & 0xFFFFFF;
 		o->dblflags = (*(uint32_t*)dpbeg >> 24) & 255;
 		char *dp = dpbeg + 4;
@@ -259,15 +259,15 @@ void LoadSceneSPK(const char *fn)
 			}
 		}
 
-		if (c->num_subchunks > 0)
+		if (c->subchunks.size() > 0)
 		{
-			for (uint32_t i = 0; i < c->num_subchunks; i++)
+			for (uint32_t i = 0; i < (uint32_t)c->subchunks.size(); i++)
 				g(&c->subchunks[i], o);
 		}
 	};
 
 	auto f = [g](Chunk *c, GameObject *o) {
-		for (uint32_t i = 0; i < c->num_subchunks; i++)
+		for (uint32_t i = 0; i < (uint32_t)c->subchunks.size(); i++)
 			g(&c->subchunks[i], o);
 	};
 
@@ -445,8 +445,7 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	}
 	uint32_t tagstate = o->state | (isclp ? 1 : 0);
 	c->tag = heaoff | (tagstate << 24);
-	c->num_subchunks = o->subobj.size();
-	c->subchunks = new Chunk[c->num_subchunks];
+	c->subchunks.resize(o->subobj.size());
 	int i = 0;
 	for(auto e = o->subobj.begin(); e != o->subobj.end(); e++)
 	{
@@ -459,13 +458,9 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 
 void ModifySPK()
 {
-	Chunk *nrot, *nclp;
-	nrot = new Chunk;
-	nclp = new Chunk;
-	memset(nrot, 0, sizeof(Chunk));
-	memset(nclp, 0, sizeof(Chunk));
-	nrot->tag = 'TORP';
-	nclp->tag = 'PLCP';
+	Chunk nrot, nclp;
+	nrot.tag = 'TORP';
+	nclp.tag = 'PLCP';
 
 	uint32_t objid = 1;
 	std::function<void(GameObject*)> z;
@@ -485,8 +480,7 @@ void ModifySPK()
 	g_sav_dblmap.clear();
 
 	auto f = [](Chunk *c, GameObject *o) {
-		c->num_subchunks = o->subobj.size();
-		c->subchunks = new Chunk[c->num_subchunks];
+		c->subchunks.resize(o->subobj.size());
 		moc_objcount = 0;
 		int i = 0;
 		for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
@@ -494,79 +488,64 @@ void ModifySPK()
 			Chunk *s = &c->subchunks[i++];
 			MakeObjChunk(s, *e, o==cliprootobj);
 		}
-		c->maindata = malloc(4);
-		c->maindata_size = 4;
-		*(uint32_t*)c->maindata = moc_objcount;
+		c->maindata.resize(4);
+		*(uint32_t*)c->maindata.data() = moc_objcount;
 	};
-	f(nrot, rootobj);
-	f(nclp, cliprootobj);
+	f(&nrot, rootobj);
+	f(&nclp, cliprootobj);
 
-	*prot = *nrot;
-	*pclp = *nclp;
+	*prot = std::move(nrot);
+	*pclp = std::move(nclp);
 
-	auto g = [](Chunk *nthg, std::stringbuf &buf) {
-		std::string st = buf.str();
-		nthg->maindata = malloc(st.length());
-		nthg->maindata_size = st.length();
-		memcpy(nthg->maindata, st.data(), nthg->maindata_size);
+	auto fillMaindata = [](Chunk *nthg, const auto& buf) {
+		using T = std::remove_reference_t<decltype(buf)>;
+		nthg->maindata.resize(buf.size() * sizeof(T::value_type));
+		memcpy(nthg->maindata.data(), buf.data(), nthg->maindata.size());
 	};
 
-	Chunk *nhea, *nnam, *npos, *nmtx, *ndbl;
-	nhea = new Chunk; memset(nhea, 0, sizeof(Chunk));
-	nnam = new Chunk; memset(nnam, 0, sizeof(Chunk));
-	nhea->tag = 'AEHP';
-	nnam->tag = 'MANP';
-	g(nhea, heabuf);
-	g(nnam, nambuf);
-
-	npos = new Chunk; memset(npos, 0, sizeof(Chunk));
-	npos->tag = 'SOPP';
-	npos->maindata = posbuf.data();
-	npos->maindata_size = posbuf.size() * 12;
-
-	nmtx = new Chunk; memset(nmtx, 0, sizeof(Chunk));
-	nmtx->tag = 'XTMP';
-	nmtx->maindata = mtxbuf.data();
-	nmtx->maindata_size = mtxbuf.size() * 16;
-
-	ndbl = new Chunk; memset(ndbl, 0, sizeof(Chunk));
-	ndbl->tag = 'LBDP';
-	std::string dblstr = dblbuf.str();
-	ndbl->maindata = malloc(dblstr.size());
-	memcpy(ndbl->maindata, dblstr.data(), dblstr.size());
-	ndbl->maindata_size = dblstr.size();
+	Chunk nhea, nnam, npos, nmtx, ndbl;
+	nhea.tag = 'AEHP';
+	nnam.tag = 'MANP';
+	npos.tag = 'SOPP';
+	nmtx.tag = 'XTMP';
+	ndbl.tag = 'LBDP';
+	fillMaindata(&nhea, heabuf.str());
+	fillMaindata(&nnam, nambuf.str());
+	fillMaindata(&npos, posbuf);
+	fillMaindata(&nmtx, mtxbuf);
+	fillMaindata(&ndbl, dblbuf.str());
 
 	// Chunk comparison
 	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
 		printf("----- Comparison of old and new %s -----\n", name);
 		if (chka->tag != chkb->tag)
 			printf("Different tag\n");
-		if (chka->num_datas != chkb->num_datas)
-			printf("Different num_datas: %u -> %u\n", chka->num_datas, chkb->num_datas);
-		if (chka->maindata_size != chkb->maindata_size)
-			printf("Different maindata_size: %u -> %u\n", chka->maindata_size, chkb->maindata_size);
-		else if(chka->maindata_size) {
+		if (chka->multidata.size() != chkb->multidata.size())
+			printf("Different num_datas: %zu -> %zu\n", chka->multidata.size(), chkb->multidata.size());
+		if (chka->maindata.size() != chkb->maindata.size())
+			printf("Different maindata_size: %zu -> %zu\n", chka->maindata.size(), chkb->maindata.size());
+		else if(chka->maindata.size()) {
 			uint32_t mdcmp = 0;
-			for (size_t i = 0; i < (size_t)chka->maindata_size; i++)
-				if (((char*)chka->maindata)[i] != ((char*)chkb->maindata)[i])
+			for (size_t i = 0; i < (size_t)chka->maindata.size(); i++)
+				if (((char*)chka->maindata.data())[i] != ((char*)chkb->maindata.data())[i])
 					mdcmp += 1;
 			if (mdcmp != 0)
 				printf("Different maindata content: %u bytes are different\n", mdcmp);
 		}
 	};
-	chkcmp(phea, nhea, "PHEA");
-	chkcmp(pnam, nnam, "PNAM");
-	chkcmp(ppos, npos, "PPOS");
-	chkcmp(pmtx, nmtx, "PMTX");
-	chkcmp(pdbl, ndbl, "PDBL");
+	chkcmp(phea, &nhea, "PHEA");
+	chkcmp(pnam, &nnam, "PNAM");
+	chkcmp(ppos, &npos, "PPOS");
+	chkcmp(pmtx, &nmtx, "PMTX");
+	chkcmp(pdbl, &ndbl, "PDBL");
 
-	*phea = *nhea;
-	*pnam = *nnam;
-	*ppos = *npos;
-	*pmtx = *nmtx;
-	*pdbl = *ndbl;
+	*phea = std::move(nhea);
+	*pnam = std::move(nnam);
+	*ppos = std::move(npos);
+	*pmtx = std::move(nmtx);
+	*pdbl = std::move(ndbl);
 
-	((uint32_t*)spkchk->maindata)[1] = 0x40000;
+	((uint32_t*)spkchk->maindata.data())[1] = 0x40000;
 
 	objidmap.clear();
 }
@@ -592,7 +571,7 @@ void SaveSceneSPK(const char *fn)
 
 	ModifySPK();
 	void *spkmem; size_t spksize;
-	SaveChunkToMem(spkchk, &spkmem, &spksize);
+	spkchk->saveToMem(&spkmem, &spksize);
 
 	mz_zip_writer_add_mem(&outzip, "Pack.SPK", spkmem, spksize, MZ_DEFAULT_COMPRESSION);
 	mz_zip_writer_finalize_archive(&outzip);

@@ -92,15 +92,15 @@ struct ProMesh {
 		static const int uvit[4] = { 0,1,2,3 };
 
 		ProMesh pro;
-		uint16_t *faces = (uint16_t*)pfac->maindata;
-		float *verts = (float*)pver->maindata + mesh->vertstart;
-		uint8_t *ftxpnt = (uint8_t*)pftx->maindata + mesh->ftxo - 1;
+		uint16_t *faces = (uint16_t*)pfac->maindata.data();
+		float *verts = (float*)pver->maindata.data() + mesh->vertstart;
+		uint8_t *ftxpnt = (uint8_t*)pftx->maindata.data() + mesh->ftxo - 1;
 		uint16_t *ftxFace = (uint16_t*)(ftxpnt + 12);
 		bool hasFtx = mesh->ftxo && !(mesh->ftxo & 0x80000000);
 
 		float *uvCoords = (float*)defUvs;
 		if (hasFtx)
-			uvCoords = (float*)puvc->maindata + *(uint32_t*)(ftxpnt);
+			uvCoords = (float*)puvc->maindata.data() + *(uint32_t*)(ftxpnt);
 
 		for (uint32_t i = 0; i < mesh->numtris; i++)
 		{
@@ -144,9 +144,9 @@ void Mesh::draw()
 {
 	if (!rendertextures)
 	{
-		glVertexPointer(3, GL_FLOAT, 6, (float*)pver->maindata + this->vertstart);
-		glDrawElements(GL_QUADS, this->numquads * 4, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata + this->quadstart);
-		glDrawElements(GL_TRIANGLES, this->numtris * 3, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata + this->tristart);
+		glVertexPointer(3, GL_FLOAT, 6, (float*)pver->maindata.data() + this->vertstart);
+		glDrawElements(GL_QUADS, this->numquads * 4, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata.data() + this->quadstart);
+		glDrawElements(GL_TRIANGLES, this->numtris * 3, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata.data() + this->tristart);
 	}
 	else
 	{

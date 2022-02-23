@@ -18,7 +18,7 @@ void ReadTextures()
 {
 	mz_zip_archive zip;
 	void *packmem, *repmem = 0; size_t packsize, repsize;
-	Chunk *mainchk;
+	Chunk mainchk;
 
 	mz_zip_zero_struct(&zip);
 	mz_bool mzreadok = mz_zip_reader_init_mem(&zip, zipmem, zipsize, 0);
@@ -34,26 +34,25 @@ void ReadTextures()
 		repmem = malloc(repsize);
 		fread(repmem, repsize, 1, repfile);
 		fclose(repfile);
-		mainchk = ReconstructPackFromRepeat(packmem, packsize, repmem);
+		mainchk = Chunk::reconstructPackFromRepeat(packmem, packsize, repmem);
 	}
 	else
 	{
 		packmem = mz_zip_reader_extract_file_to_heap(&zip, "Pack.PAL", &packsize, 0);
 		if(!packmem) ferr("Failed to find Pack.PAL or PackRepeat.PAL in ZIP archive.");
-		mainchk = new Chunk;
-		LoadChunk(mainchk, packmem);
+		mainchk.load(packmem);
 	}
 
 	mz_zip_reader_end(&zip);
 	if(repmem) free(repmem);
 	free(packmem);
 
-	if (mainchk->tag != 'PAL') ferr("Not a PAL chunk in Repeat.PAL");
+	if (mainchk.tag != 'PAL') ferr("Not a PAL chunk in Repeat.PAL");
 
-	for (int i = 0; i < mainchk->num_subchunks; i++)
+	for (size_t i = 0; i < mainchk.subchunks.size(); i++)
 	{
-		Chunk *c = &mainchk->subchunks[i];
-		uint8_t *d = (uint8_t*)c->maindata;
+		Chunk *c = &mainchk.subchunks[i];
+		uint8_t *d = (uint8_t*)c->maindata.data();
 		uint32_t texid = *(uint32_t*)d;
 		uint32_t texh = *(uint16_t*)(d + 4);
 		uint32_t texw = *(uint16_t*)(d + 6);
