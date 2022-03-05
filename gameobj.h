@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <variant>
 #include <vector>
 
@@ -42,7 +43,7 @@ struct Mesh
 	//float *vertices;
 	//uint16_t *quadindices, *triindices;
 	uint32_t vertstart, quadstart, tristart, ftxo, numverts, numquads, numtris, weird;
-	void Mesh::draw();
+	void Mesh::draw(Vector3* animatedVertices = nullptr);
 };
 
 struct Light
@@ -62,6 +63,8 @@ struct DBLEntry
 
 struct GameObject
 {
+	uint32_t refcount = 0;
+
 	uint32_t state = 0;
 	uint32_t pdbloff = 0, pexcoff = 0;
 	std::string name;
@@ -82,7 +85,7 @@ struct GameObject
 	std::vector<DBLEntry> dbl;
 	uint32_t dblflags = 0;
 
-	uint32_t refcount = 0;
+	std::shared_ptr<Chunk> pexcChunk;
 
 	GameObject(const char *nName = "Unnamed", int nType = 0) : name(nName), type(nType) {}
 	GameObject(const GameObject& other) = default;

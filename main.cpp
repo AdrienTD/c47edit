@@ -7,6 +7,7 @@
 #include <cmath>
 #include <ctime>
 #include <functional>
+#include <stack>
 
 #include "chunk.h"
 #include "gameobj.h"
@@ -24,6 +25,15 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_opengl2.h"
 #include "imgui/imgui_impl_win32.h"
+
+#pragma pack(push, 1)
+struct BonePre {
+	uint16_t parentIndex, flags;
+	double stuff[7];
+	char name[16];
+};
+static_assert(sizeof(BonePre) == 0x4C);
+#pragma pack(pop)
 
 GameObject *selobj = 0, *viewobj = 0;
 float objviewscale = 0.0f;
@@ -317,6 +327,32 @@ void IGObjectInfo()
 			ImGui::Text("Quad count:   %u", selobj->mesh->numquads);
 			ImGui::Text("Tri count:    %u", selobj->mesh->numtris);
 			ImGui::Text("FTXO offset: 0x%X", selobj->mesh->ftxo);
+			ImGui::Text("Weird: 0x%X", selobj->mesh->weird);
+
+			uint8_t *ftxpnt = (uint8_t*)pftx->maindata.data() + selobj->mesh->ftxo - 1;
+			uint16_t *ftxFace = (uint16_t*)(ftxpnt + 12);
+			uint16_t *faces = (uint16_t*)pfac->maindata.data();
+			for (uint32_t i = 0; i < selobj->mesh->numtris; i++) {
+				uint16_t indices[3];
+				for (int j = 0; j < 3; j++) {
+					indices[j] = faces[selobj->mesh->tristart + i * 3 + j] / 2;
+				}
+				if (ftxFace[0] == 1) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 0, 0, 1));
+				ImGui::BulletText("Tri %04X %04X %04X %04X %04X %04X\n%04X %04X %04X", ftxFace[0], ftxFace[1], ftxFace[2], ftxFace[3], ftxFace[4], ftxFace[5], indices[0], indices[1], indices[2]);
+				if (ftxFace[0] == 1) ImGui::PopStyleColor(1);
+				ftxFace += 6;
+			}
+			for (uint32_t i = 0; i < selobj->mesh->numquads; i++) {
+				uint16_t indices[4];
+				for (int j = 0; j < 4; j++) {
+					indices[j] = faces[selobj->mesh->quadstart + i * 4 + j] / 2;
+				}
+				if (ftxFace[0] == 1) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 0, 0, 1));
+				ImGui::BulletText("Quad %04X %04X %04X %04X %04X %04X\n%04X %04X %04X %04X", ftxFace[0], ftxFace[1], ftxFace[2], ftxFace[3], ftxFace[4], ftxFace[5], indices[0], indices[1], indices[2], indices[3]);
+				if (ftxFace[0] == 1) ImGui::PopStyleColor(1);
+				ftxFace += 6;
+			}
+
 		}
 		if (selobj->light)
 			if(ImGui::CollapsingHeader("Light"))
@@ -328,6 +364,53 @@ void IGObjectInfo()
 			{
 				s[6] = '0' + i;
 				ImGui::InputScalar(s, ImGuiDataType_U32, &selobj->light->param[i], 0, 0, "%08X", ImGuiInputTextFlags_CharsHexadecimal);
+			}
+		}
+		if (selobj->pexcChunk && ImGui::CollapsingHeader("PEXC Chunk")) {
+			Chunk& exchk = *selobj->pexcChunk;
+			if (Chunk* lche = exchk.findSubchunk('LCHE')) {
+				Chunk* hmtx = exchk.findSubchunk('HMTX');
+				Chunk* hpre = exchk.findSubchunk('HPRE');
+				Chunk* hpts = exchk.findSubchunk('HPTS');
+				assert(hmtx && hpre && hpts);
+				uint32_t numBones = *(uint32_t*)lche->maindata.data();
+				assert(hmtx->multidata.size() == numBones);
+				uint16_t* ranges = (uint16_t*)hpts->maindata.data();
+				if (ImGui::Button("Corrupt")) {
+					//Chunk* vrmp = exchk.findSubchunk('VRMP');
+					//assert(vrmp);
+					//memset(vrmp->maindata.data(), 0, vrmp->maindata.size());
+					//*(uint32_t*)vrmp->maindata.data() /= 2;
+					Chunk* hpvd = exchk.findSubchunk('HPVD');
+					assert(hpvd);
+					//memset(hpvd->maindata.data(), 0, hpvd->maindata.size());
+					using PvdElem = std::pair<uint32_t, float>;
+					static_assert(sizeof(PvdElem) == 8);
+					PvdElem* elems = (PvdElem*)hpvd->maindata.data();
+					int numElems = hpvd->maindata.size() / 8;
+					for (int i = 0; i < numElems; ++i) {
+						elems[i].second = 0.0f;
+					}
+					//Chunk* hpts = exchk.findSubchunk('HPTS');
+					//assert(hpts);
+					//memset(hpts->maindata.data(), 0, hpts->maindata.size());
+				}
+				for (uint32_t i = 0; i < numBones; ++i) {
+					BonePre* bone;
+					if (hpre->maindata.size() > 0)
+						bone = ((BonePre*)hpre->maindata.data()) + i;
+					else
+						bone = (BonePre*)hpre->multidata[0].data() + i;
+					if (ImGui::TreeNode((void*)i, "%2i: %s (%i %i %i)", i, bone->name, bone->parentIndex, bone->flags, ranges[i])) {
+						ImGui::Text("%i %i\n%f %f %f\n%f %f %f %f\n%s", bone->parentIndex, bone->flags, bone->stuff[0], bone->stuff[1], bone->stuff[2], bone->stuff[3], bone->stuff[4], bone->stuff[5], bone->stuff[6], bone->name);
+						double* mat = (double*)hmtx->multidata[i].data();
+						for (int row = 3; row >= 0; --row) {
+							ImGui::Text("%.3f %.3f %.3f", mat[3 * row], mat[3 * row + 1], mat[3 * row + 2]);
+						}
+						ImGui::TreePop();
+					}
+				}
+
 			}
 		}
 		if (wannadel)
@@ -448,7 +531,80 @@ void RenderObject(GameObject *o)
 			uint32_t clr = swap_rb(o->color);
 			glColor4ubv((uint8_t*)&clr);
 		}
-		o->mesh->draw();
+		Vector3* animVerts = nullptr;
+		if (o->pexcChunk) {
+			if (Chunk* lche = o->pexcChunk->findSubchunk('LCHE')) {
+				static std::vector<Vector3> animVertsVec;
+				animVertsVec.resize(o->mesh->numverts);
+				Vector3* orig = (Vector3*)((float*)pver->maindata.data() + o->mesh->vertstart);
+				for (size_t i = 0; i < o->mesh->numverts; ++i) {
+					animVertsVec[i] = orig[i];
+					//animVertsVec[i] = {};
+					auto randCoord = []() -> float {
+						// random float number between [-10;10]
+						return (((float)rand() / (float)RAND_MAX) - 0.5f) * 5.0f;
+					};
+					//animVertsVec[i] = Vector3(randCoord(), randCoord(), randCoord());
+				}
+
+				uint32_t numVerts1 = *(uint32_t*)(lche->maindata.data() + 4);
+				uint32_t numVerts2 = *(uint32_t*)(lche->maindata.data() + 8);
+				uint32_t numPackedVerts = *(uint32_t*)(lche->maindata.data() + 12);
+				assert(numVerts1 == numVerts2);
+				assert(numVerts1 == o->mesh->numverts);
+				//if (Chunk* vrmp = o->pexcChunk->findSubchunk('VRMP')) {
+				//	uint8_t* vrmpData = vrmp->maindata.data();
+				//	uint32_t count = *(uint32_t*)vrmpData;
+				//	uint32_t* arr = (uint32_t*)(vrmpData + 4);
+				//	for (uint32_t i = 0; i < count; ++i) {
+				//		animVertsVec[arr[2 * i + 1] / 3] = animVertsVec[arr[2 * i] / 3];
+				//	}
+				//}
+				//for (size_t i = 0; i < numVerts1; ++i) {
+				//	animVertsVec[i] = Vector3(0, 0, 0);
+				//}
+
+				Chunk* hmtx = o->pexcChunk->findSubchunk('HMTX');
+				Chunk* hpre = o->pexcChunk->findSubchunk('HPRE');
+				Chunk* hpts = o->pexcChunk->findSubchunk('HPTS');
+				uint32_t numBones = *(uint32_t*)lche->maindata.data();
+				uint16_t* ranges = (uint16_t*)hpts->maindata.data();
+				assert(hpts->maindata.size() == numBones * 2);
+				for (uint32_t bone = 0; bone < numBones; ++bone) {
+					uint16_t startIndex = (bone > 0) ? ranges[bone - 1] : 0;
+					uint16_t stopIndex = ranges[bone];
+
+					// --- Get Bone global matrix ---
+					int xxx = bone;
+					Matrix globalMtx = Matrix::getIdentity();
+					while (xxx != 65535) {
+						BonePre* bonepre;
+						if (hpre->maindata.size() > 0)
+							bonepre = ((BonePre*)hpre->maindata.data()) + xxx;
+						else
+							bonepre = (BonePre*)hpre->multidata[0].data() + xxx;
+						double* dmtx = (double*)hmtx->multidata[xxx].data();
+						Matrix boneMtx = Matrix::getIdentity();
+						for (int row = 3; row >= 0; --row) {
+							boneMtx.m[row][0] = (float)*(dmtx++);
+							boneMtx.m[row][1] = (float)*(dmtx++);
+							boneMtx.m[row][2] = (float)*(dmtx++);
+						}
+						globalMtx = globalMtx * boneMtx;
+						xxx = bonepre->parentIndex;
+					}
+					// ------
+
+
+					for (uint16_t vtx = startIndex; vtx < stopIndex; ++vtx) {
+						//animVertsVec[vtx].z += bone * 100;
+						animVertsVec[vtx] = animVertsVec[vtx].transform(globalMtx);
+					}
+				}
+				animVerts = animVertsVec.data();
+			}
+		}
+		o->mesh->draw(animVerts);
 	}
 	for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
 		RenderObject(*e);
@@ -545,6 +701,23 @@ int main(int argc, char* argv[])
 //int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode)
 {
 	//SetProcessDPIAware();
+
+	//auto readfile = [](const char* path) {
+	//	DynArray<uint8_t> bytes;
+	//	FILE* file; long flen;
+	//	fopen_s(&file, path, "rb");
+	//	assert(file);
+	//	fseek(file, 0, SEEK_END);
+	//	flen = ftell(file);
+	//	fseek(file, 0, SEEK_SET);
+	//	bytes.resize(flen);
+	//	fread(bytes.data(), flen, 1, file);
+	//	fclose(file);
+	//	return bytes;
+	//};
+	//DynArray<uint8_t> anmRepeat = readfile(R"-(C:\Program Files (x86)\Eidos Interactive\IO Interactive\Hitman - tueur à gages\Repeat.ANM)-");
+	//DynArray<uint8_t> anmPackRepeat = readfile(R"-(C:\Program Files (x86)\Eidos Interactive\IO Interactive\Hitman - tueur à gages\Cutscenes\C1_HongKong\PackRepeat.ANM)-");
+	//Chunk anmChunk = Chunk::reconstructPackFromRepeat(anmPackRepeat.data(), anmPackRepeat.size(), anmRepeat.data());
 
 	OPENFILENAME ofn; char zipfilename[1024]; zipfilename[0] = 0;
 	memset(&ofn, 0, sizeof(OPENFILENAME));
@@ -682,16 +855,53 @@ int main(int argc, char* argv[])
 					glBegin(GL_POINTS);
 					auto renderAnim = [pexc](auto rec, GameObject* obj, const Matrix& prevmat) -> void {
 						Matrix mat = obj->matrix * Matrix::getTranslationMatrix(obj->position) * prevmat;
-						if (obj->pexcoff) {
-							uint8_t* excptr = (uint8_t*)pexc->maindata.data() + obj->pexcoff - 1;
-							Chunk exchk;
-							exchk.load(excptr);
+						if (obj->pexcChunk) {
+							Chunk& exchk = *obj->pexcChunk;
 							assert(exchk.tag == 'HEAD');
 							if (auto* keys = exchk.findSubchunk('KEYS')) {
 								uint32_t cnt = *(uint32_t*)(keys->multidata[0].data());
 								for (uint32_t i = 1; i <= cnt; ++i) {
 									float* kpos = (float*)((char*)(keys->multidata[i].data()) + 4);
 									Vector3 vpos = Vector3(kpos[0], kpos[1], kpos[2]).transform(mat);
+									//glVertex3fv(&vpos.x);
+								}
+							}
+							else if (Chunk* lche = exchk.findSubchunk('LCHE')) {
+								Chunk* hmtx = exchk.findSubchunk('HMTX');
+								Chunk* hpre = exchk.findSubchunk('HPRE');
+								uint32_t numBones = *(uint32_t*)lche->maindata.data();
+								assert(hmtx->multidata.size() == numBones);
+								std::stack<Matrix> matrixStack;
+								matrixStack.push(Matrix::getIdentity());
+								for (uint32_t i = 0; i < numBones; ++i) {
+									int xxx = i;
+									Matrix globalMtx = Matrix::getIdentity();
+									while (xxx != 65535) {
+										BonePre* bone;
+										if (hpre->maindata.size() > 0)
+											bone = ((BonePre*)hpre->maindata.data()) + xxx;
+										else
+											bone = (BonePre*)hpre->multidata[0].data() + xxx;
+										double* dmtx = (double*)hmtx->multidata[xxx].data();
+										Matrix boneMtx = Matrix::getIdentity();
+										for (int row = 3; row >= 0; --row) {
+											boneMtx.m[row][0] = (float)*(dmtx++);
+											boneMtx.m[row][1] = (float)*(dmtx++);
+											boneMtx.m[row][2] = (float)*(dmtx++);
+										}
+										globalMtx = globalMtx * boneMtx;
+										xxx = bone->parentIndex;
+									}
+
+									BonePre* bone = ((BonePre*)hpre->maindata.data()) + i;
+									//Matrix& topMtx = matrixStack.top();
+									//topMtx = boneMtx * topMtx;
+									//Vector3 vpos = Vector3(0, 0, 0).transform(topMtx);
+									//if (bone->flags == 2)
+									//	matrixStack.push(topMtx);
+									//else if (bone->flags == 1)
+									//	matrixStack.pop();
+									Vector3 vpos = Vector3(0, 0, 0).transform(globalMtx * mat);
 									glVertex3fv(&vpos.x);
 								}
 							}

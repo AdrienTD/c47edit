@@ -73,6 +73,8 @@ struct ProMesh {
 		std::vector<Vector3> vertices;
 		std::vector<std::pair<float, float>> texcoords;
 		std::vector<IndexType> indices;
+
+		std::vector<IndexType> originalVertexIndices;
 	};
 	std::map<uint16_t, Part> parts;
 
@@ -102,6 +104,8 @@ struct ProMesh {
 		if (hasFtx)
 			uvCoords = (float*)puvc->maindata.data() + *(uint32_t*)(ftxpnt);
 
+		uint16_t ftxStartIndex = 0;
+
 		for (uint32_t i = 0; i < mesh->numtris; i++)
 		{
 			uint16_t texid = hasFtx ? ftxFace[2] : 65535;
@@ -110,14 +114,20 @@ struct ProMesh {
 			for (int j = 0; j < 3; j++) {
 				float* uu = uvCoords + uvit[j] * 2;
 				part.texcoords.push_back({ uu[0], uu[1] });
-				float *v = verts + faces[mesh->tristart + i * 3 + j] * 3 / 2;
+				uint16_t index = faces[mesh->tristart + i * 3 + j] / 2 + ftxStartIndex;
+				float *v = verts + index * 3;
 				part.vertices.push_back({ v[0], v[1], v[2] });
+				part.originalVertexIndices.push_back(index);
 			}
 			for (int j : {0, 1, 2})
 				part.indices.push_back((IndexType)(prostart + j));
+			if (hasFtx && (ftxFace[0] == 1)) {
+				//ftxStartIndex += 1;
+			}
 			ftxFace += 6;
 			uvCoords += 8; // Ignore 4th UV.
 		}
+		ftxStartIndex = 0;
 		for (uint32_t i = 0; i < mesh->numquads; i++)
 		{
 			uint16_t texid = hasFtx ? ftxFace[2] : 65535;
@@ -126,11 +136,16 @@ struct ProMesh {
 			for (int j = 0; j < 4; j++) {
 				float* uu = uvCoords + uvit[j] * 2;
 				part.texcoords.push_back({ uu[0], uu[1] });
-				float *v = verts + faces[mesh->quadstart + i * 4 + j] * 3 / 2;
+				uint16_t index = faces[mesh->quadstart + i * 4 + j] / 2 + ftxStartIndex;
+				float *v = verts + index * 3;
 				part.vertices.push_back({ v[0], v[1], v[2] });
+				part.originalVertexIndices.push_back(index);
 			}
 			for (int j : {0, 1, 3, 3, 1, 2 })
 				part.indices.push_back((IndexType)(prostart + j));
+			if (hasFtx && (ftxFace[0] == 1)) {
+				//ftxStartIndex += 1;
+			}
 			ftxFace += 6;
 			uvCoords += 8;
 		}
@@ -140,13 +155,14 @@ struct ProMesh {
 	}
 };
 
-void Mesh::draw()
+void Mesh::draw(Vector3* animatedVertices)
 {
 	if (!rendertextures)
 	{
-		glVertexPointer(3, GL_FLOAT, 6, (float*)pver->maindata.data() + this->vertstart);
+		glVertexPointer(3, GL_FLOAT, 6, animatedVertices ? (float*)animatedVertices : ((float*)pver->maindata.data() + this->vertstart));
 		glDrawElements(GL_QUADS, this->numquads * 4, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata.data() + this->quadstart);
 		glDrawElements(GL_TRIANGLES, this->numtris * 3, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata.data() + this->tristart);
+		//glDrawArrays(GL_POINTS, 0, this->numverts);
 	}
 	else
 	{
@@ -161,7 +177,16 @@ void Mesh::draw()
 				glBindTexture(GL_TEXTURE_2D, 0);
 			else
 				continue;
-			glVertexPointer(3, GL_FLOAT, 12, part.vertices.data());
+			Vector3* vertices = part.vertices.data();
+			if (animatedVertices) {
+				static std::vector<Vector3> animatedProVerts;
+				animatedProVerts.resize(part.vertices.size());
+				for (size_t i = 0; i < part.vertices.size(); ++i) {
+					animatedProVerts[i] = animatedVertices[part.originalVertexIndices[i]];
+				}
+				vertices = animatedProVerts.data();
+			}
+			glVertexPointer(3, GL_FLOAT, 12, vertices);
 			glTexCoordPointer(2, GL_FLOAT, 8, part.texcoords.data());
 			glDrawElements(GL_TRIANGLES, part.indices.size(), GL_UNSIGNED_SHORT, part.indices.data());
 		}

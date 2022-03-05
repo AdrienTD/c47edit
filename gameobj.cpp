@@ -61,7 +61,7 @@ const char *objtypenames[] = {
 };
 
 Chunk *spkchk;
-Chunk *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc, *pdbl;
+Chunk *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc, *pdbl, *pexc;
 GameObject *rootobj, *cliprootobj, *superroot;
 std::string lastspkfn;
 void *zipmem = 0; uint32_t zipsize = 0;
@@ -108,6 +108,7 @@ void LoadSceneSPK(const char *fn)
 	pftx = spkchk->findSubchunk('XTFP');
 	puvc = spkchk->findSubchunk('CVUP');
 	pdbl = spkchk->findSubchunk('LBDP');
+	pexc = spkchk->findSubchunk('CXEP'); // optional for now (since demo doesn't have it)
 	if (!(prot && pclp && phea && pnam && ppos && pmtx && pver && pfac && pftx && puvc && pdbl))
 		ferr("One or more important chunks were not found in Pack.SPK .");
 
@@ -259,6 +260,12 @@ void LoadSceneSPK(const char *fn)
 			}
 		}
 
+		if (pexc && o->pexcoff > 0) {
+			void *echkptr = pexc->maindata.data() + o->pexcoff - 1;
+			o->pexcChunk = std::make_shared<Chunk>();
+			o->pexcChunk->load(echkptr);
+		}
+
 		if (c->subchunks.size() > 0)
 		{
 			for (uint32_t i = 0; i < (uint32_t)c->subchunks.size(); i++)
@@ -287,6 +294,7 @@ struct DBLHash
 std::stringbuf heabuf, nambuf, dblbuf;
 std::vector<std::array<float,3> > posbuf;
 std::vector<std::array<uint32_t, 4> > mtxbuf;
+std::stringbuf excbuf;
 
 uint32_t sbtell(std::stringbuf *sb);
 
@@ -402,6 +410,15 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	else
 		dbloff = diter->second;
 
+	uint32_t excoff = 0;
+	if (o->pexcChunk) {
+		excoff = 1 + sbtell(&excbuf);
+		void* excdata; size_t excsize;
+		o->pexcChunk->saveToMem(&excdata, &excsize);
+		excbuf.sputn((const char*)excdata, excsize);
+		free(excdata);
+	}
+
 	uint32_t heaoff = sbtell(&heabuf);
 
 	auto itNammap = g_sav_nammap.find(o->name);
@@ -417,7 +434,7 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	if(true)
 	{
 		heabuf.sputn((char*)&dbloff, 4);
-		heabuf.sputn((char*)&o->pexcoff, 4);
+		heabuf.sputn((char*)&excoff, 4);
 		heabuf.sputn((char*)&namoff, 4);
 		heabuf.sputn((char*)&mtxoff, 4);
 		heabuf.sputn((char*)&posoff, 4);
@@ -503,17 +520,19 @@ void ModifySPK()
 		memcpy(nthg->maindata.data(), buf.data(), nthg->maindata.size());
 	};
 
-	Chunk nhea, nnam, npos, nmtx, ndbl;
+	Chunk nhea, nnam, npos, nmtx, ndbl, nexc;
 	nhea.tag = 'AEHP';
 	nnam.tag = 'MANP';
 	npos.tag = 'SOPP';
 	nmtx.tag = 'XTMP';
 	ndbl.tag = 'LBDP';
+	nexc.tag = 'CXEP';
 	fillMaindata(&nhea, heabuf.str());
 	fillMaindata(&nnam, nambuf.str());
 	fillMaindata(&npos, posbuf);
 	fillMaindata(&nmtx, mtxbuf);
 	fillMaindata(&ndbl, dblbuf.str());
+	fillMaindata(&nexc, excbuf.str());
 
 	// Chunk comparison
 	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
@@ -538,12 +557,14 @@ void ModifySPK()
 	chkcmp(ppos, &npos, "PPOS");
 	chkcmp(pmtx, &nmtx, "PMTX");
 	chkcmp(pdbl, &ndbl, "PDBL");
+	chkcmp(pexc, &nexc, "PEXC");
 
 	*phea = std::move(nhea);
 	*pnam = std::move(nnam);
 	*ppos = std::move(npos);
 	*pmtx = std::move(nmtx);
 	*pdbl = std::move(ndbl);
+	*pexc = std::move(nexc);
 
 	((uint32_t*)spkchk->maindata.data())[1] = 0x40000;
 
