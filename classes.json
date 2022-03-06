@@ -1,0 +1,2473 @@
+{
+"geoms": [
+  {
+    "name": "CBinocularCamera",
+    "type": "ZCAMERA",
+    "id": 61,
+    "num1": 694,
+    "num2": 4194365,
+    "members": "ZGEOMREF OverlaySight;ZGEOMREF Compass;ZGEOMREF ZoomLvl;ZGEOMREF Distance;ZGEOMREF ShutterLow;ZGEOMREF ShutterHigh;SNDREF ShutterSound;SNDREF HummSound;SNDREF NoiseSound;SNDREF ZoomInSound;SNDREF ZoomOutSound;"
+  },
+  {
+    "name": "CMapCapture",
+    "type": "ZCAPTURE",
+    "id": 68,
+    "num1": 296,
+    "num2": -2146435004,
+    "members": ";"
+  },
+  {
+    "name": "CSniperCamera",
+    "type": "ZCAMERA",
+    "id": 41,
+    "num1": 633,
+    "num2": 4194345,
+    "members": "ZGEOMREF OverlaySight;ZGEOMREF Shutter;SNDREF ShutterSound;"
+  },
+  {
+    "name": "CWEAPONMOUSECAPTURE",
+    "type": "ZCAPTURE",
+    "id": 67,
+    "num1": 484,
+    "num2": -2146435005,
+    "members": ";"
+  },
+  {
+    "name": "Z2DOBJ",
+    "type": "ZSTDOBJ",
+    "id": 11,
+    "num1": 156,
+    "num2": 2097163,
+    "members": "long LockAxis=0;"
+  },
+  {
+    "name": "ZActionArbiter",
+    "type": "ZLIST",
+    "id": 201,
+    "num1": 190,
+    "num2": 134217929,
+    "members": "float EventGrid=4.0;long MaxCharInGrid=1;float WarnDist=10.0;float BCDelay=5.0;SNDREF BCSound;"
+  },
+  {
+    "name": "ZBOUND",
+    "type": "ZSTDOBJ",
+    "id": 28,
+    "num1": 144,
+    "num2": 2097180,
+    "members": ""
+  },
+  {
+    "name": "ZBOXGATEGROUP",
+    "type": "ZGROUP",
+    "id": 40,
+    "num1": 205,
+    "num2": 1048616,
+    "members": ""
+  },
+  {
+    "name": "ZBOXLIGHT",
+    "type": "ZLIGHT",
+    "id": 38,
+    "num1": 244,
+    "num2": -2139095002,
+    "members": ""
+  },
+  {
+    "name": "ZBOXSTDOBJ",
+    "type": "ZSTDOBJ",
+    "id": 112,
+    "num1": 148,
+    "num2": 2097264,
+    "members": ""
+  },
+  {
+    "name": "ZBUTTON",
+    "type": "ZCONTROL",
+    "id": 51,
+    "num1": 274,
+    "num2": 1048627,
+    "members": "enum InitialState={NORMAL,PUSHED};enum ButtonType={NORMAL,CHECKBUTTON};SNDREF FocusSound;SNDREF ClickSound;"
+  },
+  {
+    "name": "ZBoxPrimitive",
+    "type": "ZSTDOBJ",
+    "id": 225,
+    "num1": 172,
+    "num2": 2097377,
+    "members": "float scaleX=10;float scaleY=10;float scaleZ=10;enum NotifyOn={Never,Messages,Visible,Both};ZGEOMREFTAB NotifyGeoms;MSG Visible=msgVisible;MSG Invisible=msgInvisible;"
+  },
+  {
+    "name": "ZCAMERA",
+    "type": "ZGEOM",
+    "id": 3,
+    "num1": 482,
+    "num2": 4194307,
+    "members": "double Near=0.1;double Far=3000;long BackCol[3]={1,2,3};double m_TargetLen;double FOV;long TargetWindow=0;long TargetSubWindow=0;long WindowListPri=1000;enum Aspect={NORMAL,WIDESCREEN};BOOL bFogEnabled=true;float fFogNear=0;float fFogFar=0;"
+  },
+  {
+    "name": "ZCHAROBJ",
+    "type": "ZWINOBJ",
+    "id": 45,
+    "num1": 535,
+    "num2": 2097197,
+    "members": "char* Stringtable;char* TextID;ZGEOMREF Font;double Color[3]={0,255,0};"
+  },
+  {
+    "name": "ZCONTROL",
+    "type": "ZWINGROUP",
+    "id": 50,
+    "num1": 258,
+    "num2": -2146435022,
+    "members": "bool Visible=true;bool Disabled=false;long ID=0;"
+  },
+  {
+    "name": "ZConditionList",
+    "type": "ZLIST",
+    "id": 200,
+    "num1": 166,
+    "num2": 134217928,
+    "members": "enum Type={STDLIST,CORNERLIST};table CornerData;"
+  },
+  {
+    "name": "ZDYNAMICS2",
+    "type": "ZSTDOBJ",
+    "id": 31,
+    "num1": 240,
+    "num2": 2097183,
+    "members": "float Gravity=0.5;"
+  },
+  {
+    "name": "ZDYNAMICS",
+    "type": "ZGEOM",
+    "id": 30,
+    "num1": 84,
+    "num2": 33554462,
+    "members": ""
+  },
+  {
+    "name": "ZEDITCAM",
+    "type": "ZCAMERA",
+    "id": 7,
+    "num1": 531,
+    "num2": 4194311,
+    "members": "long EditCam;"
+  },
+  {
+    "name": "ZEDITORGROUP",
+    "type": "ZGROUP",
+    "id": 43,
+    "num1": 172,
+    "num2": 1048619,
+    "members": ""
+  },
+  {
+    "name": "ZENVIRONMENTPIC",
+    "type": "ZENVIRONMENT",
+    "id": 63,
+    "num1": 168,
+    "num2": 8388671,
+    "members": "ZGEOMREFTAB rtLightPictires;"
+  },
+  {
+    "name": "ZENVIRONMENT",
+    "type": "ZLIGHT",
+    "id": 13,
+    "num1": 160,
+    "num2": 8388621,
+    "members": "float AmbientColor[3]={0,0,0};bool AmbientEnable=1;bool FogEnable=1;"
+  },
+  {
+    "name": "ZEditControl",
+    "type": "ZCONTROL",
+    "id": 66,
+    "num1": 418,
+    "num2": 1048642,
+    "members": "ZGEOMREF Font;COLOR TextColor=0;"
+  },
+  {
+    "name": "ZExtCharObj",
+    "type": "ZCHAROBJ",
+    "id": 57,
+    "num1": 535,
+    "num2": 2097209,
+    "members": "char* Stringtable;char* TextID;ZGEOMREF Font;double Color[3]={0,255,0};"
+  },
+  {
+    "name": "ZFONT",
+    "type": "ZWINOBJ",
+    "id": 47,
+    "num1": 276,
+    "num2": 2097199,
+    "members": "long SpaceX;long SpaceY;data CharInfo;LONG FirstChar=32;"
+  },
+  {
+    "name": "ZFRAME",
+    "type": "ZWINOBJ",
+    "id": 69,
+    "num1": 407,
+    "num2": 2097221,
+    "members": "ZGeomRefTab Pieces;LONG width=0; LONG height=0;"
+  },
+  {
+    "name": "ZGATE",
+    "type": "ZSTDOBJ",
+    "id": 21,
+    "num1": 416,
+    "num2": 2097173,
+    "members": "double Depth=80;bool PFExtendFloor=true;bool PFEnabled=true;bool DynamicsEnable=false;"
+  },
+  {
+    "name": "ZGEOM",
+    "type": "(null)",
+    "id": 0,
+    "num1": 84,
+    "num2": 0,
+    "members": "double Position[3]={0,0,0};double Matrix[3][3]={0,0,1,0,1,0,1,0,0};char* Routs;enum Create={ROOT,CLIP};Script ZGeomScript;"
+  },
+  {
+    "name": "ZGIGAOBJ",
+    "type": "ZSTDOBJ",
+    "id": 8,
+    "num1": 152,
+    "num2": 2097160,
+    "members": "double Scale=1.0;"
+  },
+  {
+    "name": "ZGROUP",
+    "type": "ZGEOM",
+    "id": 1,
+    "num1": 172,
+    "num2": 1048577,
+    "members": "long test=666;float PFResMultiplier=1.0;"
+  },
+  {
+    "name": "ZGraphObj",
+    "type": "ZSTDOBJ",
+    "id": 223,
+    "num1": 205,
+    "num2": 2097375,
+    "members": ""
+  },
+  {
+    "name": "ZHELPER",
+    "type": "ZSTDOBJ",
+    "id": 5,
+    "num1": 172,
+    "num2": 2097157,
+    "members": ""
+  },
+  {
+    "name": "ZIKLNKOBJ",
+    "type": "ZLNKOBJ",
+    "id": 39,
+    "num1": 1894,
+    "num2": 2097191,
+    "members": "ZANIMBODY IKAnims={Pull_Item_LHand,Pull_Item_RHand};"
+  },
+  {
+    "name": "ZITEMBUTTON",
+    "type": "ZITEM",
+    "id": 108,
+    "num1": 267,
+    "num2": 1048684,
+    "members": "ZGEOMREF rActivate;MSG msgActivate;"
+  },
+  {
+    "name": "ZITEMGROUPAMMO",
+    "type": "ZITEMGROUP",
+    "id": 106,
+    "num1": 233,
+    "num2": 1048682,
+    "members": "float NearDamage;float FarDamage;enum Type={NONE,DART,PISTOL,SMG,556,762,MG,MAGNUM,SNIPER,SHOTGUN};"
+  },
+  {
+    "name": "ZITEMGROUPWEAPON",
+    "type": "ZITEMGROUP",
+    "id": 105,
+    "num1": 356,
+    "num2": 1048681,
+    "members": "bool SniperMode=false;DOUBLE TimeBetweenShot=0.5;DOUBLE TimeReload=1.0;long ProjectilesPerMagazine=10;ENUM Operation={Manual,Semiauto,Fullauto,Fullauto3};ZGEOMREF Ammo;LONG MuzzleVelocity=600;float Precision(deg)=0;float NearRange(m)=50;float FarRange(m)=1000;float DamageMul=1.0;float Impact=1;bool CanFireProjectiles=true;bool CanHoldMagazines=true;"
+  },
+  {
+    "name": "ZITEMGROUP",
+    "type": "ZGROUP",
+    "id": 102,
+    "num1": 221,
+    "num2": 1048678,
+    "members": "enum Hands={IH_ITEM,IH_GUN,IH_RIFLE,IH_SUB,IH_SUITCASE,IH_PIANO,IH_KNIFE,IH_NONE,IH_SHOTGUN};ZGEOMREF rContain;ZGEOMREF rPointerPicture;ZGEOMREF rPointerContextPicture;CHAR* LocaleID;DOUBLE Price;SNDREF DropSound;BOOL HeroCanPickup=TRUE;"
+  },
+  {
+    "name": "ZITEM",
+    "type": "ZGROUP",
+    "id": 101,
+    "num1": 259,
+    "num2": 1048677,
+    "members": "ZGEOMREF rItemGroup;enum lStartState={IS_DEFAULT,IS_PICKUP,IS_HOLD,IS_HIDE,IS_USE,IS_ACTIVATE,IS_DROP};"
+  },
+  {
+    "name": "ZItemAmmo",
+    "type": "ZITEM",
+    "id": 109,
+    "num1": 263,
+    "num2": 1048685,
+    "members": "long lNrProjectiles=10;"
+  },
+  {
+    "name": "ZLIGHT",
+    "type": "ZGEOM",
+    "id": 4,
+    "num1": 136,
+    "num2": -2139095036,
+    "members": "double FarRange;double NearRange;color Color;double Multiplier=1.0;bool CastShadows=0;bool Local=0;bool ParentBound=FALSE;"
+  },
+  {
+    "name": "ZLINEOBJ",
+    "type": "ZCHAROBJ",
+    "id": 56,
+    "num1": 543,
+    "num2": 2097208,
+    "members": "long Width=200;"
+  },
+  {
+    "name": "ZLIST",
+    "type": "ZGEOM",
+    "id": 26,
+    "num1": 92,
+    "num2": 134217754,
+    "members": "ZGEOMREFTAB GeomList;"
+  },
+  {
+    "name": "ZLNKOBJ",
+    "type": "ZSTDOBJ",
+    "id": 6,
+    "num1": 506,
+    "num2": 2097158,
+    "members": "File AnimFile;File ExAnimFile;ZGEOMREF LODClipGroup;"
+  },
+  {
+    "name": "ZListBox2",
+    "type": "ZCONTROL",
+    "id": 60,
+    "num1": 291,
+    "num2": 1048636,
+    "members": ""
+  },
+  {
+    "name": "ZMIRRORCAM",
+    "type": "ZCAMERA",
+    "id": 16,
+    "num1": 534,
+    "num2": -2143289328,
+    "members": ""
+  },
+  {
+    "name": "ZOMNILIGHT",
+    "type": "ZLIGHT",
+    "id": 36,
+    "num1": 136,
+    "num2": 8388644,
+    "members": ""
+  },
+  {
+    "name": "ZOUTLINEOBJ",
+    "type": "ZSTDOBJ",
+    "id": 25,
+    "num1": 376,
+    "num2": -2145386471,
+    "members": ""
+  },
+  {
+    "name": "ZPANEL",
+    "type": "ZWINGROUP",
+    "id": 55,
+    "num1": 188,
+    "num2": 1048631,
+    "members": ""
+  },
+  {
+    "name": "ZPATHGROUP",
+    "type": "ZGROUP",
+    "id": 222,
+    "num1": 176,
+    "num2": 1048798,
+    "members": ""
+  },
+  {
+    "name": "ZPICOBJ",
+    "type": "ZSTDOBJ",
+    "id": 17,
+    "num1": 163,
+    "num2": -2145386479,
+    "members": "bool bDisableCheckSum=false;data Squares;subpic PicName=Untitled;@long PicSize[2]=0,0;@long PicSplits[2]=0,0;bool Opacity=FALSE;bool TwoSided=FALSE;enum KeepInRam={VIDEO,VIDEO+SYS,SYS};@bool bOddAspect=FALSE;float OverrideSize[2]=0,0;@enum PictureFormat={RGB,ARGB,256,256A,16};@long PictureSize=0;"
+  },
+  {
+    "name": "ZPathFinder2",
+    "type": "ZSTDOBJ",
+    "id": 111,
+    "num1": 304,
+    "num2": 2097263,
+    "members": "table PathInfo;float Resolution[3]={25.0,25.0,25.0};bool StoreGlobalPaths=1;bool UseEuclideanHeuristic=1;float HeightMultiplier=1.0;long NumStraightIters=2;bool KeepDistance=false;float MaxDoorWidth=150;float MaxDoorHeight=400;float WallDistance=50.0;ZGEOMREF DynObstacle;ZGEOMREF AdditionalDoorList;bool RespectNoWalk=true;ZGEOMREFTAB IgnoreRoomList;"
+  },
+  {
+    "name": "ZPathFinder",
+    "type": "ZSTDOBJ",
+    "id": 110,
+    "num1": 174,
+    "num2": 2097262,
+    "members": "table PathInfo;"
+  },
+  {
+    "name": "ZREFRACCAM",
+    "type": "ZCAMERA",
+    "id": 24,
+    "num1": 530,
+    "num2": -2143289320,
+    "members": ""
+  },
+  {
+    "name": "ZROOM",
+    "type": "ZGROUP",
+    "id": 33,
+    "num1": 192,
+    "num2": 1048609,
+    "members": "RoomRef Room=0;MaterialRef DefaultFloor=0;"
+  },
+  {
+    "name": "ZSCALESTDOBJ",
+    "type": "ZSTDOBJ",
+    "id": 65,
+    "num1": 152,
+    "num2": 2097217,
+    "members": "FLOAT fScale=1;"
+  },
+  {
+    "name": "ZSHAPE",
+    "type": "ZGEOM",
+    "id": 34,
+    "num1": 128,
+    "num2": 67108898,
+    "members": ""
+  },
+  {
+    "name": "ZSHOTOBJ",
+    "type": "ZSTDOBJ",
+    "id": 23,
+    "num1": 228,
+    "num2": 2097175,
+    "members": "ZGEOMREF rImpactGroup;ZGEOMREF rBulletHoleGroup;"
+  },
+  {
+    "name": "ZSNDOBJ",
+    "type": "ZSTDOBJ",
+    "id": 18,
+    "num1": 305,
+    "num2": 2097170,
+    "members": "enum Type={3D,2D_Culled,2D}; SndRef Sound=0;float InnerConeAngle=360;float OuterConeAngle=360;float OuterConeVolume=0;float LPCutOffFreq=0;bool AutoAttach=false;"
+  },
+  {
+    "name": "ZSPOTLIGHT",
+    "type": "ZLIGHT",
+    "id": 35,
+    "num1": 568,
+    "num2": 8388643,
+    "members": "double FallOff;double HotSpot;double TargetLen;"
+  },
+  {
+    "name": "ZSTATECONTROLLER",
+    "type": "ZWINDOW",
+    "id": 100,
+    "num1": 204,
+    "num2": 1048676,
+    "members": ""
+  },
+  {
+    "name": "ZSTDOBJ",
+    "type": "ZGEOM",
+    "id": 2,
+    "num1": 144,
+    "num2": 2097154,
+    "members": "bool Background=1;bool Shot=1;bool Coli3=0;bool NoWalk=0;bool BlockSight=1;bool Invisible=0;bool RealtimeLight=0;bool CastShadow=0;bool ReveiveShadow=1;"
+  },
+  {
+    "name": "ZSTDRIGIDBODY",
+    "type": "ZSTDOBJ",
+    "id": 29,
+    "num1": 472,
+    "num2": 2097181,
+    "members": "float mass=1.0;float inertia=10000.0;float LinearDrag=0.02;float RotDrag=0.05;long Fixed=0;long NoGravity=0;"
+  },
+  {
+    "name": "ZScrollArea",
+    "type": "ZPANEL",
+    "id": 59,
+    "num1": 233,
+    "num2": 1048635,
+    "members": "LONG Width;LONG Height;ZGEOMREF Slider;"
+  },
+  {
+    "name": "ZScrollBar",
+    "type": "ZCONTROL",
+    "id": 64,
+    "num1": 318,
+    "num2": 1048640,
+    "members": "enum Type={Vertical,Horizontal};long Hight=64;ZGEOMREF rButton;"
+  },
+  {
+    "name": "ZShapeGroup",
+    "type": "ZGROUP",
+    "id": 224,
+    "num1": 180,
+    "num2": 1048800,
+    "members": ""
+  },
+  {
+    "name": "ZSlider",
+    "type": "ZCONTROL",
+    "id": 52,
+    "num1": 327,
+    "num2": 1048628,
+    "members": "bool bSmooth=FALSE;long Start=0;long End=100;"
+  },
+  {
+    "name": "ZT1OBJ",
+    "type": "ZIKLNKOBJ",
+    "id": 20,
+    "num1": 12346,
+    "num2": 2097172,
+    "members": "SndSetRef SoundSet=0;"
+  },
+  {
+    "name": "ZTRACKLNKOBJ",
+    "type": "ZIKLNKOBJ",
+    "id": 22,
+    "num1": 2760,
+    "num2": 2097174,
+    "members": "MSG EnterViewCmd=EnterView;MSG LeaveViewCmd=LeaveView;ZANIMBODY BodyAnim={Std_Pose,Stand_Relaxed,Stand_Tense,Die_Forward_Quick,Die_Stomac,Smoking,Turn_90,Turn_180_Relaxed,Climb_Ladder_Start,Climb_Ladder,Crouch_Down,Crouch_Up,Crouch_Ambient,Crouch_Listen,Talking,Listening,Special00,Special01,Special02,Special03,Special04,Special05,Special06,Special07,Special08,Special09,Special10,Special11,Special12,Special13,Special14,Special15,Whipper,HitShoulderLeftFrontSmall,HitShoulderRightFrontSmall,HitLegLeftFrontSmall,HitLegRightFrontSmall,HitTorsoFrontSmall,HitShoulderLeftFrontBig,HitShoulderRightFrontBig,HitLegLeftFrontBig,HitLegRightFrontBig,HitTorsoFrontBig,HitShoulderLeftBackSmall,HitShoulderRightBackSmall,HitLegLeftBackSmall,HitLegRightBackSmall,HitTorsoBackSmall,HitShoulderLeftBackBig,HitShoulderRightBackBig,HitLegLeftBackBig,HitLegRightBackBig,HitTorsoBackBig,HitHeadFrontSmall,HitHeadBackSmall,HitHeadFrontBig,HitHeadBackBig,HitTorsoFrontSmall_GetUp,HitTorsoBackSmall_GetUp,Pull_Gun,Pull_Gun_Shoot_Quick,Put_Gun_Quick,Put_Gun_Shoot_Quick,Reload_Gun,Walk,Walk_Start,Walk_Stop,Walk_StairsDown,Walk_StairsUp,Walk_Turn_Left_Radius100,Walk_Turn_Right_Radius100,Walk_Turn90,Walk_Turn180,Walk_BarrelRoll_Forward,Walk_Low,UB_HoldRifleOnShoulder,UB_Hold_Rifle,UB_Hold_Gun,UB_Pull_Gun,UB_Put_Gun.bip,UB_Shoot_Gun_Both_Hands,UB_Shoot_Gun_RightHand,UB_Reload_Gun,UB_Open_Door,UB_Open_Door_Running,UB_Walk_OpenDoor,UB_Sit_On_Chair_Impatient,UB_Sit_On_chair_Bored,UB_ScratchHead,UB_Yawn,UB_Twist,UB_Headset,UB_HeadTurning,Patrol_Relaxed,Patrol_Tense,Patrol_Tense_Turn190,Run,Run_Stop,Run_Start,Run_Upstairs,Run_StairsDown,Run_Turn180_Sliding,Run_BarrelRoll_Forward,Run_KickDoorOpen,Sit_on_chair_left,Sit_on_chair_right,Sit_On_Chair_Bored,Sit_On_Chair_Sleeping,Get_Up_Chair_Left,Check_Corner_Right,Check_Corner_Left,Check_Corner_Left_Low,Shoot_Standing,Shoot_Kneeling,Shoot_Kneeling_long_range,Sneak_Check_Back,Stabbed_Left_Shoulder,Stabbed_Right_Shoulder,Stabbed_Slash_Left,Stabbed_Slash_Right,Stabbed_Stomac01,Stabbed_Stomac02,Walk_Check_Back,Rise_From_Down,Aim_Down,Aim_Down_Pose,Sneak_Tense,Sneak_Backward,Sneak_Turn_Backward,Fall_Down,Walk_Turn_Backward,Walk_Turn_Forward,Walk_BackWards_Quick,Run_Turn_90_Left,Walk_02,FreakOut,UB_HeadTurn,UB_FreakOut,Run_01,Turn_90_Left,Turn_90_Right,Turn_180_Quick,Patrol_Relaxed_Turn180,Shoot_Pose_Gun01,Shoot_Pose_Gun02};ZANIMFACE FaceAnim={Sad,Laugh,Fear,Sorry};Script ZTrackLinkScript;ZGEOMREFTAB LocationRefs;sndsetref SoundSet;ZGEOMREF Weapon=0;"
+  },
+  {
+    "name": "ZTTFONT",
+    "type": "ZFONT",
+    "id": 58,
+    "num1": 803,
+    "num2": 2097210,
+    "members": "File FontFile; long FontSize;BOOL HintRendering=TRUE;BOOL HintSpacing=FALSE;"
+  },
+  {
+    "name": "ZVOLLIGHT",
+    "type": "ZSPOTLIGHT",
+    "id": 9,
+    "num1": 604,
+    "num2": 8388617,
+    "members": "long NrCones=1;long NrSides=16;double Cylinder=1;long Usecylinder=0;long Usegouraud=1;long Twosided=0;"
+  },
+  {
+    "name": "ZWINDOWS",
+    "type": "ZWINGROUP",
+    "id": 48,
+    "num1": 1345,
+    "num2": 1048624,
+    "members": "ZGEOMREF MainCamera;ZGEOMREF MousePointer;"
+  },
+  {
+    "name": "ZWINDOW",
+    "type": "ZWINGROUP",
+    "id": 49,
+    "num1": 176,
+    "num2": 1048625,
+    "members": ""
+  },
+  {
+    "name": "ZWINGROUP",
+    "type": "ZGROUP",
+    "id": 46,
+    "num1": 176,
+    "num2": 1048622,
+    "members": ""
+  },
+  {
+    "name": "ZWINOBJ",
+    "type": "ZPICOBJ",
+    "id": 44,
+    "num1": 231,
+    "num2": 2097196,
+    "members": "WinObjType Type=WINOBJ_TYPE_NORMAL;enum Filtering={POINT,BILINEAR};enum DrawMode={NORMAL,ADD,SUB,TRANS,MUL,OPACITY,HARDOPACITY};long Amount=255;"
+  }
+],
+"components": [
+  {
+    "infoClassName": "_ZCAMERA_BaseCamera",
+    "name": "BaseCamera",
+    "num1": 1148862464,
+    "num2": 133,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZCAMERA_ChangeClothesCamera",
+    "name": "ChangeClothesCamera",
+    "num1": 1148862464,
+    "num2": 149,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZCAMERA_DeathCam2",
+    "name": "DeathCam2",
+    "num1": 1148862464,
+    "num2": 149,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZCAMERA_KeyActivate",
+    "name": "KeyActivate",
+    "num1": 0,
+    "num2": 21,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZCAMERA_MainCameraControl",
+    "name": "MainCameraControl",
+    "num1": 1176257536,
+    "num2": -2147475307,
+    "members": "ZGEOMREF SortedList;MSG Update=Camera_Update;MSG Position=Camera_Position;MSG SendForSortedList=Camera_RequestList;MSG ReceiveSortedList=Camera_SendList;MSG FollowGeom;ZGEOMREF Sigte;"
+  },
+  {
+    "infoClassName": "_ZCAMERA_MouseConCam",
+    "name": "MouseConCam",
+    "num1": 1148862464,
+    "num2": 149,
+    "members": "MSG RequestQuality=Camera_RequestQuality;MSG SendQuality=Camera_SendQuality;MSG Position=Camera_Position;MSG Update=Camera_Update;"
+  },
+  {
+    "infoClassName": "_ZCAMERA_NewDialogCamera",
+    "name": "NewDialogCamera",
+    "num1": 1148862464,
+    "num2": -2147483499,
+    "members": "MSG Update=Camera_Update;MSG Position=Camera_Position;MSG RequestQuality=Camera_RequestQuality;MSG SendQuality=Camera_SendQuality;"
+  },
+  {
+    "infoClassName": "_ZCAMERA_NewFollowCam2",
+    "name": "NewFollowCam2",
+    "num1": 1148862464,
+    "num2": 149,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZCAMERA_OverviewCamera",
+    "name": "OverviewCamera",
+    "num1": 1148862464,
+    "num2": 149,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZCAMERA_PlaneCam",
+    "name": "PlaneCam",
+    "num1": 0,
+    "num2": 149,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZCAMERA_PreviewCamera",
+    "name": "PreviewCamera",
+    "num1": 0,
+    "num2": 8209,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZCAMERA_ScopeCamera",
+    "name": "ScopeCamera",
+    "num1": 1073741824,
+    "num2": -2147483499,
+    "members": "ZGEOMREF Sniper;ZGEOMREF Binocular;MSG Position=Camera_Position;MSG Update=Camera_Update;"
+  },
+  {
+    "infoClassName": "_ZCAMERA_StaticActivationCamera",
+    "name": "StaticActivationCamera",
+    "num1": 0,
+    "num2": 133,
+    "members": "MSG Activate=StaticCamera_Activate;MSG Deactivate=StaticCamera_Deactivate;float InterpolSpd=0.15;BOOL Fixed=FALSE;enum lPriority={LOW,HIGH};enum lUseWhen={ALWAYS,CARRYINGBODY};"
+  },
+  {
+    "infoClassName": "_ZCAMERA_ViewNotify",
+    "name": "ViewNotify",
+    "num1": 1120403456,
+    "num2": 23,
+    "members": "MSG EnterCommand=EnterView;MSG LeaveCommand=LeaveView;"
+  },
+  {
+    "infoClassName": "_ZCHAROBJ_TextWrite",
+    "name": "TextWrite",
+    "num1": 1092616192,
+    "num2": 133,
+    "members": "MSG StartMsg=StartState;MSG CancelMsg=EndState;FLOAT Speed=0.01;"
+  },
+  {
+    "infoClassName": "_ZDYNAMICS2_ConstraintEvent",
+    "name": "ConstraintEvent",
+    "num1": 0,
+    "num2": 5,
+    "members": "ZGEOMREF Obj1;ZGEOMREF Obj2;double Pos1[3]={0,0,0};double Pos2[3]={0,0,0};"
+  },
+  {
+    "infoClassName": "_ZDYNAMICS2_DynUpdate",
+    "name": "DynUpdate",
+    "num1": 0,
+    "num2": 21,
+    "members": "float TimeStep;"
+  },
+  {
+    "infoClassName": "_ZDYNAMICS2_ParticleConstraintEvent",
+    "name": "ParticleConstraintEvent",
+    "num1": 0,
+    "num2": 5,
+    "members": "ZGEOMREF Obj1;ZGEOMREF Obj2;float Distance=50;"
+  },
+  {
+    "infoClassName": "_ZDYNAMICS2_RegCollCheck",
+    "name": "RegCollCheck",
+    "num1": 0,
+    "num2": 5,
+    "members": "ZGEOMREF Obj1;ZGEOMREF Obj2;long Type=1;"
+  },
+  {
+    "infoClassName": "_ZDYNAMICS2_RegParticle",
+    "name": "RegParticle",
+    "num1": 0,
+    "num2": 5,
+    "members": "ZGEOMREF Obj;"
+  },
+  {
+    "infoClassName": "_ZDYNAMICS2_RegPhysObj",
+    "name": "RegPhysObj",
+    "num1": 0,
+    "num2": 5,
+    "members": "ZGEOMREF Obj;"
+  },
+  {
+    "infoClassName": "_ZDYNAMICS2_UpdateForces",
+    "name": "UpdateForces",
+    "num1": 0,
+    "num2": 21,
+    "members": "float TimeStep=121.0;ZGEOMREF List;"
+  },
+  {
+    "infoClassName": "_ZGEOM_Action",
+    "name": "Action",
+    "num1": 0,
+    "num2": 135,
+    "members": "char* ActionName;char* OptionName;enum Type={Pickup,Button,OpenDoor,CloseDoor,Clothes,Dialog,Generic};MSG Message=ActivateObject;ZGEOMREF Receiver;long Priority;long Range;MSG msgHide=ActionHide; MSG msgShow=ActionShow;bool bHitmanReceiver=false;BOOL Visible=TRUE;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ActionControl",
+    "name": "ActionControl",
+    "num1": 0,
+    "num2": 1159,
+    "members": ";"
+  },
+  {
+    "infoClassName": "_ZGEOM_ActivateBinoculars",
+    "name": "ActivateBinoculars",
+    "num1": 0,
+    "num2": 133,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGEOM_AdoptVisibility",
+    "name": "AdoptVisibility",
+    "num1": 1148846080,
+    "num2": 8213,
+    "members": "ZGEOMREFTAB CheckList;"
+  },
+  {
+    "infoClassName": "_ZGEOM_AnimSound",
+    "name": "AnimSound",
+    "num1": 0,
+    "num2": 21,
+    "members": "sndname Sound=NONE; float time=0;float vol=0;float pan=0;long Remove=1;float LoopTime;"
+  },
+  {
+    "infoClassName": "_ZGEOM_BasePickupTarget",
+    "name": "BasePickupTarget",
+    "num1": 0,
+    "num2": -2147483515,
+    "members": "ZGEOMREF PickupObj;"
+  },
+  {
+    "infoClassName": "_ZGEOM_BombControl2_2",
+    "name": "BombControl2_2",
+    "num1": 0,
+    "num2": 149,
+    "members": "ZGEOMREF CSExplode;ZGEOMREF CSDisarm;ZGEOMREF Counter;ZGEOMREF CSArmBomb;ZGEOMREF BorisCutScenePos;ZGEOMREF CSArmBombZip;"
+  },
+  {
+    "infoClassName": "_ZGEOM_BoxSendMessage",
+    "name": "BoxSendMessage",
+    "num1": 0,
+    "num2": 141,
+    "members": "ZGEOMREF TrackObj;ZGEOMREF TargetObj;MSG TargetMsg;MSG OnMsg;Msg OffMsg;BOOL OnDefault=TRUE;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ButtonControl",
+    "name": "ButtonControl",
+    "num1": 0,
+    "num2": 23,
+    "members": "ZGEOMREF Button;ZGEOMREF Back;ZGEOMREF object;"
+  },
+  {
+    "infoClassName": "_ZGEOM_CUI",
+    "name": "CUI",
+    "num1": 0,
+    "num2": -2147483497,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGEOM_CarBombControl2_2",
+    "name": "CarBombControl2_2",
+    "num1": 0,
+    "num2": 135,
+    "members": "ZGEOMREF CSExplode;ZGEOMREF CSPlace;ZGEOMREF rCarCutSeqDestGroup;ZGEOMREF CSBorisExit;ZGEOMREF CSBorisDrive;ZGEOMREF Boris;"
+  },
+  {
+    "infoClassName": "_ZGEOM_CharacterSound",
+    "name": "CharacterSound",
+    "num1": 0,
+    "num2": 133,
+    "members": "MaterialRef DefaultFloor=-1;MaterialRef ShoeStandardLeft=-1;MaterialRef ShoeStandardRight=-1;SndRef ShoeLeft;SndRef ShoeRight;MaterialRef BarefeetLeft=0;MaterialRef BarefeetRight=0;"
+  },
+  {
+    "infoClassName": "_ZGEOM_CheckBorderCrossX",
+    "name": "CheckBorderCrossX",
+    "num1": 0,
+    "num2": 157,
+    "members": "float fXPos=0;ZGEOMREF TargetObj;MSG MsgXCrossLess=msg_XCrossedLess;MSG MsgXCrossMore=msg_XCrossedMore;"
+  },
+  {
+    "infoClassName": "_ZGEOM_CheckInside",
+    "name": "CheckInside",
+    "num1": 0,
+    "num2": 13,
+    "members": "ZGEOMREF TrackObj;ZGEOMREF TargetObj;MSG EnterMsg=CheckInsideEnter;MSG LeaveMsg=CheckInsideLeave;BOOL Hide=TRUE;BOOL UseCameraObject=FALSE;bool bListBroadcast=true;bool SendSenderObject=false;;"
+  },
+  {
+    "infoClassName": "_ZGEOM_CheckItem",
+    "name": "CheckItem",
+    "num1": 0,
+    "num2": 13,
+    "members": "ZGEOMREF rItemHolder;ZGEOMREF rTargetObj;ZGEOMREF rItem;ENUM ItemCriteria={SpecificItem,AnyItem};ENUM HoldCriteria={NoMatter,RightHand,LeftHand,EitherHand};MSG TrueMsg=TrueNow;MSG FalseMsg=FalseNow;BOOL Hide=TRUE;BOOL UseCameraObject=FALSE;bool bListBroadcast=true;;"
+  },
+  {
+    "infoClassName": "_ZGEOM_CheckSide",
+    "name": "CheckSide",
+    "num1": 0,
+    "num2": 13,
+    "members": "ZGEOMREF TrackObj;ZGEOMREF TargetObj;MSG EnterMsg=SideRight;MSG LeaveMsg=SideWrong;BOOL Hide=TRUE;BOOL UseCameraObject=FALSE;bool bListBroadcast=true;bool bInvertDirection=false;;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ChkObjInObj",
+    "name": "ChkObjInObj",
+    "num1": 0,
+    "num2": 21,
+    "members": "ZGEOMREF InsideObj;ZGEOMREF ObjToCheck;ZGEOMREF ObjToNotify;MSG InMessage;MSG OutMessage;"
+  },
+  {
+    "infoClassName": "_ZGEOM_CreateInstance",
+    "name": "CreateInstance",
+    "num1": 0,
+    "num2": 133,
+    "members": "ZGEOMREFTAB Objects;ZGEOMREF PosObject;MSG Create=CreateInstance;MSG Destroy=DestroyInstance;"
+  },
+  {
+    "infoClassName": "_ZGEOM_CutSeqDeleteObject",
+    "name": "CutSeqDeleteObject",
+    "num1": 0,
+    "num2": 129,
+    "members": "bool Delete=TRUE;"
+  },
+  {
+    "infoClassName": "_ZGEOM_CutSequenceMove",
+    "name": "CutSequenceMove",
+    "num1": 1065353216,
+    "num2": 133,
+    "members": "ZGEOMREFTAB Groups;ZGEOMREF Pos;MSG Activate=CutSequence_Start;"
+  },
+  {
+    "infoClassName": "_ZGEOM_DasBomb",
+    "name": "DasBomb",
+    "num1": 1120403456,
+    "num2": 135,
+    "members": "float KillRange; float AlertRange; float Force;"
+  },
+  {
+    "infoClassName": "_ZGEOM_DefaultAcusticEnv",
+    "name": "DefaultAcusticEnv",
+    "num1": 0,
+    "num2": 7,
+    "members": "RoomRef Env=0;"
+  },
+  {
+    "infoClassName": "_ZGEOM_DemoMode",
+    "name": "DemoMode",
+    "num1": 0,
+    "num2": 149,
+    "members": "ZGEOMREF StateIntro;"
+  },
+  {
+    "infoClassName": "_ZGEOM_DiscoMove",
+    "name": "DiscoMove",
+    "num1": 0,
+    "num2": 13,
+    "members": "double XSpeed1=5.0;double XSpeed2=5.0;double YSpeed1=5.0;double YSpeed2=5.0;double ZSpeed1=5.0;double ZSpeed2=5.0;double XMax=10.0;double YMax=10.0;double ZMax=10.0;BOOL HeadDir=FALSE;ZGEOMREF TrackTo;"
+  },
+  {
+    "infoClassName": "_ZGEOM_DynObstacle",
+    "name": "DynObstacle",
+    "num1": 0,
+    "num2": 7,
+    "members": "float Radius=-1;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ElevatorButton",
+    "name": "ElevatorButton",
+    "num1": 0,
+    "num2": 135,
+    "members": "ZGEOMREF Target;ZGEOMREF Elevator;MSG CallElevator=ElevMoveTo;SNDREF ClickSound;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ElevatorHouse",
+    "name": "ElevatorHouse",
+    "num1": 1084227584,
+    "num2": 151,
+    "members": "float Speed=1;long ShortDistance=40;ZGEOMREFTAB Doors;MSG ReqMoveTo=ElevMoveTo;MSG ReqStop=ElevStop;sndref MovingSound=-1;sndref StartSound=-1;sndref StopSound=-1;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ElevatorIndicator",
+    "name": "ElevatorIndicator",
+    "num1": 0,
+    "num2": 21,
+    "members": "ZGEOMREF Elevator;ZGEOMREF Targets;float MaxAngle=80;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ElevatorPanel",
+    "name": "ElevatorPanel",
+    "num1": 0,
+    "num2": 135,
+    "members": "ZGEOMREF Targets;ZGEOMREF Elevator;MSG CallElevator=ElevMoveTo;SNDREF ClickSound;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ElevatorTarget",
+    "name": "ElevatorTarget",
+    "num1": 1092616192,
+    "num2": 133,
+    "members": "char* TargetName;;"
+  },
+  {
+    "infoClassName": "_ZGEOM_EnemyHelicopter",
+    "name": "EnemyHelicopter",
+    "num1": 0,
+    "num2": 129,
+    "members": "ZGEOMREF FlyBox;"
+  },
+  {
+    "infoClassName": "_ZGEOM_EnemySelect",
+    "name": "EnemySelect",
+    "num1": 1101004800,
+    "num2": 23,
+    "members": "long Key;"
+  },
+  {
+    "infoClassName": "_ZGEOM_EnemyVehicle",
+    "name": "EnemyVehicle",
+    "num1": 0,
+    "num2": 129,
+    "members": ";"
+  },
+  {
+    "infoClassName": "_ZGEOM_EngineControl2_2",
+    "name": "EngineControl2_2",
+    "num1": 0,
+    "num2": 135,
+    "members": "ZGEOMREF CSTurnOffEngine;ZGEOMREF CSHitmanExit;"
+  },
+  {
+    "infoClassName": "_ZGEOM_FlowerBox",
+    "name": "FlowerBox",
+    "num1": 1120403456,
+    "num2": 149,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGEOM_FollowShape",
+    "name": "FollowShape",
+    "num1": 0,
+    "num2": 21,
+    "members": "ZGEOMREF Shape;float Duration;float StartDelay;bool DeleteSound=false;bool DeleteShape=false;"
+  },
+  {
+    "infoClassName": "_ZGEOM_GateControl",
+    "name": "GateControl",
+    "num1": 0,
+    "num2": 21,
+    "members": "ZGEOMREFTAB Gates;ZGEOMREF TrainBody;SNDREF Sound;"
+  },
+  {
+    "infoClassName": "_ZGEOM_GeomConModifier",
+    "name": "GeomConModifier",
+    "num1": 0,
+    "num2": 4097,
+    "members": "bool WantCameraMsg=false;bool NoMouse=false;bool Coli3=false;bool bInvisible;"
+  },
+  {
+    "infoClassName": "_ZGEOM_GeomParticle",
+    "name": "GeomParticle",
+    "num1": 0,
+    "num2": 151,
+    "members": "double fTime=0;bool bColi=false;bool bMatrixAllign=false;double vSpeed[3]={0,500,0};double vGravity[3]={0,-500,0};double fDrag=1;double fFriction=1;double fElasticity=1;long lRecursion=2;SNDREF ImpactSound;bool bDeleteEmptyParent=false;bool bRandomDirection=false;"
+  },
+  {
+    "infoClassName": "_ZGEOM_GeomSound",
+    "name": "GeomSound",
+    "num1": 0,
+    "num2": 149,
+    "members": "SndSetRef SoundSet=0;"
+  },
+  {
+    "infoClassName": "_ZGEOM_GeomSpawn",
+    "name": "GeomSpawn",
+    "num1": 0,
+    "num2": 141,
+    "members": "ZGEOMREF rSpawn;enum lDestination={PARENT,OWNER,ROOT};MSG msgActivate;double fDelay=0.1;double fDeactivateTime=4;bool bHide=true;bool bCheckVisible=true;double fRandomDirection[3]={0,0,0};double fRandomPosition[3]={0,0,0};"
+  },
+  {
+    "infoClassName": "_ZGEOM_Helicopter1_1",
+    "name": "Helicopter1_1",
+    "num1": 0,
+    "num2": 145,
+    "members": "ZGEOMREF FlyBox;"
+  },
+  {
+    "infoClassName": "_ZGEOM_Helicopter2",
+    "name": "Helicopter2",
+    "num1": 0,
+    "num2": 29,
+    "members": "ZGEOMREF Waypoints;ZGEOMREFTAB RotorAnims;FLOAT AttackAngle=0;SNDREF EngineSound;;"
+  },
+  {
+    "infoClassName": "_ZGEOM_Helicopter4_1",
+    "name": "Helicopter4_1",
+    "num1": 0,
+    "num2": -2147483503,
+    "members": "ZGEOMREF FlyBox;"
+  },
+  {
+    "infoClassName": "_ZGEOM_HideBloodInDeathSequence",
+    "name": "HideBloodInDeathSequence",
+    "num1": 0,
+    "num2": 5,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGEOM_HideObject",
+    "name": "HideObject",
+    "num1": 0,
+    "num2": 5,
+    "members": "bool Hide=TRUE;bool CalcMaxMin=FALSE;"
+  },
+  {
+    "infoClassName": "_ZGEOM_Inventory",
+    "name": "Inventory",
+    "num1": 1065353216,
+    "num2": 1159,
+    "members": "ZGEOMREFTAB StartInventoryList;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ItemActivate",
+    "name": "ItemActivate",
+    "num1": 1120403456,
+    "num2": 151,
+    "members": "char* TextId;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ItemState",
+    "name": "ItemState",
+    "num1": 0,
+    "num2": -2147463035,
+    "members": "enumbits State={IS_DEFAULT,IS_PICKUP,IS_HOLD,IS_HIDE,IS_USE,IS_ACTIVATE,IS_ACTIVATE2,IS_DROP,IS_EMPTY,IS_RELOAD,IS_RELOAD2,IS_ACTION,IS_ACTION2};bool bIsMain;char* sItemID;enum lDestination={ITEM,PARENT,OWNER,ROOT};double fActivateDelay=0;double fDeactivateTime=0;bool bReuseStateGeom=true;bool bAutoRemove=true;char* pAnimName;ZGEOMREF rUseGeom;sndref Sound;enum SoundEvent={EVENT_NONE,EVENT_SOUND_SHOT,EVENT_SOUND_GUN_EMPTY,EVENT_SOUND_SCREAM,EVENT_SOUND_FOOTSTEP,EVENT_SOUND_DOOR,EVENT_SOUND_BULLETIMPACT,EVENT_SOUND_DIE,EVENT_SOUND_STRANGULATED,EVENT_SOUND_SILENT_SHOT};BOOL KeepSoundInItem=FALSE;bool bOnlyVisible=false;"
+  },
+  {
+    "infoClassName": "_ZGEOM_KeyConTimed",
+    "name": "KeyConTimed",
+    "num1": 0,
+    "num2": 13,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGEOM_KeyMove",
+    "name": "KeyMove",
+    "num1": 0,
+    "num2": 21,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGEOM_KeyMove2",
+    "name": "KeyMove2",
+    "num1": 0,
+    "num2": 157,
+    "members": "float Speed=100.0;long UpKey=38;long DownKey=40;long LeftKey=37;long RightKey=39;"
+  },
+  {
+    "infoClassName": "_ZGEOM_KeyTrigger",
+    "name": "KeyTrigger",
+    "num1": 0,
+    "num2": 17,
+    "members": "MSG Trigger=MSG_SOUNDTRIGGER;long Key=65;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MadsCdTest",
+    "name": "MadsCdTest",
+    "num1": 0,
+    "num2": 21,
+    "members": ";"
+  },
+  {
+    "infoClassName": "_ZGEOM_MainControl_C1_4",
+    "name": "MainControl_C1_4",
+    "num1": 0,
+    "num2": 129,
+    "members": "ZGEOMREF PickupObjs;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MapObject",
+    "name": "MapObject",
+    "num1": 1092616192,
+    "num2": 7,
+    "members": "CHAR* MapObject;BOOL VisibleOnMap=TRUE;BOOL UseMat=FALSE;BOOL ChangeParent=FALSE;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MatPosAnim",
+    "name": "MatPosAnim",
+    "num1": 1120403456,
+    "num2": 149,
+    "members": "bool Loop=TRUE;float FPS=25;double Offset[3]={0,0,0};bool Delete=true;bool DeleteEmptyParent=true;bool bGetMatPosAtInit=false;bool bRelative=true;MSG msgActivate;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MatPosAnimFromTo",
+    "name": "MatPosAnimFromTo",
+    "num1": 0,
+    "num2": 5,
+    "members": "long FrameStart;long FrameEnd;long FPS=25;MSG EndMsg=MatPosAnimEnd;ZGEOMREF MsgReceiver;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MaterialDef",
+    "name": "MaterialDef",
+    "num1": 0,
+    "num2": 129,
+    "members": "MaterialRef Material;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MessageGeomsDelete",
+    "name": "MessageGeomsDelete",
+    "num1": 0,
+    "num2": 133,
+    "members": "ZGEOMREFTAB rtDeleteGeoms;MSG msgActivate=ProjectileHit;bool bDeleteIfLastEvent=false;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MessageGeomsDuplicate",
+    "name": "MessageGeomsDuplicate",
+    "num1": 0,
+    "num2": 133,
+    "members": "ZGEOMREFTAB rtDuplicateGeoms;MSG msgActivate=ProjectileHit;bool bDeleteIfLastEvent=false;bool bAutoRoomAssign=false;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MotionGlow",
+    "name": "MotionGlow",
+    "num1": 1120403456,
+    "num2": 149,
+    "members": "double fTime=0.2;long lSegments=10;double fWidth=10;double fOffset[3]={0,0,0};ZGEOMREF rTextureObj;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MoveTo",
+    "name": "MoveTo",
+    "num1": 0,
+    "num2": 5,
+    "members": "ZGEOMREF DestGroup;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MsgActivate",
+    "name": "MsgActivate",
+    "num1": 0,
+    "num2": 22,
+    "members": "ZGEOMREF Target;MSG Message;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MsgForward",
+    "name": "MsgForward",
+    "num1": 0,
+    "num2": 133,
+    "members": "ZGEOMREF Receiver;Msg Filter;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MsgForwardToActors",
+    "name": "MsgForwardToActors",
+    "num1": 0,
+    "num2": 133,
+    "members": "Msg Filter;Msg ForwardMessage;float Radius;"
+  },
+  {
+    "infoClassName": "_ZGEOM_MusicControl",
+    "name": "MusicControl",
+    "num1": 0,
+    "num2": 135,
+    "members": ";"
+  },
+  {
+    "infoClassName": "_ZGEOM_NormalDoor",
+    "name": "NormalDoor",
+    "num1": 0,
+    "num2": 135,
+    "members": "float MaxAngle=90;long NrSteps=10;BOOL AutoClose=TRUE;bool NotifyGate=TRUE;MSG OnReqOpen=OpenDoor2;MSG OnReqClose=CloseDoor2;sndref OpenSound=-1;sndref CloseSound=-1;CHAR* ValidDoorKeys;enum OpenDirection={Away,Towards,Inward,Outward};BOOL Locked=FALSE;enum InitialState={Closed,OpenIn,OpenOut};BOOL UseAction=TRUE;BOOL KeepKey=FALSE;BOOL EarlySndClose=FALSE;BOOL PadLock=FALSE;;"
+  },
+  {
+    "infoClassName": "_ZGEOM_OSDWriter",
+    "name": "OSDWriter",
+    "num1": 0,
+    "num2": 5,
+    "members": "ZGEOMREF SubTitleObj;MSG WriteMsg;MSG ClearMsg;MSG NotifyClearMsg;"
+  },
+  {
+    "infoClassName": "_ZGEOM_OsdChoice",
+    "name": "OsdChoice",
+    "num1": 1101004800,
+    "num2": 23,
+    "members": "ZGEOMREF NotificationTarget=0;ZGEOMREF FontGeom;ZGEOMREFTAB SuspendList;long X=0;long Y=0;ZGEOMREF MouseGeom=0;bool SetNotificationTargetToTrackLinkList=false;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ParamAnim",
+    "name": "ParamAnim",
+    "num1": 1120403456,
+    "num2": 21,
+    "members": "bool Loop=TRUE;float FPS=25;bool Delete=true;MSG msgActivate;"
+  },
+  {
+    "infoClassName": "_ZGEOM_PointerOption",
+    "name": "PointerOption",
+    "num1": 0,
+    "num2": 133,
+    "members": "char* OptionName;ZGEOMREF Receiver1;MSG Message1;ZGEOMREF Receiver2;MSG Message2;bool DisplayOnce=true;"
+  },
+  {
+    "infoClassName": "_ZGEOM_QRigidBody",
+    "name": "QRigidBody",
+    "num1": 0,
+    "num2": 151,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGEOM_Random90DegreeYRotate",
+    "name": "Random90DegreeYRotate",
+    "num1": 0,
+    "num2": 133,
+    "members": "ZGEOMREFTAB NotificationTargets;"
+  },
+  {
+    "infoClassName": "_ZGEOM_RandomPos",
+    "name": "RandomPos",
+    "num1": 0,
+    "num2": 5,
+    "members": "ZGEOMREF PosList;bool bGroupRemap=TRUE;"
+  },
+  {
+    "infoClassName": "_ZGEOM_RandomSound",
+    "name": "RandomSound",
+    "num1": 0,
+    "num2": 13,
+    "members": "SndSetRef SoundSet=0;SndRef Sound=0;float Interval=5;float RandomPct=0.10;float InnerCone=360;float OuterCone=360;float OuterAtten=0;float CutOffFreq=0;bool AutoAttach=true;ZGEOMREFTAB PlayIn=0;ZGEOMREFTAB DontPlayIn=0;"
+  },
+  {
+    "infoClassName": "_ZGEOM_RegisterSceneVal",
+    "name": "RegisterSceneVal",
+    "num1": 0,
+    "num2": 5,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGEOM_RelayMessage",
+    "name": "RelayMessage",
+    "num1": 0,
+    "num2": 133,
+    "members": "MSG msgIn;MSG msgOut;ZGEOMREF rReceiver;"
+  },
+  {
+    "infoClassName": "_ZGEOM_RelayMessageList",
+    "name": "RelayMessageList",
+    "num1": 0,
+    "num2": 133,
+    "members": "MSG msgIn;MSG msgOut;ZGEOMREFTAB rReceivers;"
+  },
+  {
+    "infoClassName": "_ZGEOM_RequireMatPosSpeed",
+    "name": "RequireMatPosSpeed",
+    "num1": 0,
+    "num2": 133,
+    "members": "double vRandomDirection[3]={0,0,0};double vRandomPosition[3]={0,0,0};double vRotationSpeed[3]={0,0,0};double vRotationSpeedMultiplier[3]={0,0,0};double vSpeed[3]={0,0,0};"
+  },
+  {
+    "infoClassName": "_ZGEOM_SetCDVolume",
+    "name": "SetCDVolume",
+    "num1": 0,
+    "num2": 21,
+    "members": "long Volume;long FadeTime=0;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ShellDrop",
+    "name": "ShellDrop",
+    "num1": 0,
+    "num2": 21,
+    "members": "float Elasticity=0.5;sndref Sound;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ShotActivate",
+    "name": "ShotActivate",
+    "num1": 0,
+    "num2": 129,
+    "members": "ZGEOMREF ActivateGeom;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ShotDelete",
+    "name": "ShotDelete",
+    "num1": 0,
+    "num2": 128,
+    "members": "ZGEOMREF DeleteGeom;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ShowHierachyPath",
+    "name": "ShowHierachyPath",
+    "num1": 0,
+    "num2": 13,
+    "members": "long XPos=0;long YPos=35;"
+  },
+  {
+    "infoClassName": "_ZGEOM_SittableFurniture",
+    "name": "SittableFurniture",
+    "num1": 0,
+    "num2": 129,
+    "members": "ZGEOMREF SitHelper;"
+  },
+  {
+    "infoClassName": "_ZGEOM_SoundEffect",
+    "name": "SoundEffect",
+    "num1": 0,
+    "num2": 133,
+    "members": "MSG Trigger=MSG_SOUNDTRIGGER;"
+  },
+  {
+    "infoClassName": "_ZGEOM_Spin",
+    "name": "Spin",
+    "num1": 0,
+    "num2": 149,
+    "members": "double Speed[3]={1,0,0};BOOL StartSpinning=TRUE;"
+  },
+  {
+    "infoClassName": "_ZGEOM_StartCdTrack",
+    "name": "StartCdTrack",
+    "num1": 0,
+    "num2": 5,
+    "members": "long TrackNo=1;long Volume=80;"
+  },
+  {
+    "infoClassName": "_ZGEOM_StartMusic",
+    "name": "StartMusic",
+    "num1": 0,
+    "num2": 133,
+    "members": "MSG StartCmd=0;long MusicId;"
+  },
+  {
+    "infoClassName": "_ZGEOM_StartSoundStream",
+    "name": "StartSoundStream",
+    "num1": 0,
+    "num2": 5,
+    "members": "char* FileName;float Offset=0;long VolumeOverRide=0;"
+  },
+  {
+    "infoClassName": "_ZGEOM_Subtitle",
+    "name": "Subtitle",
+    "num1": 1101004800,
+    "num2": 23,
+    "members": "MSG Skriv=MSG_SUBTITLESWRITE;MSG Slet=MSG_SUBTITLESERASE;MSG ClearedMsg=MSG_SUBTITLESCLEARED;ZGEOMREF FontGeom;ZGEOMREF NotificationTarget=0;long X=30;long Y=440;"
+  },
+  {
+    "infoClassName": "_ZGEOM_T1Reply",
+    "name": "T1Reply",
+    "num1": 0,
+    "num2": 133,
+    "members": "enum Reply={FENCE,BALCONYLEFT,BALCONYRIGHT,TABLE};bool bHide=false;"
+  },
+  {
+    "infoClassName": "_ZGEOM_TestSoundF1",
+    "name": "TestSoundF1",
+    "num1": 0,
+    "num2": 21,
+    "members": "sndref Sound1=-1;"
+  },
+  {
+    "infoClassName": "_ZGEOM_TestSoundF2",
+    "name": "TestSoundF2",
+    "num1": 0,
+    "num2": 21,
+    "members": "sndref Sound1=-1;"
+  },
+  {
+    "infoClassName": "_ZGEOM_TestSoundF3",
+    "name": "TestSoundF3",
+    "num1": 0,
+    "num2": 21,
+    "members": "sndref Sound1=-1;"
+  },
+  {
+    "infoClassName": "_ZGEOM_TestSoundF4",
+    "name": "TestSoundF4",
+    "num1": 0,
+    "num2": 21,
+    "members": "sndref Sound1=-1;"
+  },
+  {
+    "infoClassName": "_ZGEOM_TestSoundSetF1",
+    "name": "TestSoundSetF1",
+    "num1": 0,
+    "num2": 21,
+    "members": "sndsetref Sound1=-1;"
+  },
+  {
+    "infoClassName": "_ZGEOM_Waves",
+    "name": "Waves",
+    "num1": 0,
+    "num2": 21,
+    "members": "float WaveLen=20;float WaveRadius=50;float CycleTime=3;float WaveAlong[3]={1,0,0};float WaveDirection[3]={0,1,0};bool Relative=FALSE;"
+  },
+  {
+    "infoClassName": "_ZGEOM_ZItemLetter",
+    "name": "ZItemLetter",
+    "num1": 1120403456,
+    "num2": 151,
+    "members": "char* TextId;"
+  },
+  {
+    "infoClassName": "_ZGROUP_BarCodeScanner",
+    "name": "BarCodeScanner",
+    "num1": 0,
+    "num2": 149,
+    "members": "MSG msgActivate;ZGEOMREF rGasGroup;"
+  },
+  {
+    "infoClassName": "_ZGROUP_Breakable",
+    "name": "Breakable",
+    "num1": 0,
+    "num2": 5,
+    "members": "char* DefaultTemplate=Default;char* RemainsTemplate=Remains;char* BrokenTemplate=Broken;"
+  },
+  {
+    "infoClassName": "_ZGROUP_C11_LimoControl",
+    "name": "C11_LimoControl",
+    "num1": 1073741824,
+    "num2": 21,
+    "members": "ZGEOMREFTAB SteerWheelsLeft;ZGEOMREFTAB SteerWheelsRight;ZGEOMREFTAB OtherWheels;ZGEOMREFTAB LeftDoors;ZGEOMREFTAB RightDoors;ZGEOMREFTAB Passengers;ZGEOMREFTAB VehicleTrack;float MaxSpeed(km/h);float CruiseSpeed(km/h);float MaxAccel(m/s^2);float MaxDecel(m/s^2);ZGEOMREF ColiBody;BOOL CutSeqBeforeStop=FALSE;SNDREF StartSound;SNDREF RunningSound;SNDREF StopSound;ZGEOMREF CutSequence;"
+  },
+  {
+    "infoClassName": "_ZGROUP_CutSequenceProxy",
+    "name": "CutSequenceProxy",
+    "num1": 1065353216,
+    "num2": 133,
+    "members": "ZGEOMREF CutSequence;"
+  },
+  {
+    "infoClassName": "_ZGROUP_Debris",
+    "name": "Debris",
+    "num1": 0,
+    "num2": 21,
+    "members": "float Elasticity=0.5;"
+  },
+  {
+    "infoClassName": "_ZGROUP_DoubleDoor",
+    "name": "DoubleDoor",
+    "num1": 0,
+    "num2": 135,
+    "members": "float MaxAngle=90;long NrSteps=10;BOOL AutoClose=TRUE;bool NotifyGate=TRUE;MSG OnReqOpen=OpenDoor2;MSG OnReqClose=CloseDoor2;sndref OpenSound=-1;sndref CloseSound=-1;CHAR* ValidDoorKeys;enum OpenDirection={Away,Towards,Inward,Outward};BOOL Locked=FALSE;enum InitialState={Closed,OpenIn,OpenOut};BOOL UseAction=TRUE;BOOL KeepKey=FALSE;BOOL EarlySndClose=FALSE;BOOL PadLock=FALSE;;"
+  },
+  {
+    "infoClassName": "_ZGROUP_DynCloth",
+    "name": "DynCloth",
+    "num1": 0,
+    "num2": 5,
+    "members": "char* FabricPrefix=Fabric;char* ClothBoxPrefix=ClothBox;"
+  },
+  {
+    "infoClassName": "_ZGROUP_EnemyGenerator",
+    "name": "EnemyGenerator",
+    "num1": 0,
+    "num2": 13,
+    "members": "float TimeBetweenSpawn=30.0;float SpawnDerivation=5.0;"
+  },
+  {
+    "infoClassName": "_ZGROUP_Generic_Car_Control",
+    "name": "Generic_Car_Control",
+    "num1": 1073741824,
+    "num2": 23,
+    "members": "ZGEOMREFTAB SteerWheelsLeft;ZGEOMREFTAB SteerWheelsRight;ZGEOMREFTAB OtherWheels;ZGEOMREFTAB LeftDoors;ZGEOMREFTAB RightDoors;ZGEOMREFTAB Passengers;ZGEOMREFTAB VehicleTrack;float MaxSpeed(km/h);float CruiseSpeed(km/h);float MaxAccel(m/s^2);float MaxDecel(m/s^2);ZGEOMREF ColiBody;BOOL CutSeqBeforeStop=FALSE;SNDREF StartSound;SNDREF RunningSound;SNDREF StopSound;"
+  },
+  {
+    "infoClassName": "_ZGROUP_GroupUsingRelativeTM",
+    "name": "GroupUsingRelativeTM",
+    "num1": 0,
+    "num2": 21,
+    "members": "ZGEOMREF rPivotGeom;"
+  },
+  {
+    "infoClassName": "_ZGROUP_HideGroupObjects",
+    "name": "HideGroupObjects",
+    "num1": 0,
+    "num2": 16389,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGROUP_HiresItem",
+    "name": "HiresItem",
+    "num1": 0,
+    "num2": 16517,
+    "members": "ZGEOMREF Item;"
+  },
+  {
+    "infoClassName": "_ZGROUP_MapPositions",
+    "name": "MapPositions",
+    "num1": 1092616192,
+    "num2": 5,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGROUP_MarkTextureObjGroup",
+    "name": "MarkTextureObjGroup",
+    "num1": 0,
+    "num2": 16389,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGROUP_MaterialInfo",
+    "name": "MaterialInfo",
+    "num1": 0,
+    "num2": 5,
+    "members": "MaterialRef Material;ZGEOMREF DebrisEnter;ZGEOMREF DebrisExit;ZGEOMREF BulletHole;float HoleSize=10;"
+  },
+  {
+    "infoClassName": "_ZGROUP_MetalDetector",
+    "name": "MetalDetector",
+    "num1": 0,
+    "num2": 15,
+    "members": "sndref AlarmSound;"
+  },
+  {
+    "infoClassName": "_ZGROUP_ModifyGroupCon",
+    "name": "ModifyGroupCon",
+    "num1": 0,
+    "num2": 1,
+    "members": "BOOL ZCINVISIBLE=FALSE;BOOL GCVISIBLEREFRAC=FALSE;BOOL GCDISABLEFAR=FALSE;BOOL GCDRAWFIRST=FALSE;"
+  },
+  {
+    "infoClassName": "_ZGROUP_NumberDisplay",
+    "name": "NumberDisplay",
+    "num1": 0,
+    "num2": 133,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGROUP_OverRideNearFar",
+    "name": "OverRideNearFar",
+    "num1": 0,
+    "num2": -2147483643,
+    "members": "double fOverRideNearFar[2]={0,0};"
+  },
+  {
+    "infoClassName": "_ZGROUP_PlaneFlyOver",
+    "name": "PlaneFlyOver",
+    "num1": 0,
+    "num2": 21,
+    "members": "ZGEOMREFTAB Positions;SndRef Sound;float Velocity=100;"
+  },
+  {
+    "infoClassName": "_ZGROUP_RootGroup",
+    "name": "RootGroup",
+    "num1": 0,
+    "num2": 8213,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZGROUP_SigteCon",
+    "name": "SigteCon",
+    "num1": 0,
+    "num2": -2147482475,
+    "members": "ZGEOMREF Cam; long Steps=10; float Tolerance=10;ZGEOMREF rNormalPointer;ZGEOMREF rNormalPointerContext;"
+  },
+  {
+    "infoClassName": "_ZGROUP_SlidingDoor",
+    "name": "SlidingDoor",
+    "num1": 0,
+    "num2": 135,
+    "members": "long CloseTime=1.5;long AutoClose=1;bool NotifyGate=TRUE;MSG OnReqOpen=OpenDoor;MSG OnReqClose=CloseDoor;sndref OpenSound;sndref CloseSound;"
+  },
+  {
+    "infoClassName": "_ZGROUP_SoundTest",
+    "name": "SoundTest",
+    "num1": 1092616192,
+    "num2": 21,
+    "members": "ZGEOMREF rGeom;"
+  },
+  {
+    "infoClassName": "_ZGROUP_TrackSwitch",
+    "name": "TrackSwitch",
+    "num1": 0,
+    "num2": 151,
+    "members": "ZGEOMREF Sign;ZGEOMREF SoundCutSeq;"
+  },
+  {
+    "infoClassName": "_ZGROUP_Train",
+    "name": "Train",
+    "num1": 0,
+    "num2": 23,
+    "members": "ZGEOMREF RailShapeGroup;ZGEOMREFTAB WheelGroups;ZGEOMREFTAB ConnectionPoints;ZGEOMREF PrevWagon;ZGEOMREF NextWagon;"
+  },
+  {
+    "infoClassName": "_ZGROUP_Vehicle2",
+    "name": "Vehicle2",
+    "num1": 0,
+    "num2": 151,
+    "members": "ZGEOMREF Path=0;ZGEOMREFTAB SteeringWheels=0;ZGEOMREFTAB PassiveWheels=0;ZGEOMREF Pivot;SndSetRef CarSounds=0;"
+  },
+  {
+    "infoClassName": "_ZIKLNKOBJ_Cloth",
+    "name": "Cloth",
+    "num1": 0,
+    "num2": 149,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZIKLNKOBJ_DeathSequence",
+    "name": "DeathSequence",
+    "num1": 0,
+    "num2": 1155,
+    "members": "ZGEOMREFTAB ForwardCutSequences;ZGEOMREFTAB BackwardCutSequences;char* DieForwardName=Die_Forward;char* DieBackwardName=Die_Backward;ZGEOMREF Position;float BlendTime=0;float SpeedMul=1;ZGEOMREFTAB HideObjects;ZGEOMREF JaguarCutSeq;ZGEOMREF RiverCutSeq;"
+  },
+  {
+    "infoClassName": "_ZIKLNKOBJ_RagDoll",
+    "name": "RagDoll",
+    "num1": 0,
+    "num2": -2147483515,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZITEMGROUPWEAPON_MiniGun",
+    "name": "MiniGun",
+    "num1": 0,
+    "num2": 16517,
+    "members": "ZGEOMREF Barrel;SNDREF SpinUp;SNDREF SpinDown;SNDREF Fire;SNDREF Empty;"
+  },
+  {
+    "infoClassName": "_ZITEM_FireShot",
+    "name": "FireShot",
+    "num1": 0,
+    "num2": 21,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZLIST_ActionController",
+    "name": "ActionController",
+    "num1": 0,
+    "num2": 17,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZLIST_ActorCollision",
+    "name": "ActorCollision",
+    "num1": 0,
+    "num2": 21,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZLIST_CallOnceInAWhile",
+    "name": "CallOnceInAWhile",
+    "num1": 0,
+    "num2": 21,
+    "members": "long CallCommand,long ChkPrFrame=1;"
+  },
+  {
+    "infoClassName": "_ZLIST_CheckVisible",
+    "name": "CheckVisible",
+    "num1": 0,
+    "num2": 149,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZLIST_CutSequence",
+    "name": "CutSequence",
+    "num1": 1065353216,
+    "num2": 133,
+    "members": "float Start=0.0;float End=1.0;BOOL bResetStateAfterCut=TRUE;"
+  },
+  {
+    "infoClassName": "_ZLIST_CutSequenceCommand",
+    "name": "CutSequenceCommand",
+    "num1": 1065353216,
+    "num2": 3,
+    "members": "LONG FrameNr;MSG Message; ZGEOMREF Receiver; LONG Parameter;CHAR* ReceiverName;"
+  },
+  {
+    "infoClassName": "_ZLIST_CutSequenceInfo",
+    "name": "CutSequenceInfo",
+    "num1": 0,
+    "num2": 133,
+    "members": "char* Object; ZGEOMREF Position; char* Animation;float FrameStart;float FrameEnd;ZGEOMREF Item;BOOL bDead=FALSE;BOOL bKeepPosAfterCut=TRUE;BOOL HideObjsInHands=TRUE;"
+  },
+  {
+    "infoClassName": "_ZLIST_CutSequenceList",
+    "name": "CutSequenceList",
+    "num1": 0,
+    "num2": 151,
+    "members": "BOOL FullScreen=TRUE;BOOL MustFinish=FALSE;BOOL CreateParentGroups=false;"
+  },
+  {
+    "infoClassName": "_ZLIST_CutSequenceObject",
+    "name": "CutSequenceObject",
+    "num1": 0,
+    "num2": 133,
+    "members": "ZGEOMREF CutGeom;ZGEOMREF RootGeom;"
+  },
+  {
+    "infoClassName": "_ZLIST_CutSequenceObjects",
+    "name": "CutSequenceObjects",
+    "num1": 0,
+    "num2": 151,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZLIST_CutSequenceShowHide",
+    "name": "CutSequenceShowHide",
+    "num1": 1065353216,
+    "num2": 3,
+    "members": "LONG FrameNr;ZGEOMREF Object;ENUM ShowHide={Show,Hide};CHAR* Object;"
+  },
+  {
+    "infoClassName": "_ZLIST_CutSequenceSound",
+    "name": "CutSequenceSound",
+    "num1": 1065353216,
+    "num2": 131,
+    "members": "LONG FrameNr;SNDREF Sound;ZGEOMREF Emitter;CHAR* EmitterName;"
+  },
+  {
+    "infoClassName": "_ZLIST_CutSequenceSoundStartStop",
+    "name": "CutSequenceSoundStartStop",
+    "num1": 1065353216,
+    "num2": 19,
+    "members": "LONG FrameNr;long FramesToPlay=0;SNDREF Sound;ZGEOMREF Emitter;CHAR* EmitterName;"
+  },
+  {
+    "infoClassName": "_ZLIST_DelayNPCMessage",
+    "name": "DelayNPCMessage",
+    "num1": 0,
+    "num2": 149,
+    "members": "float Delay=5;"
+  },
+  {
+    "infoClassName": "_ZLIST_IKBomb",
+    "name": "IKBomb",
+    "num1": 0,
+    "num2": 141,
+    "members": "ZGEOMREF rBomb;MSG BombExplode=IKBomb_Explode;SndRef Explosion=-1;"
+  },
+  {
+    "infoClassName": "_ZLIST_MusicControl",
+    "name": "MusicControl",
+    "num1": 1092616192,
+    "num2": 23,
+    "members": "long lDefaultMusicNr=1;"
+  },
+  {
+    "infoClassName": "_ZLIST_PlantControl",
+    "name": "PlantControl",
+    "num1": 0,
+    "num2": 149,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZLIST_RangeNotify",
+    "name": "RangeNotify",
+    "num1": 1092616192,
+    "num2": 13,
+    "members": "ZGEOMREF List2;float EnterDist=0;float LeaveDist=0;MSG EnterCommand;MSG LeaveCommand;float Spd=30;float FrmLimit=0;float DistLimit=0;"
+  },
+  {
+    "infoClassName": "_ZLIST_RiverBoxNotify",
+    "name": "RiverBoxNotify",
+    "num1": 0,
+    "num2": 21,
+    "members": "ZGEOMREF rCutSequenceLeft;ZGEOMREF rCutSequenceRight;ZGEOMREF rCutSceneGroup;"
+  },
+  {
+    "infoClassName": "_ZLIST_SelectNotify",
+    "name": "SelectNotify",
+    "num1": 1092616192,
+    "num2": 149,
+    "members": "MSG NotifyCmd=CamFollowGeom;"
+  },
+  {
+    "infoClassName": "_ZLIST_SortCameraControls",
+    "name": "SortCameraControls",
+    "num1": 1176256512,
+    "num2": 151,
+    "members": "MSG AddObj=Camera_Add;MSG RemoveObj=Camera_Remove;MSG ReceiveQuality=Camera_SendQuality;MSG RequestQuality=Camera_RequestQuality;MSG SendForSortedList=Camera_RequestList;MSG SendSortedList=Camera_SendList;MSG Position=Camera_Position;MSG CutSequenceStart;MSG CutSequenceEnd;"
+  },
+  {
+    "infoClassName": "_ZLIST_TrainingList",
+    "name": "TrainingList",
+    "num1": 0,
+    "num2": 133,
+    "members": "MSG msgActivate=MSG_FIRETRANING;ZGEOMREF rNextList;"
+  },
+  {
+    "infoClassName": "_ZLNKOBJ_DeformEvent2",
+    "name": "DeformEvent2",
+    "num1": 0,
+    "num2": 21,
+    "members": "float Elasticity=0.0;ZGEOMREF Link;ZGEOMREF Link2;ZGEOMREF ControlObj;"
+  },
+  {
+    "infoClassName": "_ZLNKOBJ_EnableDynamics",
+    "name": "EnableDynamics",
+    "num1": 0,
+    "num2": 5,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZLNKOBJ_FrameNotify",
+    "name": "FrameNotify",
+    "num1": 1092616192,
+    "num2": 149,
+    "members": "CHAR* AnimName;ZGEOMREF Receiver; LONG FrameNumber; MSG Message=FrameNotify;"
+  },
+  {
+    "infoClassName": "_ZLNKOBJ_StartAnim",
+    "name": "StartAnim",
+    "num1": 0,
+    "num2": 1,
+    "members": "char* AnimName=WALK;ZGEOMREF StartPos=0;"
+  },
+  {
+    "infoClassName": "_ZListBox2_PointerList",
+    "name": "PointerList",
+    "num1": 1092616192,
+    "num2": 149,
+    "members": "ZGEOMREFTAB rFrameGfx;ZGEOMREF rFont;"
+  },
+  {
+    "infoClassName": "_ZPICOBJ_CameraFog",
+    "name": "CameraFog",
+    "num1": 0,
+    "num2": 21,
+    "members": "ZGEOMREF Camera;"
+  },
+  {
+    "infoClassName": "_ZSHAPE_T1GuideControler",
+    "name": "T1GuideControler",
+    "num1": 0,
+    "num2": 133,
+    "members": "double AttachRadius=40;ZGEOMREF rCameraPlane;"
+  },
+  {
+    "infoClassName": "_ZSHOTOBJ_KnifeBladeBox",
+    "name": "KnifeBladeBox",
+    "num1": 1120403456,
+    "num2": 21,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZSNDOBJ_SoundLimiter",
+    "name": "SoundLimiter",
+    "num1": 0,
+    "num2": 5,
+    "members": "ZGEOMREFTAB PlayList;ZGEOMREFTAB NOPlayList;"
+  },
+  {
+    "infoClassName": "_ZSNDOBJ_SoundRandomVolume",
+    "name": "SoundRandomVolume",
+    "num1": 0,
+    "num2": 29,
+    "members": "float Attenuation=3;float TimeInterval=2;float RandomPct=0.5;float MinChangeTime=0.5;float MaxChangeTime=4;float UpdateTime=0.1;"
+  },
+  {
+    "infoClassName": "_ZSNDOBJ_SoundSpline",
+    "name": "SoundSpline",
+    "num1": 0,
+    "num2": 21,
+    "members": "ZGEOMREF SplinePath=0;long LineSources=10;float RolloffFactor=1.0;float PanFactor=1.0;"
+  },
+  {
+    "infoClassName": "_ZSNDOBJ_SoundVolume2D",
+    "name": "SoundVolume2D",
+    "num1": 0,
+    "num2": 21,
+    "members": "float Size[3]={0,0,0};"
+  },
+  {
+    "infoClassName": "_ZSNDOBJ_SoundVolumetricSource",
+    "name": "SoundVolumetricSource",
+    "num1": 0,
+    "num2": 29,
+    "members": "float Size[3]={0,0,0};long SoundInside = 1;float AttenuationInside = 0;float MinDist = 10;float RolloffFactor = 1;float PanFactor = 1;long Visible = 0;long MaxVisibilityPoints = 6;float DampWeight = 0.5;float VisibleUpdate = 0;float Response = 1;float Resolution = 0.1;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_Cloth2",
+    "name": "Cloth2",
+    "num1": 0,
+    "num2": 149,
+    "members": "ZGEOMREFTAB ClothSelectors;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_ConvexHide",
+    "name": "ConvexHide",
+    "num1": 1114636288,
+    "num2": 16,
+    "members": "BOOL bUseBound=TRUE;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_DebugPathFinder2",
+    "name": "DebugPathFinder2",
+    "num1": 0,
+    "num2": -2147483499,
+    "members": "ZGEOMREF DestObj;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_DebugPathfinder",
+    "name": "DebugPathfinder",
+    "num1": 0,
+    "num2": -2147483499,
+    "members": "ZGEOMREF DestObj;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_DeformEvent",
+    "name": "DeformEvent",
+    "num1": 0,
+    "num2": 21,
+    "members": "float Elasticity=0.0;ZGEOMREF Link;ZGEOMREF Link2;ZGEOMREF ControlObj;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_DisableFog",
+    "name": "DisableFog",
+    "num1": 0,
+    "num2": 1,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_DisableFogAndZBuffer",
+    "name": "DisableFogAndZBuffer",
+    "num1": 0,
+    "num2": 1,
+    "members": "BOOL bDisableFog=TRUE;BOOL bDisableZBuffer=TRUE;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_ExitSceneBox",
+    "name": "ExitSceneBox",
+    "num1": 0,
+    "num2": 157,
+    "members": "ZGEOMREF TrackObj;ZGEOMREF NotificationObject;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_FireTraining",
+    "name": "FireTraining",
+    "num1": 0,
+    "num2": -2147483515,
+    "members": "double fDelayTime=1;double fHoldTime=1;ZGEOMREF rDisplayNumberGroup;ZGEOMREF rTargetValueChannel;SNDREF rMoveInSound;SNDREF rMoveOutSound;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_FireTrainingBackForth",
+    "name": "FireTrainingBackForth",
+    "num1": 0,
+    "num2": -2147483515,
+    "members": "MSG msgActivate=MSG_FIRETRANING;long FPS=25;long ForthEndFrame=100;long SoundForthFrame=100;ZGEOMREF rDisplayNumberGroup;ZGEOMREF rTargetValueChannel;MSG msgEnter=CheckInsideEnter;MSG msgLeave=CheckInsideLeave;SNDREF rMoveSound;SNDREF rStopSound;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_FluidSystem",
+    "name": "FluidSystem",
+    "num1": 0,
+    "num2": 21,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_Guide",
+    "name": "Guide",
+    "num1": 0,
+    "num2": 21,
+    "members": "float Speed=10.0;long ActivateKey=0;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_MatPosAnimFromTo",
+    "name": "MatPosAnimFromTo",
+    "num1": 0,
+    "num2": 21,
+    "members": "long FrameStart;long FrameEnd;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_MusicObject",
+    "name": "MusicObject",
+    "num1": 0,
+    "num2": 16389,
+    "members": "long lMusicNr;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_PianoWire",
+    "name": "PianoWire",
+    "num1": 1120403456,
+    "num2": 5,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_PlaceItem",
+    "name": "PlaceItem",
+    "num1": 1232348160,
+    "num2": 133,
+    "members": "char* strPlaceText;bool bNoPointerOption=false;long lPairingNr=0;ZGEOMREF rPlaceOnGeom;ZGEOMREF rPositionGeom;bool bDeletePosGeom=false;float vRelPos[3];float mRelMat[9]={0,0,1,0,1,0,1,0,0};ZGEOMREFTAB rPossibleItems;MSG PlaceItem=PlaceItem;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_Plant",
+    "name": "Plant",
+    "num1": 0,
+    "num2": -2147483513,
+    "members": "ZGEOMREFTAB PlantSelectors;long Type=0;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_QRigidBody",
+    "name": "QRigidBody",
+    "num1": 0,
+    "num2": 149,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_ScrollTexture",
+    "name": "ScrollTexture",
+    "num1": 0,
+    "num2": -2147483627,
+    "members": "GEOMTEX tganame=Untitled;double Speed[2]={0,1};double Range[4]={0,0,1,1};"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_Shatter",
+    "name": "Shatter",
+    "num1": 0,
+    "num2": 133,
+    "members": "ZGEOMREF BrokenGroup;ZGEOMREF RemainsGroup;SndSetRef SoundSet=0;SndRef Sound=0;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_ShatterGlass",
+    "name": "ShatterGlass",
+    "num1": 0,
+    "num2": 133,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_SpawnBox",
+    "name": "SpawnBox",
+    "num1": 0,
+    "num2": 13,
+    "members": "ZGEOMREF SpawnPoint;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_ThomasEvent",
+    "name": "ThomasEvent",
+    "num1": 0,
+    "num2": 21,
+    "members": "float Speed=0.1;float Stiffness=0.001;float Gravity=0.1;ZGEOMREF otherobj;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_UpdateDynamicsEvent",
+    "name": "UpdateDynamicsEvent",
+    "num1": 0,
+    "num2": 21,
+    "members": "float TimeStep=3211.0;ZGEOMREF List;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_VertAnim",
+    "name": "VertAnim",
+    "num1": 1120403456,
+    "num2": 149,
+    "members": "bool Loop=true;float FPS=25;bool Delete=true;bool DeleteEmptyParent=true;MSG msgActivate;bool bForceUpdate=false;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_VertAnimFromTo",
+    "name": "VertAnimFromTo",
+    "num1": 1120403456,
+    "num2": 133,
+    "members": "long FrameStart;long FrameEnd;long FPS=25;MSG EndMsg=VertAnimEnd;ZGEOMREF MsgReceiver;"
+  },
+  {
+    "infoClassName": "_ZSTDOBJ_ViewNotifyCheckBox",
+    "name": "ViewNotifyCheckBox",
+    "num1": 0,
+    "num2": 16407,
+    "members": "enum lOffWhen={Inside,Outside};ZGEOMREFTAB rBoxList;"
+  },
+  {
+    "infoClassName": "_ZSTDRIGIDBODY_Spring",
+    "name": "Spring",
+    "num1": 0,
+    "num2": 5,
+    "members": "float Stiffness=0.001;float DragCoeff=0.001;float RestLength=1.0;ZGEOMREF Link;double Pos1[3]={0,0,0};double Pos2[3]={0,0,0};"
+  },
+  {
+    "infoClassName": "_ZScrollArea_AutoScroller",
+    "name": "AutoScroller",
+    "num1": 1092616192,
+    "num2": 135,
+    "members": "MSG StartMessage=StartScroll; MSG StopMessage=StopScroll;float fSpeed=10;BOOL KeepSizePos=FALSE;"
+  },
+  {
+    "infoClassName": "_ZShapeGroup_TrackControl",
+    "name": "TrackControl",
+    "num1": 0,
+    "num2": 135,
+    "members": "ZGEOMREFTAB TrackSwitches;"
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl0_1",
+    "name": "LevelControl0_1",
+    "num1": 0,
+    "num2": 1175,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl1_1",
+    "name": "LevelControl1_1",
+    "num1": 0,
+    "num2": -2147482473,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl1_2",
+    "name": "LevelControl1_2",
+    "num1": 0,
+    "num2": 1175,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl1_3",
+    "name": "LevelControl1_3",
+    "num1": 0,
+    "num2": 1175,
+    "members": "MSG ClimbIn=C1_3_ClimbIn;ZGEOMREF rClimbInSeq;ZGEOMREF rPosInside;MSG ClimbOut=C1_3_ClimbOut;ZGEOMREF rClimbOutSeq;ZGEOMREF rPosOutside;MSG msgHide=HideWeapon;ZGEOMREF rHideSeq;MSG msgRetrieve=RetreiveWeapon;ZGEOMREF rRetrieveSeq;ZGEOMREF rHiddenPos;ZGEOMREF rRedDragonMember;ZGEOMREFTAB rSewerBoxList;ZGEOMREF rPoliceChief;ZGEOMREF rMedallion;ZGEOMREF rBlueLotusMember;ZGEOMREF rAmuletRestaurantBox;ZGEOMREF rWarningList;"
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl1_4",
+    "name": "LevelControl1_4",
+    "num1": 0,
+    "num2": 1175,
+    "members": "ZGEOMREF rSuperBowl; ZGEOMREF rSafe1; ZGEOMREF rSafe2; ZGEOMREF rSafe3; ZGEOMREF rSafe4;"
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl2_1",
+    "name": "LevelControl2_1",
+    "num1": 0,
+    "num2": 1175,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl2_2",
+    "name": "LevelControl2_2",
+    "num1": 0,
+    "num2": 1175,
+    "members": "ZGEOMREF CSBorisExit;ZGEOMREF CSBorisDrive;ZGEOMREF Boris;"
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl3_1",
+    "name": "LevelControl3_1",
+    "num1": 0,
+    "num2": 1175,
+    "members": "ZGEOMREF CutSuccess;ZGEOMREF CutSuccess2;"
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl4_1",
+    "name": "LevelControl4_1",
+    "num1": 0,
+    "num2": -2147482473,
+    "members": "ZGEOMREF CutSeqShowIdol;ZGEOMREF CutSeqArrive;"
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl4_2",
+    "name": "LevelControl4_2",
+    "num1": 0,
+    "num2": 1175,
+    "members": "ZGEOMREF CutSeqTunnel;"
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl4_3",
+    "name": "LevelControl4_3",
+    "num1": 0,
+    "num2": 1175,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl5_1",
+    "name": "LevelControl5_1",
+    "num1": 0,
+    "num2": 1175,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZT1OBJ_LevelControl5_2",
+    "name": "LevelControl5_2",
+    "num1": 0,
+    "num2": 1175,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZT1OBJ_ToggleStart",
+    "name": "ToggleStart",
+    "num1": 0,
+    "num2": 21,
+    "members": "ZGEOMREFTAB StartPoses;long Key=70;"
+  },
+  {
+    "infoClassName": "_ZWINDOW_IngameDisplay",
+    "name": "IngameDisplay",
+    "num1": 1092616192,
+    "num2": -2147475433,
+    "members": "ZGEOMREF InventoryList;ZGEOMREF ActionList;ZGEOMREF Font;ZGEOMREF PointerList;ZGEOMREF SniperOverlay;ZGEOMREF SubtitleFont;ZGEOMREF ActionGroup=0;ZGEOMREF WeaponDisplay;ZGEOMREF ArmorDisplay;ZGEOMREF HealthDisplay;ZGEOMREFTAB rFrame1;;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_AutoLayout",
+    "name": "AutoLayout",
+    "num1": 1092616192,
+    "num2": 21,
+    "members": "ZGEOMREFTAB Objects; long YSpace;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_CreditDisplay",
+    "name": "CreditDisplay",
+    "num1": 1082130432,
+    "num2": 23,
+    "members": ""
+  },
+  {
+    "infoClassName": "_ZWINGROUP_InformationDisplay",
+    "name": "InformationDisplay",
+    "num1": 1092616192,
+    "num2": 8343,
+    "members": "ZGEOMREF Font;ZGEOMREF rActionFrame;ZGEOMREF InfoFrame;ZGEOMREF rWarningFrame;SndSetRef rSounds;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_LaptopOverlay",
+    "name": "LaptopOverlay",
+    "num1": 1092616192,
+    "num2": 133,
+    "members": "ZGEOMREF Overlay;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_LaptopState",
+    "name": "LaptopState",
+    "num1": 1092616192,
+    "num2": 135,
+    "members": "bool Main=false;ZGEOMREF rBackGround=0;char* HeaderText=HEADER;ZGEOMREF OnOk=0;ZGEOMREF OnMoreInfo=0;bool HasButtonBack=false;char* InitialSubState;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_OSDADF",
+    "name": "OSDADF",
+    "num1": 1092616192,
+    "num2": 23,
+    "members": "ZGEOMREF ADF;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_OSDCompas",
+    "name": "OSDCompas",
+    "num1": 1092616192,
+    "num2": 21,
+    "members": "ZGEOMREF Compas;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_OSDStatusBar",
+    "name": "OSDStatusBar",
+    "num1": 1092616192,
+    "num2": 135,
+    "members": "ZGEOMREF Empty;ZGEOMREF Full;ZGEOMREF Marker;long Initial Value=0;Color TextColor;long MarkerWidth;long Offset;long Range;float TextPos[2]={0,0};;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateBackGroundBase",
+    "name": "StateBackGroundBase",
+    "num1": 1090519040,
+    "num2": 135,
+    "members": "bool Main=false;ZGEOMREF DefaultBackground=0;ZGEOMREFTAB BackGrounds;ZGEOMREF ButtonOk;ZGEOMREF ButtonBack;ZGEOMREF ButtonMoreInfo;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateBase",
+    "name": "StateBase",
+    "num1": 1092616192,
+    "num2": 1159,
+    "members": "bool Main=false;;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateConfigBase",
+    "name": "StateConfigBase",
+    "num1": 1101004800,
+    "num2": 135,
+    "members": "bool Main=false;char* Header;BOOL HasBackButton=FALSE;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateConfigControls",
+    "name": "StateConfigControls",
+    "num1": 1101004800,
+    "num2": 135,
+    "members": "bool Main=false;char* Header;BOOL HasBackButton=FALSE;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateConfigDisplay",
+    "name": "StateConfigDisplay",
+    "num1": 1101004800,
+    "num2": 135,
+    "members": "bool Main=false;char* Header;BOOL HasBackButton=FALSE;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateConfigMainMenu",
+    "name": "StateConfigMainMenu",
+    "num1": 1101004800,
+    "num2": 135,
+    "members": "bool Main=false;char* Header;BOOL HasBackButton=FALSE;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateConfigSound",
+    "name": "StateConfigSound",
+    "num1": 1101004800,
+    "num2": 135,
+    "members": "bool Main=false;char* Header;BOOL HasBackButton=FALSE;SndRef rVolumeSound=0;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateCredits",
+    "name": "StateCredits",
+    "num1": 1092616192,
+    "num2": 135,
+    "members": ";"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateDebriefing",
+    "name": "StateDebriefing",
+    "num1": 1101004800,
+    "num2": 135,
+    "members": "bool Main=false;ZGEOMREF Succes;ZGEOMREF Failed;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateEquipment",
+    "name": "StateEquipment",
+    "num1": 1092616192,
+    "num2": 135,
+    "members": "bool Main=false;LONG Payment;LONG B-Requirements;LONG C-Requirements;enumbits CloseCombat={Pentagonknife,Oyabunknife,Pianostring,Meatcleaver,Kitchenknife,Shuriken,Stungun,Clonecontroldevice};enumbits Handguns={Hardballer,DesertEagle,Beretta92,LugerP08,Derringer,HardballerSilenced,Beretta92Silenced};enumbits SMGs={IMIUZI,HKMP5,HKMP5SD};enumbits AssaultRifles={M16A2,AK103,AK47};enumbits Snipers={WaltherWA-2000,R93tacticalsniper,Blowgun};enumbits Shotguns={MossbergPersuader,Sawn-offshotgun,FranchiPA3};enumbits MachineGuns={M-60,M134Minigun};enumbits Items={RemoteBomb,RemoteDetonator,CarBomb,GPSReceiver,GPSTransmitter,Kevlarvest,Compass,Binoculars};enumbits XtraCloseCombat={Pentagonknife,Oyabunknife,Pianostring,Meatcleaver,Kitchenknife,Shuriken,Stungun,Clonecontroldevice};enumbits XtraHandguns={Hardballer,DesertEagle,Beretta92,LugerP08,Derringer,HardballerSilenced,Beretta92Silenced};enumbits XtraSMGs={IMIUZI,HKMP5,HKMP5SD};enumbits XtraAssaultRifles={M16A2,AK103,AK47};enumbits XtraSnipers={WaltherWA-2000,R93tacticalsniper,Blowgun};enumbits XtraShotguns={MossbergPersuader,Sawn-offshotgun,FranchiPA3};enumbits XtraMachineGuns={M-60,M134Minigun};enumbits XtraItems={RemoteBomb,RemoteDetonator,CarBomb,GPSReceiver,GPSTransmitter,Kevlarvest,Compass,Binoculars};enumbits SuperCloseCombat={Pentagonknife,Oyabunknife,Pianostring,Meatcleaver,Kitchenknife,Shuriken,Stungun,Clonecontroldevice};enumbits SuperHandguns={Hardballer,DesertEagle,Beretta92,LugerP08,Derringer,HardballerSilenced,Beretta92Silenced};enumbits SuperSMGs={IMIUZI,HKMP5,HKMP5SD};enumbits SuperAssaultRifles={M16A2,AK103,AK47};enumbits SuperSnipers={WaltherWA-2000,R93tacticalsniper,Blowgun};enumbits SuperShotguns={MossbergPersuader,Sawn-offshotgun,FranchiPA3};enumbits SuperMachineGuns={M-60,M134Minigun};enumbits SuperItems={RemoteBomb,RemoteDetonator,CarBomb,GPSReceiver,GPSTransmitter,Kevlarvest,Compass,Binoculars};SNDREF ViewItemSnd;SNDREF NoMoneySnd;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateExit",
+    "name": "StateExit",
+    "num1": 1092616192,
+    "num2": 135,
+    "members": "bool Main=false;;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateGFX",
+    "name": "StateGFX",
+    "num1": 1077936128,
+    "num2": 135,
+    "members": "bool Main=false;ZGEOMREF CheckButton;ZGEOMREF Listbox;ZGEOMREF ScrollBar;SNDREF WriteSound;ZGEOMREF DialogFrame;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateICAGreeting",
+    "name": "StateICAGreeting",
+    "num1": 1092616192,
+    "num2": 135,
+    "members": "bool Main=false;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateIntro",
+    "name": "StateIntro",
+    "num1": 1092616192,
+    "num2": 1159,
+    "members": "bool Main=false;ZGEOMREF Font;ZGEOMREF LogoGroup;ZGEOMREF rLoGoCam;ZGEOMREF rE3LoadPic;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateLoadGame",
+    "name": "StateLoadGame",
+    "num1": 1077936128,
+    "num2": 135,
+    "members": "bool Main=false;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateLocation",
+    "name": "StateLocation",
+    "num1": 1092616192,
+    "num2": 135,
+    "members": "bool Main=false;ZGEOMREF Camera;ZGEOMREFTAB MapGroups;ZGEOMREF MapGroup;long MaxZoomOut=5000;ZGEOMREF Repository;SNDREF SelectMapSnd;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateMain",
+    "name": "StateMain",
+    "num1": 1084227584,
+    "num2": 1159,
+    "members": "bool Main=false;char* InitialState=StateICAGreeting;char* FinalState=StateExit;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateNewGame",
+    "name": "StateNewGame",
+    "num1": 1077936128,
+    "num2": 135,
+    "members": "bool Main=false;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateOverlays",
+    "name": "StateOverlays",
+    "num1": 1092616192,
+    "num2": 135,
+    "members": "bool Main=false;ZGEOMREF Mouse;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StatePreScene",
+    "name": "StatePreScene",
+    "num1": 1092616192,
+    "num2": 5,
+    "members": "bool Main=false;ZGEOMREF Text;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateSelectLevel",
+    "name": "StateSelectLevel",
+    "num1": 1077936128,
+    "num2": 135,
+    "members": "bool Main=false;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StateWeapon",
+    "name": "StateWeapon",
+    "num1": 1092616192,
+    "num2": 135,
+    "members": "bool Main=false;;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_StatetargetDetails",
+    "name": "StatetargetDetails",
+    "num1": 1092616192,
+    "num2": 7,
+    "members": "bool Main=false;ZGEOMREF CutSceneRoot;ZGEOMREF CutSceneCamera;ZGEOMREF CutSequence;ZGEOMREF PhotoOverlay1;ZGEOMREF PhotoOverlay2;ZGEOMREF MovieOverlay;SNDREF PhotoSound;SNDREF MovieNoise;SNDREF MovieFinishedSnd;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_ZInvListItem",
+    "name": "ZInvListItem",
+    "num1": 1092616192,
+    "num2": 16519,
+    "members": "bool NoRemove=false;ZGEOMREF Header;long GroupId=-1;bool CanSelect=true;long SelectValue=-1;ZGEOMREF Monitor=0;char* Text=None;ZGEOMREF Item;"
+  },
+  {
+    "infoClassName": "_ZWINGROUP_ZInventorylist",
+    "name": "ZInventorylist",
+    "num1": 1092616192,
+    "num2": 23,
+    "members": "ZGEOMREF MonitorGroup=0;ZGEOMREF rTitleWeapons;ZGEOMREF rTitleItems;ZGEOMREFTAB DefaultItems=0;ZGEOMREF ItemBackground=0;ZGEOMREF ActiveGroup=0;ZGEOMREF Cursor;ZGEOMREF m_rAmmoDisplay;"
+  },
+  {
+    "infoClassName": "_ZWINOBJ_WinObjAlign",
+    "name": "WinObjAlign",
+    "num1": 0,
+    "num2": 17,
+    "members": "enum Pos={Left,Right,Top,Bottom,BottomLeft,BottomRight,TopLeft,TopRight,Center};"
+  }
+]}

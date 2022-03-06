@@ -9,6 +9,7 @@
 #include <functional>
 
 #include "chunk.h"
+#include "classInfo.h"
 #include "gameobj.h"
 #include "global.h"
 #include "texture.h"
@@ -89,7 +90,7 @@ void IGOTNode(GameObject *o)
 		colorpushed = 1;
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 1, 0, 1));
 	}
-	op = ImGui::TreeNodeEx(o, (o->subobj.empty() ? ImGuiTreeNodeFlags_Leaf : 0) | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ((o == selobj) ? ImGuiTreeNodeFlags_Selected : 0), "%s(0x%X)::%s", GetObjTypeString(o->type), o->type, o->name.c_str());
+	op = ImGui::TreeNodeEx(o, (o->subobj.empty() ? ImGuiTreeNodeFlags_Leaf : 0) | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ((o == selobj) ? ImGuiTreeNodeFlags_Selected : 0), "%s(0x%X)::%s", ClassInfo::GetObjTypeString(o->type), o->type, o->name.c_str());
 	if (colorpushed)
 		ImGui::PopStyleColor();
 	if (findsel)
@@ -201,6 +202,8 @@ void IGObjectInfo()
 		ImGui::Text("Num. references: %u", selobj->refcount);
 		if (ImGui::CollapsingHeader("DBL"))
 		{
+			auto members = ClassInfo::GetMemberNames(selobj);
+			size_t memberIndex = 0;
 			ImGui::InputScalar("Flags", ImGuiDataType_U32, &selobj->dblflags);
 			int i = 0;
 			for (auto e = selobj->dbl.begin(); e != selobj->dbl.end(); e++)
@@ -208,26 +211,30 @@ void IGObjectInfo()
 				ImGui::PushID(i++);
 				ImGui::Text("%1X", e->flags >> 4);
 				ImGui::SameLine();
+				static const std::string oobMember = "OOB";
+				const auto& name = (memberIndex < members.size()) ? members[memberIndex++] : oobMember;
 				switch (e->type)
 				{
 				case 0:
 					ImGui::Text("0"); break;
 				case 1:
-					ImGui::InputDouble("Double", &std::get<double>(e->value)); break;
+					ImGui::InputDouble(name.c_str(), &std::get<double>(e->value)); break;
 				case 2:
-					ImGui::InputFloat("Float", &std::get<float>(e->value)); break;
+					ImGui::InputFloat(name.c_str(), &std::get<float>(e->value)); break;
 				case 3:
 				case 0xA:
 				case 0xB:
 				case 0xC:
 				{
-					ImGui::InputInt(DBLEntry::getTypeName(e->type), (int*)&std::get<uint32_t>(e->value)); break;
+					//ImGui::InputInt(DBLEntry::getTypeName(e->type), (int*)&std::get<uint32_t>(e->value)); break;
+					ImGui::InputInt(name.c_str(), (int*)&std::get<uint32_t>(e->value)); break;
 				}
 				case 4:
 				case 5:
 				{
 					auto& str = std::get<std::string>(e->value);
-					IGStdStringInput((e->type == 5) ? "Filename" : "String", str);
+					//IGStdStringInput((e->type == 5) ? "Filename" : "String", str);
+					IGStdStringInput(name.c_str(), str);
 					break;
 				}
 				case 6:
@@ -257,12 +264,12 @@ void IGObjectInfo()
 				}
 				case 8:
 					if (auto& obj = std::get<GORef>(e->value); obj.valid()) {
-						ImGui::Text("Object: %s", obj->name.c_str());
+						ImGui::LabelText(name.c_str(), "Object %s::%s", ClassInfo::GetObjTypeString(obj->type), obj->name.c_str());
 						if (ImGui::IsItemClicked())
 							nextobjtosel = obj.get();
 					}
 					else
-						ImGui::Text("Object: Invalid");
+						ImGui::LabelText(name.c_str(), "Object <Invalid>");
 					if (ImGui::BeginDragDropTarget())
 					{
 						if (const ImGuiPayload *pl = ImGui::AcceptDragDropPayload("GameObject"))
@@ -274,8 +281,7 @@ void IGObjectInfo()
 					break;
 				case 9: {
 					auto& vec = std::get<std::vector<GORef>>(e->value);
-					ImGui::Text("Objlist: %zu objects", vec.size());
-					if (ImGui::BeginListBox("Objlist", ImVec2(0, 64))) {
+					if (ImGui::BeginListBox("##Objlist", ImVec2(0, 64))) {
 						for (auto& obj : vec)
 						{
 							ImGui::Text("%s", obj->name.c_str());
@@ -291,6 +297,8 @@ void IGObjectInfo()
 							}
 						}
 						ImGui::EndListBox();
+						ImGui::SameLine();
+						ImGui::Text("%s\n%zu objects", name.c_str(), vec.size());
 					}
 					break;
 				}
@@ -545,6 +553,7 @@ int main(int argc, char* argv[])
 //int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode)
 {
 	//SetProcessDPIAware();
+	ClassInfo::ReadClassInfo();
 
 	OPENFILENAME ofn; char zipfilename[1024]; zipfilename[0] = 0;
 	memset(&ofn, 0, sizeof(OPENFILENAME));
