@@ -101,6 +101,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>opengl32.lib;glu32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y "$(ProjectDir)classes.json"  "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
@@ -110,15 +113,21 @@
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
+    <PostBuildEvent>
+      <Command>xcopy /y $(ProjectDir)classes.json  $(ProjectDir)$(OutDir)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Link>
       <AdditionalDependencies>opengl32.lib;glu32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
+    <PostBuildEvent>
+      <Command>xcopy /y "$(ProjectDir)classes.json"  "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="chunk.cpp" />
@@ -156,7 +165,17 @@
   <ItemGroup>
     <ResourceCompile Include="c47edit.rc" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="packages\nlohmann.json.3.10.5\build\native\nlohmann.json.targets" Condition="Exists('packages\nlohmann.json.3.10.5\build\native\nlohmann.json.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('packages\nlohmann.json.3.10.5\build\native\nlohmann.json.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\nlohmann.json.3.10.5\build\native\nlohmann.json.targets'))" />
+  </Target>
 </Project>
