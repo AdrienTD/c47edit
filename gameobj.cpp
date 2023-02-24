@@ -163,7 +163,6 @@ void LoadSceneSPK(const char *fn)
 		o->pdbloff = p[0];
 		o->pexcoff = p[1];
 		o->flags = *((unsigned short*)(&p[5]) + 1);
-		o->color = p[13];
 		o->root = o->parent->root;
 
 		o->position = *(Vector3*)((char*)ppos->maindata.data() + p[4]);
@@ -182,23 +181,81 @@ void LoadSceneSPK(const char *fn)
 			for (int j = 0; j < 3; j++)
 				o->matrix.m[i][j] = rv[i].coord[j];
 
-		if (o->flags & 0x0420)
+		p += 6;
+		if (o->flags & 0x0020)
 		{
-			Mesh *m = o->mesh = new Mesh;
-			m->vertstart = p[6]; m->quadstart = p[7]; m->tristart = p[8];
-			m->ftxo = p[9];
-			m->numverts = p[10]; m->numquads = p[11]; m->numtris = p[12];
-			m->weird = p[14];
+			o->mesh = std::make_shared<Mesh>();
+			Mesh *m = o->mesh.get();
+			uint32_t vertstart = p[0];
+			uint32_t quadstart = p[1];
+			uint32_t tristart = p[2];
+			uint32_t ftxOffset = p[3];
+			uint32_t numverts = p[4];
+			uint32_t numquads = p[5];
+			uint32_t numtris = p[6];
+			o->color = p[7];
+			uint32_t weird = p[8];
+			Vector3* chkVertices = (Vector3*)((float*)pver->maindata.data() + vertstart);
+			uint16_t* chkFaces = (uint16_t*)pfac->maindata.data();
+			float* chkUvs = (float*)puvc->maindata.data();
+			m->vertices.assign(chkVertices, chkVertices + numverts);
+			m->triIndices.assign(chkFaces + tristart, chkFaces + tristart + numtris * 3);
+			m->quadIndices.assign(chkFaces + quadstart, chkFaces + quadstart + numquads * 4);
+			//assert(!(ftxOffset & 0x80000000));
+			if (ftxOffset & 0x80000000)
+				printf("Odd FTX offset: %08X\n", ftxOffset);
+			if (ftxOffset && !(ftxOffset & 0x80000000)) {
+				uint8_t* ftxpnt = (uint8_t*)pftx->maindata.data() + ftxOffset - 1;
+				uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
+				uint32_t uvs1start = *(uint32_t*)ftxpnt;
+				uint32_t uvs2start = *(uint32_t*)(ftxpnt + 4);
+				uint32_t numFaces = *(uint32_t*)(ftxpnt + 8);
+				assert(numFaces == numtris + numquads);
+				m->ftxFaces.resize(numFaces);
+				for (auto& face : m->ftxFaces) {
+					face = { ftxFace[0], ftxFace[1], ftxFace[2], ftxFace[3], ftxFace[4], ftxFace[5] };
+					ftxFace += 6;
+				}
+				m->primaryUvs.assign(chkUvs + uvs1start, chkUvs + uvs1start + 8 * numFaces);
+				m->secondaryUvs.assign(chkUvs + uvs2start, chkUvs + uvs2start + 8 * numFaces);
+			}
+			//if(numquads) printf("(%i, %i)\n", quadstart, quadstart + numquads * 4);
+			//if (numtris) printf("(%i, %i)\n", tristart, tristart + numtris * 3);
+		}
+		if (o->flags & 0x0400)
+		{
+			o->shape = std::make_shared<Shape>();
+			uint32_t vertstart = p[0];
+			uint32_t quadstart = p[1];
+			uint32_t tristart = p[2];
+			uint32_t ftxOffset = p[3];
+			uint32_t numverts = p[4];
+			uint32_t numquads = p[5];
+			uint32_t numtris = p[6];
+			o->color = p[7];
+			uint32_t weird = p[8];
+			assert(quadstart == 0);
+			assert(numquads == 0);
+
+			Shape* s = o->shape.get();
+			Vector3* chkVertices = (Vector3*)((float*)pver->maindata.data() + vertstart);
+			s->vertices.assign(chkVertices, chkVertices + numverts);
+			s->quadstart = quadstart;
+			s->tristart = tristart;
+			s->ftxo = ftxOffset;
+			s->numquads = numquads;
+			s->numtris = numtris;
+			s->weird = weird;
 		}
 
 		if (o->flags & 0x0080)
 		{
 			Light *l = o->light = new Light;
 			for (int i = 0; i < 7; i++)
-				l->param[i] = p[6 + i];
+				l->param[i] = p[i];
 		}
 
-		char *dpbeg = (char*)pdbl->maindata.data() + p[0];
+		char *dpbeg = (char*)pdbl->maindata.data() + o->pdbloff;
 		uint32_t ds = *(uint32_t*)dpbeg & 0xFFFFFF;
 		o->dblflags = (*(uint32_t*)dpbeg >> 24) & 255;
 		char *dp = dpbeg + 4;
@@ -284,9 +341,21 @@ struct DBLHash
 	}
 };
 
+uint32_t checksum(void* data, size_t length) {
+	uint32_t sum = 0;
+	uint8_t* bytes = (uint8_t*)data;
+	for (size_t i = 0; i < length; ++i)
+		sum += bytes[i];
+	return sum;
+}
+
 std::stringbuf heabuf, nambuf, dblbuf;
 std::vector<std::array<float,3> > posbuf;
 std::vector<std::array<uint32_t, 4> > mtxbuf;
+std::vector<Vector3> g_sav_verbuf;
+std::vector<uint16_t> g_sav_facbuf;
+std::vector<float> g_sav_uvcbuf;
+std::stringbuf g_sav_ftxbuf;
 
 uint32_t sbtell(std::stringbuf *sb);
 
@@ -297,6 +366,10 @@ std::map<std::array<float, 3>, uint32_t> g_sav_posmap;
 std::map<std::array<uint32_t, 4>, uint32_t> g_sav_mtxmap;
 std::map<std::string, uint32_t> g_sav_nammap;
 std::unordered_map<std::pair<uint32_t, std::string>, uint32_t, DBLHash> g_sav_dblmap;
+std::map<std::vector<Vector3>, uint32_t> g_sav_vermap;
+std::map<std::vector<uint16_t>, uint32_t> g_sav_facmap;
+std::map<std::vector<float>, uint32_t> g_sav_uvcmap;
+std::map<std::string, uint32_t> g_sav_ftxmap;
 
 void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 {
@@ -423,18 +496,80 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		heabuf.sputn((char*)&posoff, 4);
 		heabuf.sputn((char*)&o->type, 2);
 		heabuf.sputn((char*)&o->flags, 2);
-		if (o->flags & 0x0420)
+
+		auto look = [](auto& buf, auto& map, auto& data, auto& outOffset, int multiplier) {
+			if (data.empty()) {
+				outOffset = 0;
+				return;
+			}
+			if (auto it = map.find(data); it != map.end()) {
+				outOffset = it->second;
+			}
+			else {
+				outOffset = buf.size() * multiplier;
+				buf.insert(buf.end(), data.begin(), data.end());
+				map.emplace(data, outOffset);
+			}
+		};
+
+		if (o->flags & 0x0020)
 		{
 			assert(o->mesh);
-			heabuf.sputn((char*)&o->mesh->vertstart, 4);
-			heabuf.sputn((char*)&o->mesh->quadstart, 4);
-			heabuf.sputn((char*)&o->mesh->tristart, 4);
-			heabuf.sputn((char*)&o->mesh->ftxo, 4);
-			heabuf.sputn((char*)&o->mesh->numverts, 4);
-			heabuf.sputn((char*)&o->mesh->numquads, 4);
-			heabuf.sputn((char*)&o->mesh->numtris, 4);
+			uint32_t vertstart, quadstart, tristart, ftxo = 0;
+			uint32_t numverts = (uint32_t)o->mesh->vertices.size();
+			uint32_t numquads = (uint32_t)o->mesh->quadIndices.size() / 4;
+			uint32_t numtris = (uint32_t)o->mesh->triIndices.size() / 3;
+			uint32_t uv1start, uv2start, numFaces = numquads + numtris;
+			assert(o->mesh->ftxFaces.empty() || (numFaces == o->mesh->ftxFaces.size()));
+
+			look(g_sav_verbuf, g_sav_vermap, o->mesh->vertices, vertstart, 3);
+			look(g_sav_facbuf, g_sav_facmap, o->mesh->triIndices, tristart, 1);
+			look(g_sav_facbuf, g_sav_facmap, o->mesh->quadIndices, quadstart, 1);
+			look(g_sav_uvcbuf, g_sav_uvcmap, o->mesh->primaryUvs, uv1start, 1);
+			look(g_sav_uvcbuf, g_sav_uvcmap, o->mesh->secondaryUvs, uv2start, 1);
+
+			if (!o->mesh->ftxFaces.empty()) {
+				std::stringbuf ftxdata;
+				ftxdata.sputn((char*)&uv1start, 4);
+				ftxdata.sputn((char*)&uv2start, 4);
+				ftxdata.sputn((char*)&numFaces, 4);
+				ftxdata.sputn((char*)o->mesh->ftxFaces.data(), numFaces * 12);
+				auto ftxstr = ftxdata.str();
+				
+				if (auto it = g_sav_ftxmap.find(ftxstr); it == g_sav_ftxmap.end()) {
+					uint32_t off = sbtell(&g_sav_ftxbuf) + 1;
+					g_sav_ftxmap.insert({ ftxstr, off });
+					g_sav_ftxbuf.sputn(ftxstr.data(), ftxstr.size());
+					ftxo = off;
+				}
+				else
+					ftxo = it->second;
+			}
+
+			heabuf.sputn((char*)&vertstart, 4);
+			heabuf.sputn((char*)&quadstart, 4);
+			heabuf.sputn((char*)&tristart, 4);
+			heabuf.sputn((char*)&ftxo, 4);
+			heabuf.sputn((char*)&numverts, 4);
+			heabuf.sputn((char*)&numquads, 4);
+			heabuf.sputn((char*)&numtris, 4);
 			heabuf.sputn((char*)&o->color, 4);
-			heabuf.sputn((char*)&o->mesh->weird, 4);
+			heabuf.sputn((char*)&o->mesh->flags, 4);
+		}
+		if (o->flags & 0x0400) {
+			assert(o->shape);
+			uint32_t vertstart;
+			uint32_t numverts = (uint32_t)o->shape->vertices.size();
+			look(g_sav_verbuf, g_sav_vermap, o->shape->vertices, vertstart, 3);
+			heabuf.sputn((char*)&vertstart, 4);
+			heabuf.sputn((char*)&o->shape->quadstart, 4);
+			heabuf.sputn((char*)&o->shape->tristart, 4);
+			heabuf.sputn((char*)&o->shape->ftxo, 4);
+			heabuf.sputn((char*)&numverts, 4);
+			heabuf.sputn((char*)&o->shape->numquads, 4);
+			heabuf.sputn((char*)&o->shape->numtris, 4);
+			heabuf.sputn((char*)&o->color, 4);
+			heabuf.sputn((char*)&o->shape->weird, 4);
 		}
 		if (o->flags & 0x0080)
 		{
@@ -478,6 +613,10 @@ void ModifySPK()
 	g_sav_mtxmap.clear();
 	g_sav_nammap.clear();
 	g_sav_dblmap.clear();
+	g_sav_vermap.clear();
+	g_sav_facmap.clear();
+	g_sav_uvcmap.clear();
+	g_sav_ftxmap.clear();
 
 	auto f = [](Chunk *c, GameObject *o) {
 		c->subchunks.resize(o->subobj.size());
@@ -497,23 +636,23 @@ void ModifySPK()
 	*prot = std::move(nrot);
 	*pclp = std::move(nclp);
 
-	auto fillMaindata = [](Chunk *nthg, const auto& buf) {
+	auto fillMaindata = [](uint32_t tag, Chunk *nthg, const auto& buf) {
 		using T = std::remove_reference_t<decltype(buf)>;
+		nthg->tag = tag;
 		nthg->maindata.resize(buf.size() * sizeof(T::value_type));
 		memcpy(nthg->maindata.data(), buf.data(), nthg->maindata.size());
 	};
 
-	Chunk nhea, nnam, npos, nmtx, ndbl;
-	nhea.tag = 'AEHP';
-	nnam.tag = 'MANP';
-	npos.tag = 'SOPP';
-	nmtx.tag = 'XTMP';
-	ndbl.tag = 'LBDP';
-	fillMaindata(&nhea, heabuf.str());
-	fillMaindata(&nnam, nambuf.str());
-	fillMaindata(&npos, posbuf);
-	fillMaindata(&nmtx, mtxbuf);
-	fillMaindata(&ndbl, dblbuf.str());
+	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac, nuvc, nftx;
+	fillMaindata('AEHP', &nhea, heabuf.str());
+	fillMaindata('MANP', &nnam, nambuf.str());
+	fillMaindata('SOPP', &npos, posbuf);
+	fillMaindata('XTMP', &nmtx, mtxbuf);
+	fillMaindata('LBDP', &ndbl, dblbuf.str());
+	fillMaindata('REVP', &nver, g_sav_verbuf);
+	fillMaindata('CAFP', &nfac, g_sav_facbuf);
+	fillMaindata('CVUP', &nuvc, g_sav_uvcbuf);
+	fillMaindata('XTFP', &nftx, g_sav_ftxbuf.str());
 
 	// Chunk comparison
 	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
@@ -531,6 +670,12 @@ void ModifySPK()
 					mdcmp += 1;
 			if (mdcmp != 0)
 				printf("Different maindata content: %u bytes are different\n", mdcmp);
+			auto sum_a = checksum(chka->maindata.data(), chka->maindata.size());
+			auto sum_b = checksum(chkb->maindata.data(), chkb->maindata.size());
+			if (sum_a != sum_b)
+				printf("Different checksum\n");
+			else
+				printf("Same checksum\n");
 		}
 	};
 	chkcmp(phea, &nhea, "PHEA");
@@ -538,12 +683,20 @@ void ModifySPK()
 	chkcmp(ppos, &npos, "PPOS");
 	chkcmp(pmtx, &nmtx, "PMTX");
 	chkcmp(pdbl, &ndbl, "PDBL");
+	chkcmp(pver, &nver, "PVER");
+	chkcmp(pfac, &nfac, "PFAC");
+	chkcmp(puvc, &nuvc, "PUVC");
+	chkcmp(pftx, &nftx, "PFTX");
 
 	*phea = std::move(nhea);
 	*pnam = std::move(nnam);
 	*ppos = std::move(npos);
 	*pmtx = std::move(nmtx);
 	*pdbl = std::move(ndbl);
+	*pver = std::move(nver);
+	*pfac = std::move(nfac);
+	*puvc = std::move(nuvc);
+	*pftx = std::move(nftx);
 
 	((uint32_t*)spkchk->maindata.data())[1] = 0x40000;
 

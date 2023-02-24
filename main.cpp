@@ -318,13 +318,28 @@ void IGObjectInfo()
 			ImVec4 c = ImGui::ColorConvertU32ToFloat4(swap_rb(selobj->color));
 			if (ImGui::ColorEdit4("Color", &c.x, 0))
 				selobj->color = swap_rb(ImGui::ColorConvertFloat4ToU32(c));
-			ImGui::Text("Vertex start index: %u", selobj->mesh->vertstart);
-			ImGui::Text("Quad start index:   %u", selobj->mesh->quadstart);
-			ImGui::Text("Tri start index:    %u", selobj->mesh->tristart);
-			ImGui::Text("Vertex count: %u", selobj->mesh->numverts);
-			ImGui::Text("Quad count:   %u", selobj->mesh->numquads);
-			ImGui::Text("Tri count:    %u", selobj->mesh->numtris);
-			ImGui::Text("FTXO offset: 0x%X", selobj->mesh->ftxo);
+			//ImGui::Text("Vertex start index: %u", selobj->mesh->vertstart);
+			//ImGui::Text("Quad start index:   %u", selobj->mesh->quadstart);
+			//ImGui::Text("Tri start index:    %u", selobj->mesh->tristart);
+			//ImGui::Text("Vertex count: %u", selobj->mesh->numverts);
+			//ImGui::Text("Quad count:   %u", selobj->mesh->numquads);
+			//ImGui::Text("Tri count:    %u", selobj->mesh->numtris);
+			//ImGui::Text("FTXO offset: 0x%X", selobj->mesh->ftxo);
+			ImGui::Text("Vertex count: %zu", selobj->mesh->vertices.size());
+			ImGui::Text("Quad count:   %zu", selobj->mesh->quadIndices.size() / 4);
+			ImGui::Text("Tri count:    %zu", selobj->mesh->triIndices.size() / 3);
+		}
+		if (selobj->shape && ImGui::CollapsingHeader("Shape")) {
+			ImVec4 c = ImGui::ColorConvertU32ToFloat4(swap_rb(selobj->color));
+			if (ImGui::ColorEdit4("Color", &c.x, 0))
+				selobj->color = swap_rb(ImGui::ColorConvertFloat4ToU32(c));
+			//ImGui::Text("Vertex start index: %u", selobj->shape->vertstart);
+			ImGui::Text("Quad start index:   %u", selobj->shape->quadstart);
+			ImGui::Text("Tri start index:    %u", selobj->shape->tristart);
+			ImGui::Text("Vertex count: %zu", selobj->shape->vertices.size());
+			ImGui::Text("Quad count:   %u", selobj->shape->numquads);
+			ImGui::Text("Tri count:    %u", selobj->shape->numtris);
+			ImGui::Text("FTXO offset: 0x%X", selobj->shape->ftxo);
 		}
 		if (selobj->light)
 			if(ImGui::CollapsingHeader("Light"))
@@ -465,11 +480,8 @@ void RenderObject(GameObject *o)
 
 Vector3 finalintersectpnt = Vector3(0, 0, 0);
 
-bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, int startvertex, int startface, int numverts, Matrix *worldmtx)
+bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, float* bver, uint16_t* bfac, int numverts, Matrix *worldmtx)
 {
-	uint16_t *bfac = (uint16_t*)pfac->maindata.data() + startface;
-	float *bver = (float*)pver->maindata.data() + startvertex;
-
 	std::unique_ptr<Vector3[]> pnts = std::make_unique<Vector3[]>(numverts);
 	for (int i = 0; i < 3; i++)
 	{
@@ -516,7 +528,7 @@ bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, int startvertex, 
 	return true;
 }
 
-GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObject *o, Matrix *worldmtx)
+void IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObject *o, Matrix *worldmtx)
 {
 	float d;
 	Matrix objmtx = o->matrix;
@@ -526,27 +538,30 @@ GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObje
 	objmtx *= *worldmtx;
 	if (o->mesh)
 	{
-		Mesh *m = o->mesh;
-		for (int i = 0; i < m->numquads; i++)
-			if (IsRayIntersectingFace(raystart, raydir, m->vertstart, m->quadstart + i*4, 4, &objmtx))
-				if ((d = (finalintersectpnt - campos).sqlen2xz()) < bestpickdist)
-				{
+		Mesh *m = o->mesh.get();
+		for (int i = 0; i < m->quadIndices.size(); i += 4) {
+			if (IsRayIntersectingFace(raystart, raydir, (float*)m->vertices.data(), m->quadIndices.data() + i, 4, &objmtx)) {
+				d = (finalintersectpnt - campos).sqlen2xz();
+				if (d < bestpickdist) {
 					bestpickdist = d;
 					bestpickobj = o;
 					bestpickintersectionpnt = finalintersectpnt;
 				}
-		for(int i = 0; i < m->numtris; i++)
-			if (IsRayIntersectingFace(raystart, raydir, m->vertstart, m->tristart  + i*3, 3, &objmtx))
-				if ((d = (finalintersectpnt - campos).sqlen2xz()) < bestpickdist)
-				{
+			}
+		}
+		for (int i = 0; i < m->triIndices.size(); i += 3) {
+			if (IsRayIntersectingFace(raystart, raydir, (float*)m->vertices.data(), m->triIndices.data() + i, 3, &objmtx)) {
+				d = (finalintersectpnt - campos).sqlen2xz();
+				if (d < bestpickdist) {
 					bestpickdist = d;
 					bestpickobj = o;
 					bestpickintersectionpnt = finalintersectpnt;
 				}
+			}
+		}
 	}
 	for (auto c = o->subobj.begin(); c != o->subobj.end(); c++)
 		IsRayIntersectingObject(raystart, raydir, *c, &objmtx);
-	return 0;
 }
 
 int main(int argc, char* argv[])

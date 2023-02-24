@@ -92,46 +92,51 @@ struct ProMesh {
 		static const int uvit[4] = { 0,1,2,3 };
 
 		ProMesh pro;
-		uint16_t *faces = (uint16_t*)pfac->maindata.data();
-		float *verts = (float*)pver->maindata.data() + mesh->vertstart;
-		uint8_t *ftxpnt = (uint8_t*)pftx->maindata.data() + mesh->ftxo - 1;
-		uint16_t *ftxFace = (uint16_t*)(ftxpnt + 12);
-		bool hasFtx = mesh->ftxo && !(mesh->ftxo & 0x80000000);
+		//uint16_t *faces = (uint16_t*)pfac->maindata.data();
+		//Vector3* verts = mesh->vertices.data();
+		//uint8_t *ftxpnt = (uint8_t*)pftx->maindata.data() + mesh->ftxo - 1;
+		//uint16_t *ftxFace = (uint16_t*)(ftxpnt + 12);
+		//bool hasFtx = mesh->ftxo && !(mesh->ftxo & 0x80000000);
+
+		Mesh::FTXFace* ftxFaceArray = mesh->ftxFaces.data();
+		bool hasFtx = !mesh->ftxFaces.empty();
 
 		float *uvCoords = (float*)defUvs;
 		if (hasFtx)
-			uvCoords = (float*)puvc->maindata.data() + *(uint32_t*)(ftxpnt);
+			uvCoords = mesh->primaryUvs.data();
 
-		for (uint32_t i = 0; i < mesh->numtris; i++)
+		for (uint32_t i = 0; i < mesh->triIndices.size(); i += 3)
 		{
+			Mesh::FTXFace& ftxFace = *ftxFaceArray;
 			uint16_t texid = hasFtx ? ftxFace[2] : 65535;
 			auto& part = pro.parts[texid];
 			IndexType prostart = (IndexType)part.vertices.size();
 			for (int j = 0; j < 3; j++) {
 				float* uu = uvCoords + uvit[j] * 2;
 				part.texcoords.push_back({ uu[0], uu[1] });
-				float *v = verts + faces[mesh->tristart + i * 3 + j] * 3 / 2;
-				part.vertices.push_back({ v[0], v[1], v[2] });
+				Vector3& v = mesh->vertices[mesh->triIndices[i + j] / 2];
+				part.vertices.push_back(v);
 			}
 			for (int j : {0, 1, 2})
 				part.indices.push_back((IndexType)(prostart + j));
-			ftxFace += 6;
+			++ftxFaceArray;
 			uvCoords += 8; // Ignore 4th UV.
 		}
-		for (uint32_t i = 0; i < mesh->numquads; i++)
+		for (uint32_t i = 0; i < mesh->quadIndices.size(); i += 4)
 		{
+			Mesh::FTXFace& ftxFace = *ftxFaceArray;
 			uint16_t texid = hasFtx ? ftxFace[2] : 65535;
 			auto& part = pro.parts[texid];
 			IndexType prostart = (IndexType)part.vertices.size();
 			for (int j = 0; j < 4; j++) {
 				float* uu = uvCoords + uvit[j] * 2;
 				part.texcoords.push_back({ uu[0], uu[1] });
-				float *v = verts + faces[mesh->quadstart + i * 4 + j] * 3 / 2;
-				part.vertices.push_back({ v[0], v[1], v[2] });
+				Vector3& v = mesh->vertices[mesh->quadIndices[i + j] / 2];
+				part.vertices.push_back(v);
 			}
 			for (int j : {0, 1, 3, 3, 1, 2 })
 				part.indices.push_back((IndexType)(prostart + j));
-			ftxFace += 6;
+			++ftxFaceArray;
 			uvCoords += 8;
 		}
 
@@ -144,9 +149,9 @@ void Mesh::draw()
 {
 	if (!rendertextures)
 	{
-		glVertexPointer(3, GL_FLOAT, 6, (float*)pver->maindata.data() + this->vertstart);
-		glDrawElements(GL_QUADS, this->numquads * 4, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata.data() + this->quadstart);
-		glDrawElements(GL_TRIANGLES, this->numtris * 3, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata.data() + this->tristart);
+		glVertexPointer(3, GL_FLOAT, 6, (float*)this->vertices.data());
+		glDrawElements(GL_QUADS, this->quadIndices.size(), GL_UNSIGNED_SHORT, (uint16_t*)this->quadIndices.data());
+		glDrawElements(GL_TRIANGLES, this->triIndices.size(), GL_UNSIGNED_SHORT, (uint16_t*)this->triIndices.data());
 	}
 	else
 	{

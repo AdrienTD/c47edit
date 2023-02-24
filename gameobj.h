@@ -5,7 +5,9 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
+#include <memory>
 #include <variant>
 #include <vector>
 
@@ -39,10 +41,19 @@ public:
 
 struct Mesh
 {
-	//float *vertices;
-	//uint16_t *quadindices, *triindices;
-	uint32_t vertstart, quadstart, tristart, ftxo, numverts, numquads, numtris, weird;
+	using FTXFace = std::array<uint16_t, 6>;
+	//uint32_t vertstart, quadstart, tristart, ftxo, numverts, numquads, numtris, weird;
+	std::vector<Vector3> vertices;
+	std::vector<uint16_t> quadIndices, triIndices;
+	std::vector<FTXFace> ftxFaces;
+	std::vector<float> primaryUvs, secondaryUvs;
+	uint32_t flags = 0;
 	void Mesh::draw();
+};
+
+struct Shape {
+	std::vector<Vector3> vertices;
+	uint32_t quadstart, tristart, ftxo, numquads, numtris, weird;
 };
 
 struct Light
@@ -74,9 +85,9 @@ struct GameObject
 	GameObject* root = nullptr;
 
 	// Mesh
-	Mesh* mesh = nullptr;
+	std::shared_ptr<Mesh> mesh;
 	uint32_t color = 0;
-
+	std::shared_ptr<Shape> shape;
 	Light *light = nullptr;
 
 	std::vector<DBLEntry> dbl;
