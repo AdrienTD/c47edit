@@ -7,6 +7,7 @@
 #include <cmath>
 #include <ctime>
 #include <functional>
+#include <memory>
 
 #include "chunk.h"
 #include "classInfo.h"
