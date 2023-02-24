@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <memory>
 #include <variant>
