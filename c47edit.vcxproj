@@ -74,7 +74,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -124,6 +124,7 @@
     <ClCompile Include="chunk.cpp" />
     <ClCompile Include="classInfo.cpp" />
     <ClCompile Include="gameobj.cpp" />
+    <ClCompile Include="GuiUtils.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />
@@ -133,6 +134,7 @@
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="miniz.c" />
+    <ClCompile Include="ObjModel.cpp" />
     <ClCompile Include="texture.cpp" />
     <ClCompile Include="vecmat.cpp" />
     <ClCompile Include="video.cpp" />
@@ -144,10 +146,12 @@
     <ClInclude Include="DynArray.h" />
     <ClInclude Include="gameobj.h" />
     <ClInclude Include="global.h" />
+    <ClInclude Include="GuiUtils.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_impl_opengl2.h" />
     <ClInclude Include="imgui\imgui_impl_win32.h" />
     <ClInclude Include="miniz.h" />
+    <ClInclude Include="ObjModel.h" />
     <ClInclude Include="texture.h" />
     <ClInclude Include="vecmat.h" />
     <ClInclude Include="video.h" />

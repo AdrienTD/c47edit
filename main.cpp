@@ -6,6 +6,7 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <ctime>
+#include <filesystem>
 #include <functional>
 #include <memory>
 
@@ -17,8 +18,11 @@
 #include "vecmat.h"
 #include "video.h"
 #include "window.h"
+#include "ObjModel.h"
+#include "GuiUtils.h"
 
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <Windows.h>
 #include <gl/GL.h>
 #include <gl/GLU.h>
@@ -175,12 +179,94 @@ void IGObjectInfo()
 			if (ImGui::Button("Select parent"))
 				selobj = selobj->parent;
 		}
+		if (ImGui::Button("Import OBJ")) {
+			auto filepath = OpenDialogBox("Wavefront OBJ model\0*.OBJ\0\0", "obj");
+			if (!filepath.empty()) {
+				std::vector<Vector3> objVertices;
+				std::vector<uint16_t> triIndices;
+				std::vector<uint16_t> quadIndices;
+				//std::vector<std::array<float, 8>> triUvs;
+				//std::vector<std::array<float, 8>> quadUvs;
+
+				ObjModel objmodel;
+				objmodel.load(filepath);
+				objVertices = std::move(objmodel.vertices);
+				for (auto& vec : objVertices)
+					vec *= Vector3(-1.0f, 1.0f, 1.0f);
+				for (auto& tri : objmodel.triangles) {
+					triIndices.insert(triIndices.end(), tri.begin(), tri.end());
+				}
+
+				selobj->flags |= 0x20;
+				if (!selobj->mesh)
+					selobj->mesh = new Mesh;
+				else
+					*selobj->mesh = {};
+
+				Mesh* mesh = selobj->mesh;
+				mesh->numverts = std::size(objVertices);
+				mesh->numquads = std::size(quadIndices) / 4;
+				mesh->numtris = std::size(triIndices) / 3;
+				int faceIndex = pfac->maindata.size() / 2;
+				mesh->vertstart = pver->maindata.size() / 4;
+				mesh->tristart = (mesh->numtris > 0) ? faceIndex : 0;
+				mesh->quadstart = (mesh->numquads > 0) ? faceIndex + 3 * mesh->numtris : 0;
+				mesh->ftxo = pftx->maindata.size() + 1;
+
+				Chunk::DataBuffer pver_newdata(pver->maindata.size() + mesh->numverts * 12);
+				Chunk::DataBuffer pfac_newdata(pfac->maindata.size() + mesh->numquads * 8 + mesh->numtris * 6);
+				Chunk::DataBuffer pftx_newdata(pftx->maindata.size() + 12 + (mesh->numquads + mesh->numtris) * 12);
+				Chunk::DataBuffer puvc_newdata(puvc->maindata.size() + (mesh->numquads + mesh->numtris) * 4 * 8 * 2); // 8 floats per face, 2 sets
+				memcpy(pver_newdata.data(), pver->maindata.data(), pver->maindata.size());
+				memcpy(pfac_newdata.data(), pfac->maindata.data(), pfac->maindata.size());
+				memcpy(pftx_newdata.data(), pftx->maindata.data(), pftx->maindata.size());
+				memcpy(puvc_newdata.data(), puvc->maindata.data(), puvc->maindata.size());
+
+				float* verts = (float*)pver_newdata.data() + mesh->vertstart;
+				uint16_t* faces = (uint16_t*)pfac_newdata.data() + faceIndex;
+				uint32_t* ftxHead = (uint32_t*)(pftx_newdata.data() + pftx->maindata.size());
+				uint16_t* ftx = (uint16_t*)(ftxHead + 3);
+				float* uv1 = (float*)(puvc_newdata.data() + puvc->maindata.size());
+				float* uv2 = (float*)(puvc_newdata.data() + puvc->maindata.size() + (mesh->numquads + mesh->numtris) * 4 * 8);
+
+				memcpy(verts, objVertices.data(), objVertices.size() * 12);
+				for (uint16_t x : triIndices)
+					*faces++ = 2 * x;
+				for (uint16_t x : quadIndices)
+					*faces++ = 2 * x;
+				uint32_t numFaces = mesh->numquads + mesh->numtris;
+				ftxHead[0] = uv1 - (float*)puvc_newdata.data();
+				ftxHead[1] = uv2 - (float*)puvc_newdata.data();
+				ftxHead[2] = numFaces;
+				for (uint32_t f = 0; f < numFaces; ++f) {
+					*ftx++ = 0x00A0; // 0: no texture, 0x20 textured, 0x80 lighting/shading
+					*ftx++ = 0;
+					*ftx++ = 0x0135;
+					*ftx++ = 0xFFFF;
+					*ftx++ = 0;
+					*ftx++ = 0x0CF8;
+					*uv1++ = 0.0f; *uv1++ = 0.0f;
+					*uv1++ = 0.0f; *uv1++ = 1.0f;
+					*uv1++ = 1.0f; *uv1++ = 1.0f;
+					*uv1++ = 1.0f; *uv1++ = 0.0f;
+					*uv2++ = 0.0f; *uv2++ = 0.0f;
+					*uv2++ = 0.0f; *uv2++ = 1.0f;
+					*uv2++ = 1.0f; *uv2++ = 1.0f;
+					*uv2++ = 1.0f; *uv2++ = 0.0f;
+				}
+
+				pver->maindata = std::move(pver_newdata);
+				pfac->maindata = std::move(pfac_newdata);
+				pftx->maindata = std::move(pftx_newdata);
+				puvc->maindata = std::move(puvc_newdata);
+			}
+		}
 		ImGui::Separator();
 
 		IGStdStringInput("Name", selobj->name);
 		ImGui::InputScalar("State", ImGuiDataType_U32, &selobj->state);
 		ImGui::InputScalar("Type", ImGuiDataType_U32, &selobj->type);
-		ImGui::InputScalar("Flags", ImGuiDataType_U32, &selobj->flags);
+		ImGui::InputScalar("Flags", ImGuiDataType_U32, &selobj->flags, nullptr, nullptr, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
 		ImGui::Separator();
 		ImGui::InputScalar("PDBL offset", ImGuiDataType_U32, &selobj->pdbloff, 0, 0, "%08X", ImGuiInputTextFlags_CharsHexadecimal);
 		ImGui::InputScalar("PEXC offset", ImGuiDataType_U32, &selobj->pexcoff, 0, 0, "%08X", ImGuiInputTextFlags_CharsHexadecimal);
@@ -311,8 +397,7 @@ void IGObjectInfo()
 				ImGui::PopID();
 			}
 		}
-		if (selobj->mesh)
-			if(ImGui::CollapsingHeader("Mesh"))
+		if (selobj->mesh && ImGui::CollapsingHeader("Mesh"))
 		{
 			//ImGui::Separator();
 			//ImGui::Text("Mesh");
@@ -327,8 +412,25 @@ void IGObjectInfo()
 			ImGui::Text("Tri count:    %u", selobj->mesh->numtris);
 			ImGui::Text("FTXO offset: 0x%X", selobj->mesh->ftxo);
 		}
-		if (selobj->light)
-			if(ImGui::CollapsingHeader("Light"))
+		if (selobj->mesh && selobj->mesh->ftxo && ImGui::CollapsingHeader("FTXO")) {
+			// TODO: place this in "DebugUI.cpp"
+			bool hasFtx = selobj->mesh->ftxo && !(selobj->mesh->ftxo & 0x80000000);
+			uint8_t* ftxpnt = (uint8_t*)pftx->maindata.data() + selobj->mesh->ftxo - 1;
+			float* uvCoords = (float*)puvc->maindata.data() + *(uint32_t*)(ftxpnt);
+			uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
+			size_t numFaces = selobj->mesh->numquads + selobj->mesh->numtris;
+			ImGui::Text("UV  offset 0x%08X", *(uint32_t*)(ftxpnt));
+			ImGui::Text("UV2 offset 0x%08X", *(uint32_t*)(ftxpnt+4));
+			ImGui::Text("Num Faces  0x%08X (0x%08X)", *(uint32_t*)(ftxpnt+8), numFaces);
+			ImGui::Separator();
+			for (size_t i = 0; i < numFaces; ++i) {
+				ImGui::Text("%04X %04X %04X %04X %04X %04X", ftxFace[0], ftxFace[1], ftxFace[2], ftxFace[3], ftxFace[4], ftxFace[5]);
+				ImGui::Text("  (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f)", uvCoords[0], uvCoords[1], uvCoords[2], uvCoords[3], uvCoords[4], uvCoords[5]);
+				ftxFace += 6;
+				uvCoords += 8;
+			}
+		}
+		if (selobj->light && ImGui::CollapsingHeader("Light"))
 		{
 			//ImGui::Separator();
 			//ImGui::Text("Light");
