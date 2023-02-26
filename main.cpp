@@ -180,7 +180,7 @@ void IGObjectInfo()
 				selobj = selobj->parent;
 		}
 		if (ImGui::Button("Import OBJ")) {
-			auto filepath = OpenDialogBox("Wavefront OBJ model\0*.OBJ\0\0", "obj");
+			auto filepath = GuiUtils::OpenDialogBox("Wavefront OBJ model\0*.OBJ\0\0\0", "obj");
 			if (!filepath.empty()) {
 				std::vector<Vector3> objVertices;
 				std::vector<uint16_t> triIndices;
@@ -472,20 +472,9 @@ void IGMain()
 		else
 			s = newfn;
 
-		OPENFILENAME ofn; char zipfilename[1024]; // = "lol"; //zipfilename[0] = 0;
-		strcpy(zipfilename, s);
-		memset(&ofn, 0, sizeof(OPENFILENAME));
-		ofn.lStructSize = sizeof(OPENFILENAME);
-		ofn.hwndOwner = hWindow;
-		ofn.hInstance = GetModuleHandle(0);
-		ofn.lpstrFilter = "Scene ZIP archive\0*.zip\0\0\0";
-		ofn.lpstrFile = zipfilename;
-		ofn.nMaxFile = 1023;
-		ofn.lpstrTitle = "Save Scene ZIP archive as...";
-		ofn.Flags = OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
-		ofn.lpstrDefExt = "zip";
-		if (GetSaveFileName(&ofn))
-			SaveSceneSPK(zipfilename);
+		auto zipPath = GuiUtils::SaveDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", s, "Save Scene ZIP archive as...");
+		if (!zipPath.empty())
+			SaveSceneSPK(zipPath.string().c_str());
 	}
 	ImGui::SameLine();
 	if(ImGui::Button("About..."))
@@ -656,21 +645,21 @@ int main(int argc, char* argv[])
 //int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode)
 {
 	//SetProcessDPIAware();
-	ClassInfo::ReadClassInfo();
 
-	OPENFILENAME ofn; char zipfilename[1024]; zipfilename[0] = 0;
-	memset(&ofn, 0, sizeof(OPENFILENAME));
-	ofn.lStructSize = sizeof(OPENFILENAME);
-	ofn.hInstance = GetModuleHandle(0);
-	ofn.lpstrFilter = "Scene ZIP archive\0*.zip\0\0\0";
-	ofn.lpstrFile = zipfilename;
-	ofn.nMaxFile = 1023;
-	ofn.lpstrTitle = "Select a Scene ZIP archive (containing Pack.SPK)";
-	ofn.Flags = OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
-	ofn.lpstrDefExt = "zip";
-	if (!GetOpenFileName(&ofn))
+	try {
+		ClassInfo::ReadClassInfo();
+	}
+	catch (const std::exception& ex) {
+		std::string err = "Failed to read the file classes.json.\n\nBe sure the file classes.json is present in the same folder that contains the c47edit executable.\n\nReason:\n";
+		err += ex.what();
+		MessageBoxA(nullptr, err.c_str(), "c47edit", 16);
+		exit(-2);
+	}
+
+	auto zipPath = GuiUtils::OpenDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", "Select a Scene ZIP archive (containing Pack.SPK)");
+	if (zipPath.empty())
 		exit(-1);
-	LoadSceneSPK(zipfilename);
+	LoadSceneSPK(zipPath.string().c_str());
 
 	bool appnoquit = true;
 	InitWindow();
