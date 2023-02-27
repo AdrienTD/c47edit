@@ -6,6 +6,7 @@
 #include "chunk.h"
 #include <sstream>
 #include <map>
+#include <cassert>
 
 Chunk::~Chunk() = default;
 
@@ -158,25 +159,47 @@ Chunk Chunk::reconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void
 	ppnt += 2;
 
 	uint32_t currp = 0;
-	std::map<uint32_t, Chunk*> rpmap;
+	std::map<uint32_t, std::pair<Chunk*, int>> rpmap;
 
 	auto f = [&ppnt, &rpmap, &currp](Chunk *c, const auto& rec) -> void {
 		uint32_t beg = currp;
-		//c->num_datas = 0; c->num_subchunks = 0;
 		c->tag = *(ppnt++);
 		uint32_t info = *(ppnt++);
 		uint32_t csize = info & 0x3FFFFFFF;
+		bool has_subchunks = info & 0x80000000;
+		bool has_multidata = info & 0x40000000;
 		uint32_t datoff = 8;
-		if (info & 0xC0000000)
+		if (has_subchunks || has_multidata)
 			datoff = *(ppnt++);
 
-		rpmap[currp + datoff] = c;
-
-		if (info & 0x80000000)
-		{
-			uint32_t num_subchunks = *(ppnt++);
+		uint32_t num_subchunks = 0;
+		if (has_subchunks) {
+			num_subchunks = *(ppnt++);
 			c->subchunks.resize(num_subchunks);
-			currp += 16;
+		}
+
+		uint32_t num_multidata = 0;
+		if (has_multidata) {
+			num_multidata = *(ppnt++);
+			c->multidata.resize(num_multidata);
+			for (auto& dat : c->multidata) {
+				uint32_t datlen = *(ppnt++);
+				dat.resize(datlen);
+			}
+		}
+
+		if (has_multidata) {
+			for (int md = 0; md < num_multidata; ++md) {
+				rpmap[currp + datoff] = { c, md };
+				datoff += c->multidata[md].size();
+			}
+		}
+		else {
+			rpmap[currp + datoff] = { c, -1 };
+		}
+
+		if (has_subchunks) {
+			currp += 16 + (has_multidata ? 4 + num_multidata*4 : 0);
 			for (int i = 0; i < num_subchunks; i++)
 				rec(&c->subchunks[i], rec);
 		}
@@ -188,15 +211,18 @@ Chunk Chunk::reconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void
 
 	char* reconspnt = (char*)packrep + 8 + reconsoff;
 	ppnt = (uint32_t*)reconspnt;
-	uint32_t reconssize = packrepsize - reconsoff;
-	while ((char*)ppnt - reconspnt <= reconssize - 16)
+	uint32_t reconssize = packrepsize - (8 + reconsoff);
+	while ((char*)ppnt - reconspnt < reconssize)
 	{
 		uint32_t repeatoff = *(ppnt++);
-		Chunk *c = rpmap[*(ppnt++)];
-		uint32_t maindata_size = *(ppnt++);
-		c->maindata.resize(maindata_size);
-		memcpy(c->maindata.data(), (char*)repeat + repeatoff, c->maindata.size());
-		*(uint32_t*)c->maindata.data() = *(ppnt++);
+		Chunk* c; int multiDataIndex;
+		std::tie(c, multiDataIndex) = rpmap.at(*(ppnt++));
+		uint32_t data_size = *(ppnt++);
+		DataBuffer& dataBuf = (multiDataIndex == -1) ? c->maindata : c->multidata[multiDataIndex];
+		assert(multiDataIndex == -1 || dataBuf.size() == data_size);
+		dataBuf.resize(data_size);
+		memcpy(dataBuf.data(), (char*)repeat + repeatoff, dataBuf.size());
+		*(uint32_t*)dataBuf.data() = *(ppnt++);
 	}
 
 	return mainchk;

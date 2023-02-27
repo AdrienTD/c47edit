@@ -9,5 +9,5 @@
 #define APP_VERSION "DEV"
 #endif
 
-void ferr(const char *str);
+[[noreturn]] void ferr(const char *str);
 void warn(const char *str);

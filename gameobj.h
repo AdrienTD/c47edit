@@ -98,6 +98,7 @@ extern GameObject *rootobj, *cliprootobj, *superroot;
 extern std::string lastspkfn;
 extern void *zipmem;
 extern uint32_t zipsize;
+extern Chunk g_palPack, g_dxtPack;
 
 const char* GetObjTypeString(uint32_t ot);
 void LoadSceneSPK(const char *fn);

@@ -65,12 +65,63 @@ Chunk *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc, *pdb
 GameObject *rootobj, *cliprootobj, *superroot;
 std::string lastspkfn;
 void *zipmem = 0; uint32_t zipsize = 0;
+Chunk g_palPack, g_dxtPack, g_anmPack, g_wavPack;
+bool g_hasAnmPack = false;
 
 const char *GetObjTypeString(uint32_t ot)
 {
 	const char *otname = "?";
 	if (ot < std::size(objtypenames)) otname = objtypenames[ot];
 	return otname;
+}
+
+void ReadAssetPacks(mz_zip_archive* zip)
+{
+	static const auto readFile = [](const char* filename) {
+		void* repmem; size_t repsize;
+		FILE* repfile = fopen(filename, "rb");
+		if (!repfile) ferr("Could not open Repeat.* file.");
+		fseek(repfile, 0, SEEK_END);
+		repsize = ftell(repfile);
+		fseek(repfile, 0, SEEK_SET);
+		repmem = malloc(repsize);
+		fread(repmem, repsize, 1, repfile);
+		fclose(repfile);
+		return std::make_pair(repmem, repsize);
+	};
+
+	const auto readPack = [&zip](const char* ext, Chunk& pack, bool* outFound = nullptr) {
+		std::string fnPackRepeat = std::string("PackRepeat.") + ext;
+		std::string fnRepeat = std::string("Repeat.") + ext;
+		std::string fnPack = std::string("Pack.") + ext;
+		void* packmem; size_t packsize;
+		packmem = mz_zip_reader_extract_file_to_heap(zip, fnPackRepeat.c_str(), &packsize, 0);
+		if (packmem)
+		{
+			auto [repmem, repsize] = readFile(fnRepeat.c_str());
+			pack = Chunk::reconstructPackFromRepeat(packmem, packsize, repmem);
+			free(repmem);
+		}
+		else
+		{
+			packmem = mz_zip_reader_extract_file_to_heap(zip, fnPack.c_str(), &packsize, 0);
+			if (!packmem && !outFound) ferr("Failed to find Pack.* or PackRepeat.* in ZIP archive.");
+			if (packmem)
+				pack.load(packmem);
+		}
+		if (outFound)
+			*outFound = packmem;
+		if (packmem)
+			free(packmem);
+	};
+
+	readPack("PAL", g_palPack);
+	readPack("DXT", g_dxtPack);
+	readPack("WAV", g_wavPack);
+	readPack("ANM", g_anmPack, &g_hasAnmPack);
+
+	if (g_palPack.tag != 'PAL') ferr("Not a PAL chunk in Repeat.PAL");
+	if (g_dxtPack.tag != 'DXT') ferr("Not a DXT chunk in Repeat.DXT");
 }
 
 void LoadSceneSPK(const char *fn)
@@ -92,6 +143,7 @@ void LoadSceneSPK(const char *fn)
 	if (!mzreadok) ferr("Failed to initialize ZIP reading.");
 	spkmem = mz_zip_reader_extract_file_to_heap(&zip, "Pack.SPK", &spksize, 0);
 	if (!spkmem) ferr("Failed to extract Pack.SPK from ZIP archive.");
+	ReadAssetPacks(&zip);
 	mz_zip_reader_end(&zip);
 	spkchk->load(spkmem);
 	free(spkmem);
@@ -563,17 +615,34 @@ void SaveSceneSPK(const char *fn)
 	if (!mzr) { warn("Couldn't create the new scene ZIP file for saving."); return; }
 
 	int nfiles = mz_zip_reader_get_num_files(&inzip);
-	int spkindex = mz_zip_reader_locate_file(&inzip, "Pack.SPK", 0, 0);
-	assert(spkindex != -1);
+	// Determine files to copy from original ZIP
+	static constexpr const char* nocopyFiles[] = {"Pack.SPK", "Pack.PAL", "Pack.DXT", "Pack.ANM", "Pack.WAV",
+		"PackRepeat.PAL", "PackRepeat.DXT", "PackRepeat.ANM", "PackRepeat.WAV" };
+	std::vector<bool> allowCopy = std::vector<bool>(nfiles, true);
+	for (size_t i = 0; i < std::size(nocopyFiles); ++i) {
+		int x = mz_zip_reader_locate_file(&inzip, nocopyFiles[i], nullptr, 0);
+		if (x != -1)
+			allowCopy[x] = false;
+	}
+	// Copy the files
 	for (int i = 0; i < nfiles; i++)
-		if (i != spkindex)
+		if (allowCopy[i])
 			mz_zip_writer_add_from_zip_reader(&outzip, &inzip, i);
 
+	auto saveChunk = [&outzip](Chunk* chk, const char* filename) {
+		void* cmem; size_t csize;
+		chk->saveToMem(&cmem, &csize);
+		mz_zip_writer_add_mem(&outzip, filename, cmem, csize, MZ_DEFAULT_COMPRESSION);
+		free(cmem);
+	};
 	ModifySPK();
-	void *spkmem; size_t spksize;
-	spkchk->saveToMem(&spkmem, &spksize);
+	saveChunk(spkchk, "Pack.SPK");
+	saveChunk(&g_palPack, "Pack.PAL");
+	saveChunk(&g_dxtPack, "Pack.DXT");
+	saveChunk(&g_wavPack, "Pack.WAV");
+	if (g_hasAnmPack)
+		saveChunk(&g_anmPack, "Pack.ANM");
 
-	mz_zip_writer_add_mem(&outzip, "Pack.SPK", spkmem, spksize, MZ_DEFAULT_COMPRESSION);
 	mz_zip_writer_finalize_archive(&outzip);
 	mz_zip_writer_end(&outzip);
 	mz_zip_reader_end(&inzip);
@@ -581,7 +650,6 @@ void SaveSceneSPK(const char *fn)
 	heabuf = std::stringbuf();
 	nambuf = std::stringbuf();
 	posbuf.clear(); mtxbuf.clear(); dblbuf = std::stringbuf();
-	free(spkmem);
 }
 
 void RemoveObject(GameObject *o)
