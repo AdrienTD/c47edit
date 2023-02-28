@@ -146,6 +146,7 @@ Vector3 GetYXZRotVecFromMatrix(Matrix *m)
 #define swap_rb(a) ( (a & 0xFF00FF00) | ((a & 0xFF0000) >> 16) | ((a & 255) << 16) )
 
 GameObject *objtogive = 0;
+uint32_t curtexid = 0;
 
 void IGObjectInfo()
 {
@@ -414,6 +415,15 @@ void IGObjectInfo()
 		}
 		if (selobj->mesh && selobj->mesh->ftxo && ImGui::CollapsingHeader("FTXO")) {
 			// TODO: place this in "DebugUI.cpp"
+			if (ImGui::Button("Change texture")) {
+				uint8_t* ftxpnt = (uint8_t*)pftx->maindata.data() + selobj->mesh->ftxo - 1;
+				uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
+				uint32_t numFaces = *(uint32_t*)(ftxpnt + 8);
+				for (size_t i = 0; i < numFaces; ++i) {
+					ftxFace[2] = curtexid;
+					ftxFace += 6;
+				}
+			}
 			bool hasFtx = selobj->mesh->ftxo && !(selobj->mesh->ftxo & 0x80000000);
 			uint8_t* ftxpnt = (uint8_t*)pftx->maindata.data() + selobj->mesh->ftxo - 1;
 			float* uvCoords = (float*)puvc->maindata.data() + *(uint32_t*)(ftxpnt);
@@ -496,32 +506,95 @@ void IGMain()
 	ImGui::End();
 }
 
-uint32_t curtexid = 0;
-
 void IGTest()
 {
-	ImGui::Begin("Debug/Test");
-	if (ImGui::Button("ReadTextures()"))
-		ReadTextures();
-	static const int one = 1;
-	ImGui::InputScalar("Texture ID", ImGuiDataType_U32, &curtexid, &one);
-	auto l = texmap.lower_bound(curtexid);
-	ImGui::PushButtonRepeat(true);
-	if (ImGui::Button("Next")) {
-		if (l != texmap.end()) {
-			auto ln = std::next(l);
-			if (ln != texmap.end())
-				curtexid = ln->first;
-		}
-	}
-	ImGui::PopButtonRepeat();
-	auto t = texmap.find(curtexid);
-	if (t != texmap.end())
-		ImGui::Image(t->second, ImVec2(256, 256));
-	else
-		ImGui::Text("Texture %u not found.", curtexid);
+	//ImGui::Begin("Debug/Test");
 
 //#include "unused/moredebug.inc"
+
+	//ImGui::End();
+}
+
+void IGTextures()
+{
+	ImGui::SetNextWindowSize(ImVec2(512.0f, 350.0f), ImGuiCond_FirstUseEver);
+	ImGui::Begin("Textures");
+
+	if (ImGui::Button("Add")) {
+		auto filepath = GuiUtils::OpenDialogBox("Image\0*.png;*.bmp;*.jpg;*.jpeg;*.gif\0\0\0\0", "png");
+		if (!filepath.empty()) {
+			AddTexture(filepath);
+			GlifyTexture(&g_palPack.subchunks.back());
+		}
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Replace")) {
+		auto [palchk, dxtchk] = FindTextureChunk(curtexid);
+		if (palchk) {
+			auto fpath = GuiUtils::OpenDialogBox("Image\0*.png;*.bmp;*.jpg;*.jpeg;*.gif\0\0\0\0", "png");
+			if (!fpath.empty()) {
+				TexInfo* ti = (TexInfo*)palchk->maindata.data();
+				ImportTexture(fpath, *palchk, *dxtchk, ti->id);
+			}
+		}
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Export")) {
+		Chunk* palchk = FindTextureChunk(curtexid).first;
+		if (palchk) {
+			TexInfo* ti = (TexInfo*)palchk->maindata.data();
+			auto fpath = GuiUtils::SaveDialogBox("PNG Image\0*.png\0\0\0\0", "png", ti->name);
+			if (!fpath.empty()) {
+				ExportTexture(palchk, fpath);
+			}
+		}
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Export all")) {
+		auto dirpath = GuiUtils::SelectFolderDialogBox("Export all the textures in PNG to:");
+		if (!dirpath.empty()) {
+			for (Chunk& chk : g_palPack.subchunks) {
+				TexInfo* ti = (TexInfo*)chk.maindata.data();
+				std::string name = ti->name;
+				if (name.empty()) {
+					char tbuf[20];
+					sprintf_s(tbuf, "NoName%04X", ti->id);
+					name = tbuf;
+				}
+				ExportTexture(&chk, dirpath / (name + ".png"));
+			}
+		}
+	}
+
+	if (ImGui::BeginTable("TextureColumnsa", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoHostExtendY | ImGuiTableFlags_NoHostExtendX, ImGui::GetContentRegionAvail())) {
+		ImGui::TableSetupColumn("TexListCol", ImGuiTableColumnFlags_WidthFixed, 256.0f);
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+		ImGui::BeginChild("TextureList");
+		for (Chunk& chk : g_palPack.subchunks) {
+			TexInfo* ti = (TexInfo*)chk.maindata.data();
+			ImGui::PushID(ti);
+			static const float imgsize = ImGui::GetTextLineHeightWithSpacing() * 2.0f;
+			if (ImGui::Selectable("##texture", curtexid == ti->id, 0, ImVec2(0.0f, imgsize)))
+				curtexid = ti->id;
+			if (ImGui::IsItemVisible()) {
+				ImGui::SameLine();
+				auto t = texmap.find(ti->id);
+				ImGui::Image((t != texmap.end()) ? t->second : nullptr, ImVec2(imgsize, imgsize));
+				ImGui::SameLine();
+				ImGui::Text("%i: %s\n%i*%i", ti->id, ti->name, ti->width, ti->height);
+			}
+			ImGui::PopID();
+		}
+		ImGui::EndChild();
+		ImGui::TableNextColumn();
+		if (Chunk* palchk = FindTextureChunk(curtexid).first) {
+			TexInfo* ti = (TexInfo*)palchk->maindata.data();
+			ImGui::Text("ID: %i\nSize: %i*%i\nNum mipmaps: %i\nFlags: %08X\nUnknown: %08X\nName: %s", ti->id, ti->width, ti->height, ti->numMipmaps, ti->flags, ti->random, ti->name);
+			ImGui::Image(texmap.at(curtexid), ImVec2(ti->width, ti->height));
+		}
+		ImGui::EndTable();
+	}
 
 	ImGui::End();
 }
@@ -670,6 +743,8 @@ int main(int argc, char* argv[])
 	ImGui_ImplOpenGL2_Init();
 	lastfpscheck = GetTickCount();
 
+	GlifyAllTextures();
+
 	while (appnoquit = HandleWindow())
 	{
 		if (win_minimized)
@@ -748,6 +823,7 @@ int main(int argc, char* argv[])
 //#if 1
 			IGTest();
 //#endif
+			IGTextures();
 			ImGui::EndFrame();
 
 			BeginDrawing();
