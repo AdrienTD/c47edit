@@ -260,6 +260,7 @@ void IGObjectInfo()
 				pfac->maindata = std::move(pfac_newdata);
 				pftx->maindata = std::move(pftx_newdata);
 				puvc->maindata = std::move(puvc_newdata);
+				InvalidateMesh(mesh);
 			}
 		}
 		ImGui::Separator();
@@ -423,6 +424,7 @@ void IGObjectInfo()
 					ftxFace[2] = curtexid;
 					ftxFace += 6;
 				}
+				InvalidateMesh(selobj->mesh);
 			}
 			bool hasFtx = selobj->mesh->ftxo && !(selobj->mesh->ftxo & 0x80000000);
 			uint8_t* ftxpnt = (uint8_t*)pftx->maindata.data() + selobj->mesh->ftxo - 1;
@@ -533,8 +535,9 @@ void IGTextures()
 		if (palchk) {
 			auto fpath = GuiUtils::OpenDialogBox("Image\0*.png;*.bmp;*.jpg;*.jpeg;*.gif\0\0\0\0", "png");
 			if (!fpath.empty()) {
-				TexInfo* ti = (TexInfo*)palchk->maindata.data();
-				ImportTexture(fpath, *palchk, *dxtchk, ti->id);
+				uint32_t tid = *(uint32_t*)palchk->maindata.data();
+				ImportTexture(fpath, *palchk, *dxtchk, tid);
+				InvalidateTexture(tid);
 			}
 		}
 	}
@@ -621,7 +624,7 @@ void RenderObject(GameObject *o)
 			uint32_t clr = swap_rb(o->color);
 			glColor4ubv((uint8_t*)&clr);
 		}
-		o->mesh->draw();
+		DrawMesh(o->mesh);
 	}
 	for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
 		RenderObject(*e);

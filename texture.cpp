@@ -41,7 +41,7 @@ void GlifyTexture(Chunk* c) {
 		memcpy(pal, pnt, 4 * npalentries);
 	}
 
-	uint32_t gltex;
+	GLuint gltex;
 	glGenTextures(1, &gltex);
 	glBindTexture(GL_TEXTURE_2D, gltex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -77,6 +77,13 @@ void GlifyAllTextures()
 	}
 
 	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void InvalidateTexture(uint32_t texid)
+{
+	GLuint gltex = (GLuint)texmap.at(texid);
+	glDeleteTextures(1, &gltex);
+	GlifyTexture(FindTextureChunk(texid).first);
 }
 
 void AddTexture(const std::filesystem::path& filepath)

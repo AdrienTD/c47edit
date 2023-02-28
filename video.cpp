@@ -140,17 +140,17 @@ struct ProMesh {
 	}
 };
 
-void Mesh::draw()
+void DrawMesh(Mesh* mesh)
 {
 	if (!rendertextures)
 	{
-		glVertexPointer(3, GL_FLOAT, 6, (float*)pver->maindata.data() + this->vertstart);
-		glDrawElements(GL_QUADS, this->numquads * 4, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata.data() + this->quadstart);
-		glDrawElements(GL_TRIANGLES, this->numtris * 3, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata.data() + this->tristart);
+		glVertexPointer(3, GL_FLOAT, 6, (float*)pver->maindata.data() + mesh->vertstart);
+		glDrawElements(GL_QUADS, mesh->numquads * 4, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata.data() + mesh->quadstart);
+		glDrawElements(GL_TRIANGLES, mesh->numtris * 3, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata.data() + mesh->tristart);
 	}
 	else
 	{
-		ProMesh* pro = ProMesh::getProMesh(this);
+		ProMesh* pro = ProMesh::getProMesh(mesh);
 		for (auto& [texid,part] : pro->parts) {
 			if (texid == 65535)
 				continue;
@@ -166,6 +166,11 @@ void Mesh::draw()
 			glDrawElements(GL_TRIANGLES, part.indices.size(), GL_UNSIGNED_SHORT, part.indices.data());
 		}
 	}
+}
+
+void InvalidateMesh(Mesh* mesh)
+{
+	ProMesh::g_proMeshes.erase(mesh);
 }
 
 void BeginMeshDraw()

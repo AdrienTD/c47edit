@@ -5,6 +5,8 @@
 
 #pragma once
 
+struct Mesh;
+
 extern int drawframes;
 extern bool rendertextures;
 
@@ -12,3 +14,5 @@ void InitVideo();
 void BeginDrawing();
 void EndDrawing();
 void BeginMeshDraw();
+void DrawMesh(Mesh* mesh);
+void InvalidateMesh(Mesh* mesh);

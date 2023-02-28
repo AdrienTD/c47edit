@@ -43,7 +43,6 @@ struct Mesh
 	//float *vertices;
 	//uint16_t *quadindices, *triindices;
 	uint32_t vertstart, quadstart, tristart, ftxo, numverts, numquads, numtris, weird;
-	void Mesh::draw();
 };
 
 struct Light
