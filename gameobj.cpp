@@ -14,7 +14,7 @@
 #include "chunk.h"
 #include "vecmat.h"
 
-#include "miniz.h"
+#include <miniz/miniz.h>
 
 const char *objtypenames[] = {
 	// 0x00
