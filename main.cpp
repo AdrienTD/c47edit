@@ -31,6 +31,8 @@
 #include "imgui/imgui_impl_opengl2.h"
 #include "imgui/imgui_impl_win32.h"
 
+#include <stb_image_write.h>
+
 GameObject *selobj = 0, *viewobj = 0;
 float objviewscale = 0.0f;
 Vector3 campos(0, 0, -50), camori(0,0,0);
@@ -143,10 +145,132 @@ Vector3 GetYXZRotVecFromMatrix(Matrix *m)
 	return Vector3(a, b, j);
 }
 
-#define swap_rb(a) ( (a & 0xFF00FF00) | ((a & 0xFF0000) >> 16) | ((a & 255) << 16) )
+constexpr uint32_t swap_rb(uint32_t a) { return (a & 0xFF00FF00) | ((a & 0xFF0000) >> 16) | ((a & 255) << 16); }
 
 GameObject *objtogive = 0;
 uint32_t curtexid = 0;
+
+std::vector<uint32_t> UnsplitDblImage(GameObject* obj, void* data, int type, int width, int height, bool opacity)
+{
+	std::vector<uint32_t> unpacked(width * height, 0xFFFF00FF);
+	uint8_t* ptr = (uint8_t*)data;
+	auto read8 = [&ptr]() {uint8_t val = *(uint8_t*)ptr; ptr += 1; return val; };
+	auto read16 = [&ptr]() {int16_t val = *(int16_t*)ptr; ptr += 2; return val; };
+	auto read32 = [&ptr]() {int32_t val = *(int32_t*)ptr; ptr += 4; return val; };
+	bool weird = false;
+	int numQuads = read32();
+	if (numQuads == 0x40000001) {
+		numQuads = read32();
+		weird = true;
+	}
+	numQuads &= 0xFFFFFF;
+	int numVerts = read32();
+	std::vector<std::array<int32_t, 4>> quadIndices;
+	std::vector<std::array<int16_t, 2>> vertices;
+	quadIndices.resize(numQuads);
+	for (auto& qi : quadIndices)
+		for (auto& c : qi)
+			c = read32();
+	vertices.resize(numVerts);
+	for (auto& v : vertices)
+		for (auto& c : v)
+			c = read32();
+	std::vector<uint32_t> palette;
+	if (type >= 2 && type <= 4) {
+		int numPaletteColors = read32();
+		palette.resize(numPaletteColors);
+		for (uint32_t& c : palette)
+			c = swap_rb(read32());
+	}
+	for (int i = 0; i < numQuads; ++i) {
+		auto& qi = quadIndices[i];
+		auto [lowX, highX] = std::minmax({ vertices[qi[0]][0], vertices[qi[1]][0], vertices[qi[2]][0], vertices[qi[3]][0] });
+		auto [lowY, highY] = std::minmax({ vertices[qi[0]][1], vertices[qi[1]][1], vertices[qi[2]][1], vertices[qi[3]][1] });
+		if(weird)
+			read32();
+		int16_t dw = read16();
+		int16_t dh = read16();
+		int16_t s2 = read16();
+		int16_t s3 = read16();
+		int rw = (s2 >= 0) ? s2 : dw;
+		int rh = (s3 >= 0) ? s3 : dh;
+		if (type == 0) {
+			for (int dy = 0; dy < dh; ++dy) {
+				for (int dx = 0; dx < dw; ++dx) {
+					uint32_t c = swap_rb(read32());
+					if (dx < rw && dy < rh)
+						unpacked[(lowY + dy) * width + (lowX + dx)] = c;
+				}
+			}
+		}
+		else if (type == 2) {
+			for (int dy = 0; dy < dh; ++dy) {
+				for (int dx = 0; dx < dw; ++dx) {
+					uint32_t c = palette[read8()];
+					if (dx < rw && dy < rh)
+						unpacked[(lowY + dy) * width + (lowX + dx)] = c;
+				}
+			}
+		}
+		else if (type == 3) {
+			for (int dy = 0; dy < dh; ++dy) {
+				for (int dx = 0; dx < dw; ++dx) {
+					uint32_t c = palette[read8()] & 0xFFFFFF;
+					if (dx < rw && dy < rh)
+						unpacked[(lowY + dy) * width + (lowX + dx)] = c;
+				}
+			}
+			for (int dy = 0; dy < dh; ++dy) {
+				for (int dx = 0; dx < dw; ++dx) {
+					uint8_t val = read8();
+					if (dx < rw && dy < rh)
+						unpacked[(lowY + dy) * width + (lowX + dx)] |= (uint32_t)val << 24;
+				}
+			}
+		}
+		else if (type == 4) {
+			for (int dy = 0; dy < dh; ++dy) {
+				for (int dx = 0; dx < dw; dx += 2) {
+					uint8_t byte = read8();
+					if (dx < rw && dy < rh)
+						unpacked[(lowY + dy) * width + (lowX + dx)] = palette[byte & 15];
+					if (dx + 1 < rw && dy < rh)
+						unpacked[(lowY + dy) * width + (lowX + dx + 1)] = palette[byte >> 4];
+				}
+			}
+		}
+
+	}
+	if (opacity) {
+		// inverse alpha
+		for (auto& col : unpacked)
+			col ^= 0xFF000000;
+	}
+	else {
+		// force alpha to 255
+		for (auto& col : unpacked)
+			col = 0xFF000000 | (col & 0x00FFFFFF);
+	}
+	return unpacked;
+}
+
+GLuint GetDblImageTexture(GameObject* obj, void* data, int type, int width, int height, bool opacity) {
+	static GameObject* previousObj = nullptr;
+	static GLuint tex = 0;
+	if (obj == previousObj)
+		return tex;
+	if (tex)
+		glDeleteTextures(1, &tex);
+	previousObj = obj;
+
+	auto image = UnsplitDblImage(obj, data, type, width, height, opacity);
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.data());
+	return tex;
+}
 
 void IGObjectInfo()
 {
@@ -330,7 +454,7 @@ void IGObjectInfo()
 					ImGui::Separator(); break;
 				case 7: {
 					auto& data = std::get<std::vector<uint8_t>>(e->value);
-					ImGui::Text("Data (%X): %zu bytes", e->type, data.size());
+					ImGui::Text("Data (%s): %zu bytes", name.c_str(), data.size());
 					ImGui::SameLine();
 					if (ImGui::SmallButton("Export")) {
 						FILE* file;
@@ -348,6 +472,25 @@ void IGObjectInfo()
 						data.resize(len);
 						fread(data.data(), data.size(), 1, file);
 						fclose(file);
+					}
+					if (name == "Squares") {
+						std::string& name = std::get<std::string>((e + 1)->value);
+						uint32_t width = std::get<uint32_t>((e + 2)->value);
+						uint32_t height = std::get<uint32_t>((e + 3)->value);
+						uint32_t opacity = std::get<uint32_t>((e + 6)->value);
+						uint32_t format = std::get<uint32_t>((e + 12)->value);
+						if (ImGui::Button("Export image")) {
+							auto fname = std::filesystem::path(name).stem().string() + ".png";
+							auto fpath = GuiUtils::SaveDialogBox("PNG Image\0*.png\0\0\0\0", "png", fname.c_str());
+							if (!fpath.empty()) {
+								auto image = UnsplitDblImage(selobj, data.data(), format, width, height, opacity);
+								stbi_write_png(fpath.string().c_str(), width, height, 4, image.data(), 0);
+							}
+						}
+						GLuint tex = GetDblImageTexture(selobj, data.data(), format, width, height, opacity);
+						int dispHeight = std::min(128u, height);
+						int dispWidth = width * dispHeight / height;
+						ImGui::Image((void*)tex, ImVec2(dispWidth, dispHeight));
 					}
 					break;
 				}
