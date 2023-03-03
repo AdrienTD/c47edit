@@ -6,6 +6,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 struct GameObject;
@@ -17,6 +18,21 @@ namespace ClassInfo {
 	// Get name of class from ID
 	const char *GetObjTypeString(int typeId);
 
+	struct ClassMember {
+		std::string type;
+		std::string name;
+		std::string defaultValue;
+		std::vector<std::string> valueChoices;
+		int arrayCount = 1;
+		bool isProtected = false;
+	};
+
+	struct ObjectMember {
+		const ClassMember* info;
+		int arrayIndex;
+		ObjectMember(const ClassMember* info, int arrayIndex = -1) : info(info), arrayIndex(arrayIndex) {}
+	};
+
 	// Return a list of names of all DBL members of the object
-	std::vector<std::string> GetMemberNames(GameObject* obj);
+	std::vector<ObjectMember> GetMemberNames(GameObject* obj);
 }

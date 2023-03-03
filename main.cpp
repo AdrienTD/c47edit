@@ -421,11 +421,18 @@ void IGObjectInfo()
 			int i = 0;
 			for (auto e = selobj->dbl.begin(); e != selobj->dbl.end(); e++)
 			{
+				static const ClassInfo::ClassMember oobClassMember = { "", "OOB" };
+				static const ClassInfo::ObjectMember oobObjMember = { &oobClassMember };
+				const auto& [mem, arrayIndex] = (memberIndex < members.size()) ? members[memberIndex++] : oobObjMember;
+				std::string nameIndexed;
+				if (arrayIndex != -1)
+					nameIndexed = mem->name + '[' + std::to_string(arrayIndex) + ']';
+				const std::string& name = (arrayIndex != -1) ? nameIndexed : mem->name;
 				ImGui::PushID(i++);
+				if (mem->isProtected)
+					ImGui::BeginDisabled();
 				ImGui::Text("%1X", e->flags >> 4);
 				ImGui::SameLine();
-				static const std::string oobMember = "OOB";
-				const auto& name = (memberIndex < members.size()) ? members[memberIndex++] : oobMember;
 				switch (e->type)
 				{
 				case 0:
@@ -439,8 +446,24 @@ void IGObjectInfo()
 				case 0xB:
 				case 0xC:
 				{
-					//ImGui::InputInt(DBLEntry::getTypeName(e->type), (int*)&std::get<uint32_t>(e->value)); break;
-					ImGui::InputInt(name.c_str(), (int*)&std::get<uint32_t>(e->value)); break;
+					uint32_t& ref = std::get<uint32_t>(e->value);
+					if (mem->type == "BOOL") {
+						bool val = ref;
+						if (ImGui::Checkbox(name.c_str(), &val))
+							ref = val ? 1 : 0;
+					}
+					else if (mem->type == "ENUM") {
+						if (ImGui::BeginCombo(name.c_str(), mem->valueChoices[ref].c_str())) {
+							for (size_t i = 0; i < mem->valueChoices.size(); ++i)
+								if (ImGui::Selectable(mem->valueChoices[i].c_str(), ref == (uint32_t)i))
+									ref = (uint32_t)i;
+							ImGui::EndCombo();
+						}
+					}
+					else {
+						ImGui::InputInt(name.c_str(), (int*)&ref);
+					}
+					break;
 				}
 				case 4:
 				case 5:
@@ -539,6 +562,8 @@ void IGObjectInfo()
 				default:
 					ImGui::Text("Unknown type %u", e->type); break;
 				}
+				if (mem->isProtected)
+					ImGui::EndDisabled();
 				ImGui::PopID();
 			}
 		}

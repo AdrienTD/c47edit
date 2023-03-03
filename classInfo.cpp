@@ -48,7 +48,13 @@ struct MemberDecoder {
 			++ptr;
 			skipWhitespace();
 			const char* b_val = ptr;
-			skipWord();
+			if (*ptr == '{') {
+				while (*ptr && *ptr != '}') ++ptr;
+				++ptr;
+			}
+			else {
+				skipWord();
+			}
 			value = { b_val, (size_t)(ptr - b_val) };
 		}
 		else {
@@ -66,18 +72,63 @@ std::map<int, const nlohmann::json*> g_classInfo_idJsonMap; // ID -> Json map
 std::map<std::string, int> g_classInfo_stringIdMap;         // Class name -> ID map
 std::map<std::string, const nlohmann::json*> g_cpntJsonMap; // Component name -> Json map
 
+std::map<std::string, std::vector<ClassInfo::ClassMember>> g_classMemberLists;
+
+static std::string strUpper(std::string_view sv) {
+	std::string str = std::string{ sv };
+	for (char& c : str)
+		if (c >= 'a' && c <= 'z')
+			c = c - 'a' + 'A';
+	return str;
+}
+
 // Initialize the class info from the file
 void ClassInfo::ReadClassInfo()
 {
 	std::ifstream file("classes.json");
 	file >> g_classInfoJson;
+
+	auto processMembers = [](const std::string& membersString) -> std::vector<ClassMember> {
+		std::vector<ClassMember> members;
+		MemberDecoder dec{ membersString.c_str() };
+		while (dec.next()) {
+			ClassMember& mem = members.emplace_back();
+			mem.type = strUpper(dec.type);
+			mem.name = dec.name;
+			if (dec.value.size() >= 1 && dec.value[0] == '{') {
+				const char* ptr = dec.value.data() + 1;
+				mem.valueChoices.emplace_back();
+				while (*ptr != '}') {
+					if (*ptr == ',')
+						mem.valueChoices.emplace_back();
+					else
+						mem.valueChoices.back().push_back(*ptr);
+					++ptr;
+				}
+			}
+			else {
+				mem.defaultValue = dec.value;
+			}
+			mem.arrayCount = dec.arrayCount;
+			if (mem.type.size() >= 1 && mem.type[0] == '@') {
+				mem.isProtected = true;
+				mem.type = mem.type.substr(1);
+			}
+		}
+		return members;
+	};
+
 	for (const auto& ci : g_classInfoJson.at("geoms")) {
 		int id = ci.at("num2").get<int>() & 0xFFFFF;
 		g_classInfo_idJsonMap[id] = &ci;
-		g_classInfo_stringIdMap[ci.at("name").get_ref<const std::string&>()] = id;
+		const std::string& name = ci.at("name").get_ref<const std::string&>();
+		g_classInfo_stringIdMap[name] = id;
+		g_classMemberLists[name] = processMembers(ci.at("members").get_ref<const std::string&>());
 	}
 	for (const auto& cpnt : g_classInfoJson.at("components")) {
-		g_cpntJsonMap[cpnt.at("infoClassName").get_ref<const std::string&>().substr(1)] = &cpnt;
+		std::string name = cpnt.at("infoClassName").get_ref<const std::string&>().substr(1);
+		g_cpntJsonMap[name] = &cpnt;
+		g_classMemberLists[name] = processMembers(cpnt.at("members").get_ref<const std::string&>());
 	}
 }
 
@@ -88,25 +139,27 @@ const char* ClassInfo::GetObjTypeString(int typeId)
 }
 
 // Return a list of names of all DBL members of the object
-std::vector<std::string> ClassInfo::GetMemberNames(GameObject* obj)
+std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj)
 {
-	std::vector<std::string> members = { "Components", "Head1", "Head2", "" }; // some objects might have less or more initial members...
+	static const ClassMember emptyMember = { "", "" };
+	static const ClassMember initialMembers[3] = { {"", "Components"}, {"", "Head1"}, {"", "Head2"} }; // some objects might have less or more initial members...
+	std::vector<ClassInfo::ObjectMember> members = { {&initialMembers[0]}, {&initialMembers[1]}, {&initialMembers[2]}, {&emptyMember} };
 	auto onClass = [&members](const auto& rec, const nlohmann::json& cl) -> void {
 		if (cl.at("name") == "ZGEOM")
 			return;
 		const auto& parent = cl.at("type").get_ref<const std::string&>();
 		rec(rec, *g_classInfo_idJsonMap.at(g_classInfo_stringIdMap.at(parent))); // recursive call to parent class
 		const auto& membersString = cl.at("members").get_ref<const std::string&>();
-		MemberDecoder dec{ membersString.c_str() };
-		while (dec.next()) {
-			if (dec.arrayCount == 1)
-				members.emplace_back(dec.name);
+		const auto& memlist = g_classMemberLists.at(cl.at("name").get_ref<const std::string&>());
+		for (const ClassMember& mem : memlist) {
+			if (mem.arrayCount == 1)
+				members.emplace_back(&mem, -1);
 			else {
-				for (int i = 0; i < dec.arrayCount; ++i)
-					members.push_back(std::string(dec.name) + '[' + std::to_string(i) + ']');
+				for (int i = 0; i < mem.arrayCount; ++i)
+					members.emplace_back(&mem, i);
 			}
 		}
-		members.emplace_back();
+		members.emplace_back(&emptyMember);
 	};
 	onClass(onClass, *g_classInfo_idJsonMap.at(obj->type));
 
@@ -124,17 +177,16 @@ std::vector<std::string> ClassInfo::GetMemberNames(GameObject* obj)
 			nextElem();
 			skipWhitespace();
 
-			const auto& membersString = g_cpntJsonMap.at(std::string(cpntName))->at("members").get_ref<const std::string&>();
-			MemberDecoder dec{ membersString.c_str() };
-			while (dec.next()) {
-				if (dec.arrayCount == 1)
-					members.emplace_back(dec.name);
+			const auto& memlist = g_classMemberLists.at(std::string(cpntName));
+			for (const ClassMember& mem : memlist) {
+				if (mem.arrayCount == 1)
+					members.emplace_back(&mem, -1);
 				else {
-					for (int i = 0; i < dec.arrayCount; ++i)
-						members.push_back(std::string(dec.name) + '[' + std::to_string(i) + ']');
+					for (int i = 0; i < mem.arrayCount; ++i)
+						members.emplace_back(&mem, i);
 				}
 			}
-			members.emplace_back();
+			members.emplace_back(&emptyMember);
 		}
 	}
 
