@@ -16,6 +16,8 @@
 
 #include <miniz/miniz.h>
 
+Scene g_scene;
+
 const char *objtypenames[] = {
 	// 0x00
 	"Z0", "ZGROUP", "ZSTDOBJ", "ZCAMERA",
@@ -60,14 +62,6 @@ const char *objtypenames[] = {
 	"?", "?", "?", "?",
 };
 
-Chunk *spkchk;
-Chunk *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc, *pdbl;
-GameObject *rootobj, *cliprootobj, *superroot;
-std::string lastspkfn;
-void *zipmem = 0; uint32_t zipsize = 0;
-Chunk g_palPack, g_dxtPack, g_anmPack, g_wavPack;
-bool g_hasAnmPack = false;
-
 const char *GetObjTypeString(uint32_t ot)
 {
 	const char *otname = "?";
@@ -75,7 +69,7 @@ const char *GetObjTypeString(uint32_t ot)
 	return otname;
 }
 
-void ReadAssetPacks(mz_zip_archive* zip)
+static void ReadAssetPacks(Scene* scene, mz_zip_archive* zip)
 {
 	static const auto readFile = [](const char* filename) {
 		void* repmem; size_t repsize;
@@ -115,16 +109,16 @@ void ReadAssetPacks(mz_zip_archive* zip)
 			free(packmem);
 	};
 
-	readPack("PAL", g_palPack);
-	readPack("DXT", g_dxtPack);
-	readPack("WAV", g_wavPack);
-	readPack("ANM", g_anmPack, &g_hasAnmPack);
+	readPack("PAL", scene->g_palPack);
+	readPack("DXT", scene->g_dxtPack);
+	readPack("WAV", scene->g_wavPack);
+	readPack("ANM", scene->g_anmPack, &scene->g_hasAnmPack);
 
-	if (g_palPack.tag != 'PAL') ferr("Not a PAL chunk in Repeat.PAL");
-	if (g_dxtPack.tag != 'DXT') ferr("Not a DXT chunk in Repeat.DXT");
+	if (scene->g_palPack.tag != 'PAL') ferr("Not a PAL chunk in Repeat.PAL");
+	if (scene->g_dxtPack.tag != 'DXT') ferr("Not a DXT chunk in Repeat.DXT");
 }
 
-void LoadSceneSPK(const char *fn)
+void Scene::LoadSceneSPK(const char *fn)
 {
 	FILE *zipfile = fopen(fn, "rb");
 	if (!zipfile) ferr("Could not open the ZIP file.");
@@ -143,7 +137,7 @@ void LoadSceneSPK(const char *fn)
 	if (!mzreadok) ferr("Failed to initialize ZIP reading.");
 	spkmem = mz_zip_reader_extract_file_to_heap(&zip, "Pack.SPK", &spksize, 0);
 	if (!spkmem) ferr("Failed to extract Pack.SPK from ZIP archive.");
-	ReadAssetPacks(&zip);
+	ReadAssetPacks(this, &zip);
 	mz_zip_reader_end(&zip);
 	spkchk->load(spkmem);
 	free(spkmem);
@@ -177,7 +171,7 @@ void LoadSceneSPK(const char *fn)
 	std::map<Chunk*, GameObject*> chkobjmap;
 	std::function<void(Chunk*,GameObject*)> z;
 	uint32_t objid = 1;
-	z = [&z, &objid, &chkobjmap, &idobjmap](Chunk *c, GameObject *parentobj) {
+	z = [this, &z, &objid, &chkobjmap, &idobjmap](Chunk *c, GameObject *parentobj) {
 		uint32_t pheaoff = c->tag & 0xFFFFFF;
 		uint32_t *p = (uint32_t*)((char*)phea->maindata.data() + pheaoff);
 		uint32_t ot = *(unsigned short*)(&p[5]);
@@ -203,7 +197,7 @@ void LoadSceneSPK(const char *fn)
 
 	// Then read/load the object properties.
 	std::function<void(Chunk*, GameObject*)> g;
-	g = [&g,&objid,&chkobjmap,&idobjmap](Chunk *c, GameObject *parentobj) {
+	g = [this, &g,&objid,&chkobjmap,&idobjmap](Chunk *c, GameObject *parentobj) {
 		uint32_t pheaoff = c->tag & 0xFFFFFF;
 		uint32_t *p = (uint32_t*)((char*)phea->maindata.data() + pheaoff);
 		uint32_t ot = *(unsigned short*)(&p[5]);
@@ -336,11 +330,12 @@ struct DBLHash
 	}
 };
 
+// All global variables below are used during saving.
+// Should be fine as long as a scene is saved one at a time.
+
 std::stringbuf heabuf, nambuf, dblbuf;
 std::vector<std::array<float,3> > posbuf;
 std::vector<std::array<uint32_t, 4> > mtxbuf;
-
-uint32_t sbtell(std::stringbuf *sb);
 
 uint32_t moc_objcount;
 std::map<GameObject*, uint32_t> objidmap;
@@ -349,6 +344,8 @@ std::map<std::array<float, 3>, uint32_t> g_sav_posmap;
 std::map<std::array<uint32_t, 4>, uint32_t> g_sav_mtxmap;
 std::map<std::string, uint32_t> g_sav_nammap;
 std::unordered_map<std::pair<uint32_t, std::string>, uint32_t, DBLHash> g_sav_dblmap;
+
+uint32_t sbtell(std::stringbuf* sb);
 
 void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 {
@@ -508,30 +505,29 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	}
 }
 
-void ModifySPK()
+void Scene::ModifySPK()
 {
 	Chunk nrot, nclp;
 	nrot.tag = 'TORP';
 	nclp.tag = 'PLCP';
 
 	uint32_t objid = 1;
-	std::function<void(GameObject*)> z;
-	z = [&z,&objid](GameObject *o) {
+	auto z = [&objid](GameObject *o, auto& rec) -> void {
 		for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
 		{
 			objidmap[*e] = objid++;
-			z(*e);
+			rec(*e, rec);
 		}
 	};
-	z(cliprootobj);
-	z(rootobj);
+	z(cliprootobj, z);
+	z(rootobj, z);
 
 	g_sav_posmap.clear();
 	g_sav_mtxmap.clear();
 	g_sav_nammap.clear();
 	g_sav_dblmap.clear();
 
-	auto f = [](Chunk *c, GameObject *o) {
+	auto f = [this](Chunk *c, GameObject *o) {
 		c->subchunks.resize(o->subobj.size());
 		moc_objcount = 0;
 		int i = 0;
@@ -549,23 +545,23 @@ void ModifySPK()
 	*prot = std::move(nrot);
 	*pclp = std::move(nclp);
 
-	auto fillMaindata = [](Chunk *nthg, const auto& buf) {
+	auto fillMaindata = [](uint32_t tag, Chunk *nthg, const auto& buf) {
 		using T = std::remove_reference_t<decltype(buf)>;
+		nthg->tag = tag;
 		nthg->maindata.resize(buf.size() * sizeof(T::value_type));
 		memcpy(nthg->maindata.data(), buf.data(), nthg->maindata.size());
 	};
 
 	Chunk nhea, nnam, npos, nmtx, ndbl;
-	nhea.tag = 'AEHP';
-	nnam.tag = 'MANP';
-	npos.tag = 'SOPP';
-	nmtx.tag = 'XTMP';
-	ndbl.tag = 'LBDP';
-	fillMaindata(&nhea, heabuf.str());
-	fillMaindata(&nnam, nambuf.str());
-	fillMaindata(&npos, posbuf);
-	fillMaindata(&nmtx, mtxbuf);
-	fillMaindata(&ndbl, dblbuf.str());
+	fillMaindata('AEHP', &nhea, heabuf.str());
+	fillMaindata('MANP', &nnam, nambuf.str());
+	fillMaindata('SOPP', &npos, posbuf);
+	fillMaindata('XTMP', &nmtx, mtxbuf);
+	fillMaindata('LBDP', &ndbl, dblbuf.str());
+
+	heabuf = std::stringbuf();
+	nambuf = std::stringbuf();
+	posbuf.clear(); mtxbuf.clear(); dblbuf = std::stringbuf();
 
 	// Chunk comparison
 	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
@@ -602,7 +598,7 @@ void ModifySPK()
 	objidmap.clear();
 }
 
-void SaveSceneSPK(const char *fn)
+void Scene::SaveSceneSPK(const char *fn)
 {
 	mz_zip_archive inzip, outzip;
 	mz_zip_zero_struct(&inzip);
@@ -646,13 +642,9 @@ void SaveSceneSPK(const char *fn)
 	mz_zip_writer_finalize_archive(&outzip);
 	mz_zip_writer_end(&outzip);
 	mz_zip_reader_end(&inzip);
-
-	heabuf = std::stringbuf();
-	nambuf = std::stringbuf();
-	posbuf.clear(); mtxbuf.clear(); dblbuf = std::stringbuf();
 }
 
-void RemoveObject(GameObject *o)
+void Scene::RemoveObject(GameObject *o)
 {
 	if (o->parent)
 	{
@@ -664,8 +656,9 @@ void RemoveObject(GameObject *o)
 	delete o;
 }
 
-GameObject* DuplicateObject(GameObject *o, GameObject *parent)
+GameObject* Scene::DuplicateObject(GameObject *o, GameObject *parent)
 {
+	if (!parent) parent = rootobj;
 	if (!o->parent) return 0;
 	GameObject *d = new GameObject(*o);
 	
@@ -679,7 +672,7 @@ GameObject* DuplicateObject(GameObject *o, GameObject *parent)
 	return d;
 }
 
-void GiveObject(GameObject *o, GameObject *t)
+void Scene::GiveObject(GameObject *o, GameObject *t)
 {
 	if (o->parent)
 	{

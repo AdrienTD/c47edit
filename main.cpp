@@ -88,7 +88,7 @@ bool IGStdStringInput(const char* label, std::string& str) {
 void IGOTNode(GameObject *o)
 {
 	bool op, colorpushed = 0;
-	if (o == superroot)
+	if (o == g_scene.superroot)
 		ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 	if (findsel)
 		if (ObjInObj(selobj, o))
@@ -132,7 +132,7 @@ void IGObjectTree()
 	ImGui::SetNextWindowPos(ImVec2(3, 3), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSize(ImVec2(316, 652), ImGuiCond_FirstUseEver);
 	ImGui::Begin("Object tree", 0, ImGuiWindowFlags_HorizontalScrollbar);
-	IGOTNode(superroot);
+	IGOTNode(g_scene.superroot);
 	findsel = false;
 	ImGui::End();
 }
@@ -283,7 +283,7 @@ void IGObjectInfo()
 	else {
 		if (ImGui::Button("Duplicate"))
 			if(selobj->root)
-				DuplicateObject(selobj, selobj->root);
+				g_scene.DuplicateObject(selobj, selobj->root);
 		ImGui::SameLine();
 		bool wannadel = 0;
 		if (ImGui::Button("Delete"))
@@ -294,7 +294,7 @@ void IGObjectInfo()
 		ImGui::SameLine();
 		if (ImGui::Button("Give it here!"))
 			if(objtogive)
-				GiveObject(objtogive, selobj);
+				g_scene.GiveObject(objtogive, selobj);
 		
 		if (ImGui::Button("Find in tree"))
 			findsel = true;
@@ -332,27 +332,27 @@ void IGObjectInfo()
 				mesh->numverts = std::size(objVertices);
 				mesh->numquads = std::size(quadIndices) / 4;
 				mesh->numtris = std::size(triIndices) / 3;
-				int faceIndex = pfac->maindata.size() / 2;
-				mesh->vertstart = pver->maindata.size() / 4;
+				int faceIndex = g_scene.pfac->maindata.size() / 2;
+				mesh->vertstart = g_scene.pver->maindata.size() / 4;
 				mesh->tristart = (mesh->numtris > 0) ? faceIndex : 0;
 				mesh->quadstart = (mesh->numquads > 0) ? faceIndex + 3 * mesh->numtris : 0;
-				mesh->ftxo = pftx->maindata.size() + 1;
+				mesh->ftxo = g_scene.pftx->maindata.size() + 1;
 
-				Chunk::DataBuffer pver_newdata(pver->maindata.size() + mesh->numverts * 12);
-				Chunk::DataBuffer pfac_newdata(pfac->maindata.size() + mesh->numquads * 8 + mesh->numtris * 6);
-				Chunk::DataBuffer pftx_newdata(pftx->maindata.size() + 12 + (mesh->numquads + mesh->numtris) * 12);
-				Chunk::DataBuffer puvc_newdata(puvc->maindata.size() + (mesh->numquads + mesh->numtris) * 4 * 8 * 2); // 8 floats per face, 2 sets
-				memcpy(pver_newdata.data(), pver->maindata.data(), pver->maindata.size());
-				memcpy(pfac_newdata.data(), pfac->maindata.data(), pfac->maindata.size());
-				memcpy(pftx_newdata.data(), pftx->maindata.data(), pftx->maindata.size());
-				memcpy(puvc_newdata.data(), puvc->maindata.data(), puvc->maindata.size());
+				Chunk::DataBuffer pver_newdata(g_scene.pver->maindata.size() + mesh->numverts * 12);
+				Chunk::DataBuffer pfac_newdata(g_scene.pfac->maindata.size() + mesh->numquads * 8 + mesh->numtris * 6);
+				Chunk::DataBuffer pftx_newdata(g_scene.pftx->maindata.size() + 12 + (mesh->numquads + mesh->numtris) * 12);
+				Chunk::DataBuffer puvc_newdata(g_scene.puvc->maindata.size() + (mesh->numquads + mesh->numtris) * 4 * 8 * 2); // 8 floats per face, 2 sets
+				memcpy(pver_newdata.data(), g_scene.pver->maindata.data(), g_scene.pver->maindata.size());
+				memcpy(pfac_newdata.data(), g_scene.pfac->maindata.data(), g_scene.pfac->maindata.size());
+				memcpy(pftx_newdata.data(), g_scene.pftx->maindata.data(), g_scene.pftx->maindata.size());
+				memcpy(puvc_newdata.data(), g_scene.puvc->maindata.data(), g_scene.puvc->maindata.size());
 
 				float* verts = (float*)pver_newdata.data() + mesh->vertstart;
 				uint16_t* faces = (uint16_t*)pfac_newdata.data() + faceIndex;
-				uint32_t* ftxHead = (uint32_t*)(pftx_newdata.data() + pftx->maindata.size());
+				uint32_t* ftxHead = (uint32_t*)(pftx_newdata.data() + g_scene.pftx->maindata.size());
 				uint16_t* ftx = (uint16_t*)(ftxHead + 3);
-				float* uv1 = (float*)(puvc_newdata.data() + puvc->maindata.size());
-				float* uv2 = (float*)(puvc_newdata.data() + puvc->maindata.size() + (mesh->numquads + mesh->numtris) * 4 * 8);
+				float* uv1 = (float*)(puvc_newdata.data() + g_scene.puvc->maindata.size());
+				float* uv2 = (float*)(puvc_newdata.data() + g_scene.puvc->maindata.size() + (mesh->numquads + mesh->numtris) * 4 * 8);
 
 				memcpy(verts, objVertices.data(), objVertices.size() * 12);
 				for (uint16_t x : triIndices)
@@ -380,10 +380,10 @@ void IGObjectInfo()
 					*uv2++ = 1.0f; *uv2++ = 0.0f;
 				}
 
-				pver->maindata = std::move(pver_newdata);
-				pfac->maindata = std::move(pfac_newdata);
-				pftx->maindata = std::move(pftx_newdata);
-				puvc->maindata = std::move(puvc_newdata);
+				g_scene.pver->maindata = std::move(pver_newdata);
+				g_scene.pfac->maindata = std::move(pfac_newdata);
+				g_scene.pftx->maindata = std::move(pftx_newdata);
+				g_scene.puvc->maindata = std::move(puvc_newdata);
 				InvalidateMesh(mesh);
 			}
 		}
@@ -585,7 +585,7 @@ void IGObjectInfo()
 		if (selobj->mesh && selobj->mesh->ftxo && ImGui::CollapsingHeader("FTXO")) {
 			// TODO: place this in "DebugUI.cpp"
 			if (ImGui::Button("Change texture")) {
-				uint8_t* ftxpnt = (uint8_t*)pftx->maindata.data() + selobj->mesh->ftxo - 1;
+				uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
 				uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
 				uint32_t numFaces = *(uint32_t*)(ftxpnt + 8);
 				for (size_t i = 0; i < numFaces; ++i) {
@@ -595,8 +595,8 @@ void IGObjectInfo()
 				InvalidateMesh(selobj->mesh);
 			}
 			bool hasFtx = selobj->mesh->ftxo && !(selobj->mesh->ftxo & 0x80000000);
-			uint8_t* ftxpnt = (uint8_t*)pftx->maindata.data() + selobj->mesh->ftxo - 1;
-			float* uvCoords = (float*)puvc->maindata.data() + *(uint32_t*)(ftxpnt);
+			uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
+			float* uvCoords = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt);
 			uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
 			size_t numFaces = selobj->mesh->numquads + selobj->mesh->numtris;
 			ImGui::Text("UV  offset 0x%08X", *(uint32_t*)(ftxpnt));
@@ -626,7 +626,7 @@ void IGObjectInfo()
 			if (selobj->refcount > 0)
 				warn("It's not possible to remove an object that is referenced by other objects!");
 			else {
-				RemoveObject(selobj);
+				g_scene.RemoveObject(selobj);
 				selobj = 0;
 			}
 		}
@@ -644,7 +644,7 @@ void IGMain()
 	if (ImGui::Button("Save Scene"))
 	{
 		char newfn[300]; newfn[299] = 0;
-		_splitpath(lastspkfn.c_str(), 0, 0, newfn, 0);
+		_splitpath(g_scene.lastspkfn.c_str(), 0, 0, newfn, 0);
 		strcat(newfn, ".zip");
 		char *s = strrchr(newfn, '@');
 		if (s)
@@ -654,7 +654,7 @@ void IGMain()
 
 		auto zipPath = GuiUtils::SaveDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", s, "Save Scene ZIP archive as...");
 		if (!zipPath.empty())
-			SaveSceneSPK(zipPath.string().c_str());
+			g_scene.SaveSceneSPK(zipPath.string().c_str());
 	}
 	ImGui::SameLine();
 	if(ImGui::Button("About..."))
@@ -693,13 +693,13 @@ void IGTextures()
 	if (ImGui::Button("Add")) {
 		auto filepath = GuiUtils::OpenDialogBox("Image\0*.png;*.bmp;*.jpg;*.jpeg;*.gif\0\0\0\0", "png");
 		if (!filepath.empty()) {
-			AddTexture(filepath);
-			GlifyTexture(&g_palPack.subchunks.back());
+			AddTexture(g_scene, filepath);
+			GlifyTexture(&g_scene.g_palPack.subchunks.back());
 		}
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Replace")) {
-		auto [palchk, dxtchk] = FindTextureChunk(curtexid);
+		auto [palchk, dxtchk] = FindTextureChunk(g_scene, curtexid);
 		if (palchk) {
 			auto fpath = GuiUtils::OpenDialogBox("Image\0*.png;*.bmp;*.jpg;*.jpeg;*.gif\0\0\0\0", "png");
 			if (!fpath.empty()) {
@@ -711,7 +711,7 @@ void IGTextures()
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Export")) {
-		Chunk* palchk = FindTextureChunk(curtexid).first;
+		Chunk* palchk = FindTextureChunk(g_scene, curtexid).first;
 		if (palchk) {
 			TexInfo* ti = (TexInfo*)palchk->maindata.data();
 			auto fpath = GuiUtils::SaveDialogBox("PNG Image\0*.png\0\0\0\0", "png", ti->name);
@@ -724,7 +724,7 @@ void IGTextures()
 	if (ImGui::Button("Export all")) {
 		auto dirpath = GuiUtils::SelectFolderDialogBox("Export all the textures in PNG to:");
 		if (!dirpath.empty()) {
-			for (Chunk& chk : g_palPack.subchunks) {
+			for (Chunk& chk : g_scene.g_palPack.subchunks) {
 				TexInfo* ti = (TexInfo*)chk.maindata.data();
 				std::string name = ti->name;
 				if (name.empty()) {
@@ -742,7 +742,7 @@ void IGTextures()
 		ImGui::TableNextRow();
 		ImGui::TableNextColumn();
 		ImGui::BeginChild("TextureList");
-		for (Chunk& chk : g_palPack.subchunks) {
+		for (Chunk& chk : g_scene.g_palPack.subchunks) {
 			TexInfo* ti = (TexInfo*)chk.maindata.data();
 			ImGui::PushID(ti);
 			static const float imgsize = ImGui::GetTextLineHeightWithSpacing() * 2.0f;
@@ -759,7 +759,7 @@ void IGTextures()
 		}
 		ImGui::EndChild();
 		ImGui::TableNextColumn();
-		if (Chunk* palchk = FindTextureChunk(curtexid).first) {
+		if (Chunk* palchk = FindTextureChunk(g_scene, curtexid).first) {
 			TexInfo* ti = (TexInfo*)palchk->maindata.data();
 			ImGui::Text("ID: %i\nSize: %i*%i\nNum mipmaps: %i\nFlags: %08X\nUnknown: %08X\nName: %s", ti->id, ti->width, ti->height, ti->numMipmaps, ti->flags, ti->random, ti->name);
 			ImGui::Image(texmap.at(curtexid), ImVec2(ti->width, ti->height));
@@ -770,7 +770,7 @@ void IGTextures()
 	ImGui::End();
 }
 
-GameObject* FindObjectNamed(const char *name, GameObject *sup = rootobj)
+GameObject* FindObjectNamed(const char *name, GameObject *sup = g_scene.rootobj)
 {
 	if (sup->name == name)
 		return sup;
@@ -803,8 +803,8 @@ Vector3 finalintersectpnt = Vector3(0, 0, 0);
 
 bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, int startvertex, int startface, int numverts, Matrix *worldmtx)
 {
-	uint16_t *bfac = (uint16_t*)pfac->maindata.data() + startface;
-	float *bver = (float*)pver->maindata.data() + startvertex;
+	uint16_t *bfac = (uint16_t*)g_scene.pfac->maindata.data() + startface;
+	float *bver = (float*)g_scene.pver->maindata.data() + startvertex;
 
 	std::unique_ptr<Vector3[]> pnts = std::make_unique<Vector3[]>(numverts);
 	for (int i = 0; i < 3; i++)
@@ -903,7 +903,7 @@ int main(int argc, char* argv[])
 	auto zipPath = GuiUtils::OpenDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", "Select a Scene ZIP archive (containing Pack.SPK)");
 	if (zipPath.empty())
 		exit(-1);
-	LoadSceneSPK(zipPath.string().c_str());
+	g_scene.LoadSceneSPK(zipPath.string().c_str());
 
 	bool appnoquit = true;
 	InitWindow();
@@ -1025,7 +1025,7 @@ int main(int argc, char* argv[])
 			}
 
 			if (renderExc && viewobj) {
-				if (Chunk* pexc = spkchk->findSubchunk('CXEP')) {
+				if (Chunk* pexc = g_scene.spkchk->findSubchunk('CXEP')) {
 					glPointSize(5.0f);
 					glBegin(GL_POINTS);
 					auto renderAnim = [pexc](auto rec, GameObject* obj, const Matrix& prevmat) -> void {

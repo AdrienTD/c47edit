@@ -10,6 +10,7 @@
 #include <variant>
 #include <vector>
 
+#include "chunk.h"
 #include "vecmat.h"
 
 struct GameObject;
@@ -92,17 +93,22 @@ struct GameObject
 inline void GORef::deref() noexcept { if (m_obj) { m_obj->refcount--; m_obj = nullptr; } }
 inline void GORef::set(GameObject * obj) noexcept { deref(); m_obj = obj; if (m_obj) m_obj->refcount++; }
 
-extern Chunk *spkchk, *prot, *pclp, *phea, *pnam, *ppos, *pmtx, *pver, *pfac, *pftx, *puvc;
-extern GameObject *rootobj, *cliprootobj, *superroot;
-extern std::string lastspkfn;
-extern void *zipmem;
-extern uint32_t zipsize;
-extern Chunk g_palPack, g_dxtPack;
+struct Scene {
+	Chunk* spkchk, * prot, * pclp, * phea, * pnam, * ppos, * pmtx, * pver, * pfac, * pftx, * puvc, *pdbl;
+	GameObject* rootobj, * cliprootobj, * superroot;
+	std::string lastspkfn;
+	void* zipmem = nullptr;
+	uint32_t zipsize = 0;
+	Chunk g_palPack, g_dxtPack, g_anmPack, g_wavPack;
+	bool g_hasAnmPack = false;
+
+	void LoadSceneSPK(const char *fn);
+	void ModifySPK();
+	void SaveSceneSPK(const char *fn);
+	void RemoveObject(GameObject *o);
+	GameObject* DuplicateObject(GameObject *o, GameObject *parent = nullptr);
+	void GiveObject(GameObject *o, GameObject *t);
+};
+extern Scene g_scene;
 
 const char* GetObjTypeString(uint32_t ot);
-void LoadSceneSPK(const char *fn);
-void ModifySPK();
-void SaveSceneSPK(const char *fn);
-void RemoveObject(GameObject *o);
-GameObject* DuplicateObject(GameObject *o, GameObject *parent = rootobj);
-void GiveObject(GameObject *o, GameObject *t);

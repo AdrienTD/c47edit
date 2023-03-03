@@ -70,9 +70,9 @@ void GlifyTexture(Chunk* c) {
 
 void GlifyAllTextures()
 {
-	for (size_t i = 0; i < g_palPack.subchunks.size(); i++)
+	for (size_t i = 0; i < g_scene.g_palPack.subchunks.size(); i++)
 	{
-		Chunk* c = &g_palPack.subchunks[i];
+		Chunk* c = &g_scene.g_palPack.subchunks[i];
 		GlifyTexture(c);
 	}
 
@@ -83,17 +83,17 @@ void InvalidateTexture(uint32_t texid)
 {
 	GLuint gltex = (GLuint)texmap.at(texid);
 	glDeleteTextures(1, &gltex);
-	GlifyTexture(FindTextureChunk(texid).first);
+	GlifyTexture(FindTextureChunk(g_scene, texid).first);
 }
 
-void AddTexture(const std::filesystem::path& filepath)
+void AddTexture(Scene& scene, const std::filesystem::path& filepath)
 {
-	Chunk* ptxi = spkchk->findSubchunk('IXTP');
+	Chunk* ptxi = scene.spkchk->findSubchunk('IXTP');
 	assert(ptxi);
 	uint32_t& numTextureIds = *(uint32_t*)ptxi->maindata.data();
 
-	Chunk& chk = g_palPack.subchunks.emplace_back();
-	Chunk& dxtchk = g_dxtPack.subchunks.emplace_back();
+	Chunk& chk = scene.g_palPack.subchunks.emplace_back();
+	Chunk& dxtchk = scene.g_dxtPack.subchunks.emplace_back();
 	ImportTexture(filepath, chk, dxtchk, numTextureIds);
 	numTextureIds += 1;
 }
@@ -183,14 +183,14 @@ void ExportTexture(Chunk* texChunk, const std::filesystem::path& filepath)
 	stbi_write_png(filepath.string().c_str(), ti->width, ti->height, 4, rgba.data(), 0);
 }
 
-std::pair<Chunk*, Chunk*> FindTextureChunk(uint32_t id)
+std::pair<Chunk*, Chunk*> FindTextureChunk(Scene& scene, uint32_t id)
 {
-	for (Chunk& chk : g_palPack.subchunks) {
+	for (Chunk& chk : scene.g_palPack.subchunks) {
 		uint32_t chkid = *(uint32_t*)chk.maindata.data();
 		if (chkid == id) {
-			int nth = &chk - g_palPack.subchunks.data();
-			assert(*(uint32_t*)g_dxtPack.subchunks[nth].maindata.data() == id);
-			return { &chk, &g_dxtPack.subchunks[nth] };
+			int nth = &chk - scene.g_palPack.subchunks.data();
+			assert(*(uint32_t*)scene.g_dxtPack.subchunks[nth].maindata.data() == id);
+			return { &chk, &scene.g_dxtPack.subchunks[nth] };
 		}
 	}
 	return { nullptr, nullptr };

@@ -4,6 +4,7 @@
 #include <map>
 
 struct Chunk;
+struct Scene;
 namespace std::filesystem {
 	class path;
 }
@@ -22,7 +23,7 @@ extern std::map<uint32_t, void*> texmap;
 void GlifyTexture(Chunk* c);
 void GlifyAllTextures();
 void InvalidateTexture(uint32_t texid);
-void AddTexture(const std::filesystem::path& filepath);
+void AddTexture(Scene& scene, const std::filesystem::path& filepath);
 void ImportTexture(const std::filesystem::path& filepath, Chunk& chk, Chunk& dxtchk, int texid);
 void ExportTexture(Chunk* texChunk, const std::filesystem::path& filepath);
-std::pair<Chunk*, Chunk*> FindTextureChunk(uint32_t id);
+std::pair<Chunk*, Chunk*> FindTextureChunk(Scene& scene, uint32_t id);

@@ -92,15 +92,15 @@ struct ProMesh {
 		static const int uvit[4] = { 0,1,2,3 };
 
 		ProMesh pro;
-		uint16_t *faces = (uint16_t*)pfac->maindata.data();
-		float *verts = (float*)pver->maindata.data() + mesh->vertstart;
-		uint8_t *ftxpnt = (uint8_t*)pftx->maindata.data() + mesh->ftxo - 1;
+		uint16_t *faces = (uint16_t*)g_scene.pfac->maindata.data();
+		float *verts = (float*)g_scene.pver->maindata.data() + mesh->vertstart;
+		uint8_t *ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + mesh->ftxo - 1;
 		uint16_t *ftxFace = (uint16_t*)(ftxpnt + 12);
 		bool hasFtx = mesh->ftxo && !(mesh->ftxo & 0x80000000);
 
 		float *uvCoords = (float*)defUvs;
 		if (hasFtx)
-			uvCoords = (float*)puvc->maindata.data() + *(uint32_t*)(ftxpnt);
+			uvCoords = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt);
 
 		for (uint32_t i = 0; i < mesh->numtris; i++)
 		{
@@ -144,9 +144,9 @@ void DrawMesh(Mesh* mesh)
 {
 	if (!rendertextures)
 	{
-		glVertexPointer(3, GL_FLOAT, 6, (float*)pver->maindata.data() + mesh->vertstart);
-		glDrawElements(GL_QUADS, mesh->numquads * 4, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata.data() + mesh->quadstart);
-		glDrawElements(GL_TRIANGLES, mesh->numtris * 3, GL_UNSIGNED_SHORT, (uint16_t*)pfac->maindata.data() + mesh->tristart);
+		glVertexPointer(3, GL_FLOAT, 6, (float*)g_scene.pver->maindata.data() + mesh->vertstart);
+		glDrawElements(GL_QUADS, mesh->numquads * 4, GL_UNSIGNED_SHORT, (uint16_t*)g_scene.pfac->maindata.data() + mesh->quadstart);
+		glDrawElements(GL_TRIANGLES, mesh->numtris * 3, GL_UNSIGNED_SHORT, (uint16_t*)g_scene.pfac->maindata.data() + mesh->tristart);
 	}
 	else
 	{
