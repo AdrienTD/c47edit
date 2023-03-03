@@ -91,11 +91,11 @@ void AddTexture(Scene& scene, const std::filesystem::path& filepath)
 	Chunk* ptxi = scene.spkchk->findSubchunk('IXTP');
 	assert(ptxi);
 	uint32_t& numTextureIds = *(uint32_t*)ptxi->maindata.data();
+	numTextureIds += 1;
 
 	Chunk& chk = scene.g_palPack.subchunks.emplace_back();
 	Chunk& dxtchk = scene.g_dxtPack.subchunks.emplace_back();
 	ImportTexture(filepath, chk, dxtchk, numTextureIds);
-	numTextureIds += 1;
 }
 
 void ImportTexture(const std::filesystem::path& filepath, Chunk& chk, Chunk& dxtchk, int texid)

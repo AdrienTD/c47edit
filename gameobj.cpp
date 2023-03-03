@@ -116,6 +116,7 @@ static void ReadAssetPacks(Scene* scene, mz_zip_archive* zip)
 
 	if (scene->g_palPack.tag != 'PAL') ferr("Not a PAL chunk in Repeat.PAL");
 	if (scene->g_dxtPack.tag != 'DXT') ferr("Not a DXT chunk in Repeat.DXT");
+	assert(scene->g_palPack.subchunks.size() == scene->g_dxtPack.subchunks.size());
 }
 
 void Scene::LoadSceneSPK(const char *fn)
