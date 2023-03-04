@@ -27,6 +27,7 @@
 #include <gl/GL.h>
 #include <gl/GLU.h>
 #include <commdlg.h>
+#include <mmsystem.h>
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_opengl2.h"
 #include "imgui/imgui_impl_win32.h"
@@ -47,6 +48,9 @@ bool renderExc = false;
 GameObject *bestpickobj = 0;
 float bestpickdist;
 Vector3 bestpickintersectionpnt(0, 0, 0);
+
+bool wndShowTextures = false;
+bool wndShowSounds = false;
 
 extern HWND hWindow;
 
@@ -502,18 +506,20 @@ void IGObjectInfo()
 						uint32_t height = std::get<uint32_t>((e + 3)->value);
 						uint32_t opacity = std::get<uint32_t>((e + 6)->value);
 						uint32_t format = std::get<uint32_t>((e + 12)->value);
-						if (ImGui::Button("Export image")) {
-							auto fname = std::filesystem::path(name).stem().string() + ".png";
-							auto fpath = GuiUtils::SaveDialogBox("PNG Image\0*.png\0\0\0\0", "png", fname.c_str());
-							if (!fpath.empty()) {
-								auto image = UnsplitDblImage(selobj, data.data(), format, width, height, opacity);
-								stbi_write_png(fpath.string().c_str(), width, height, 4, image.data(), 0);
+						if (!data.empty()) {
+							if (ImGui::Button("Export image")) {
+								auto fname = std::filesystem::path(name).stem().string() + ".png";
+								auto fpath = GuiUtils::SaveDialogBox("PNG Image\0*.png\0\0\0\0", "png", fname.c_str());
+								if (!fpath.empty()) {
+									auto image = UnsplitDblImage(selobj, data.data(), format, width, height, opacity);
+									stbi_write_png(fpath.string().c_str(), width, height, 4, image.data(), 0);
+								}
 							}
+							GLuint tex = GetDblImageTexture(selobj, data.data(), format, width, height, opacity);
+							int dispHeight = std::min(128u, height);
+							int dispWidth = width * dispHeight / height;
+							ImGui::Image((void*)tex, ImVec2(dispWidth, dispHeight));
 						}
-						GLuint tex = GetDblImageTexture(selobj, data.data(), format, width, height, opacity);
-						int dispHeight = std::min(128u, height);
-						int dispWidth = width * dispHeight / height;
-						ImGui::Image((void*)tex, ImVec2(dispWidth, dispHeight));
 					}
 					break;
 				}
@@ -688,7 +694,7 @@ void IGTest()
 void IGTextures()
 {
 	ImGui::SetNextWindowSize(ImVec2(512.0f, 350.0f), ImGuiCond_FirstUseEver);
-	ImGui::Begin("Textures");
+	ImGui::Begin("Textures", &wndShowTextures);
 
 	if (ImGui::Button("Add")) {
 		auto filepath = GuiUtils::OpenDialogBox("Image\0*.png;*.bmp;*.jpg;*.jpeg;*.gif\0\0\0\0", "png");
@@ -767,6 +773,90 @@ void IGTextures()
 		ImGui::EndTable();
 	}
 
+	ImGui::End();
+}
+
+void IGSounds()
+{
+	static int selectedSound = -1;
+	Chunk* ands = g_scene.spkchk->findSubchunk('SDNA');
+	if (!ands) return;
+	Chunk* wavc = ands->findSubchunk('CVAW');
+	if (!wavc) return;
+	int32_t numSounds = *(uint32_t*)wavc->multidata[1].data();
+	assert(wavc->multidata.size() == 2 + 2 * numSounds);
+	assert((size_t)numSounds == g_scene.g_wavPack.subchunks.size());
+
+	ImGui::SetNextWindowSize(ImVec2(512.0f, 350.0f), ImGuiCond_FirstUseEver);
+	ImGui::Begin("Sounds", &wndShowSounds);
+	ImGui::BeginDisabled(!(selectedSound >= 0 && selectedSound < numSounds));
+	if (ImGui::Button("Replace")) {
+		auto fpath = GuiUtils::OpenDialogBox("Sound Wave file (*.wav)\0*.WAV\0\0\0", "wav");
+		if (!fpath.empty()) {
+			Chunk& chk = g_scene.g_wavPack.subchunks[selectedSound];
+			FILE* file;
+			_wfopen_s(&file, fpath.c_str(), L"rb");
+			if (file) {
+				fseek(file, 0, SEEK_END);
+				size_t len = ftell(file);
+				fseek(file, 0, SEEK_SET);
+				chk.maindata.resize(len);
+				fread(chk.maindata.data(), len, 1, file);
+				fclose(file);
+			}
+		}
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Export")) {
+		const char* sndName = (const char*)wavc->multidata[2 + 2 * selectedSound + 1].data();
+		auto fpath = GuiUtils::SaveDialogBox("Sound Wave file (*.wav)\0*.WAV\0\0\0", "wav", std::filesystem::path(sndName).filename());
+		if (!fpath.empty()) {
+			Chunk& chk = g_scene.g_wavPack.subchunks[selectedSound];
+			FILE* file;
+			_wfopen_s(&file, fpath.c_str(), L"wb");
+			if (file) {
+				fwrite(chk.maindata.data(), chk.maindata.size(), 1, file);
+				fclose(file);
+			}
+		}
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	if (ImGui::Button("Export all")) {
+		auto dirpath = GuiUtils::SelectFolderDialogBox("Export all WAV sounds to:\n(this will also create subfolders)");
+		if (!dirpath.empty()) {
+			for (int i = 0; i < numSounds; ++i) {
+				Chunk& chk = g_scene.g_wavPack.subchunks[i];
+				const char* sndName = (const char*)wavc->multidata[2 + 2 * i + 1].data();
+				auto fpath = dirpath / std::filesystem::path(sndName).relative_path();
+				std::filesystem::create_directories(fpath.parent_path());
+				FILE* file;
+				_wfopen_s(&file, fpath.c_str(), L"wb");
+				if (file) {
+					fwrite(chk.maindata.data(), chk.maindata.size(), 1, file);
+					fclose(file);
+				}
+			}
+		}
+	}
+	ImGui::BeginChild("SoundList");
+	for (int i = 0; i < numSounds; ++i) {
+		Chunk& chk = g_scene.g_wavPack.subchunks[i];
+		uint32_t sndId = *(uint32_t*)wavc->multidata[2 + 2 * i].data();
+		const char* sndName = (const char*)wavc->multidata[2 + 2 * i + 1].data();
+		ImGui::PushID(i);
+		if (ImGui::Selectable("##Sound", selectedSound == i)) {
+			selectedSound = i;
+			// copy for playing, to prevent sound corruption when sound is replaced/deleted while being played
+			static Chunk::DataBuffer playingWav;
+			playingWav = chk.maindata;
+			PlaySoundA((const char*)chk.maindata.data(), nullptr, SND_MEMORY | SND_ASYNC);
+		}
+		ImGui::SameLine();
+		ImGui::Text("%3i: %s", sndId, sndName);
+		ImGui::PopID();
+	}
+	ImGui::EndChild();
 	ImGui::End();
 }
 
@@ -994,7 +1084,16 @@ int main(int argc, char* argv[])
 //#if 1
 			IGTest();
 //#endif
-			IGTextures();
+			if(wndShowTextures) IGTextures();
+			if(wndShowSounds) IGSounds();
+			if (ImGui::BeginMainMenuBar()) {
+				if (ImGui::BeginMenu("Tools")) {
+					ImGui::MenuItem("Textures", nullptr, &wndShowTextures);
+					ImGui::MenuItem("Sounds", nullptr, &wndShowSounds);
+					ImGui::EndMenu();
+				}
+				ImGui::EndMainMenuBar();
+			}
 			ImGui::EndFrame();
 
 			BeginDrawing();
