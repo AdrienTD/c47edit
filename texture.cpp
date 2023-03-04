@@ -141,6 +141,8 @@ void ImportTexture(const std::filesystem::path& filepath, Chunk& chk, Chunk& dxt
 	str = dxtdata.str();
 	dxtchk.maindata.resize(str.size());
 	memcpy(dxtchk.maindata.data(), str.data(), str.size());
+
+	stbi_image_free(pixels);
 }
 
 DynArray<uint32_t> ConvertTextureToRGBA8(Chunk* texChunk) {

@@ -32,6 +32,7 @@
 #include "imgui/imgui_impl_opengl2.h"
 #include "imgui/imgui_impl_win32.h"
 
+#include <stb_image.h>
 #include <stb_image_write.h>
 
 GameObject *selobj = 0, *viewobj = 0;
@@ -258,10 +259,79 @@ std::vector<uint32_t> UnsplitDblImage(GameObject* obj, void* data, int type, int
 	return unpacked;
 }
 
-GLuint GetDblImageTexture(GameObject* obj, void* data, int type, int width, int height, bool opacity) {
+std::vector<uint8_t> SplitDblImage(uint32_t* image, int width, int height) {
+	// NOTE: Texture pieces can only have a max size of 256x256 pixels.
+	// For D3D and OGL renderers, pieces can be non power of 2.
+	// For Glide, they HAVE to be power of 2.
+	// Hence:
+	// This algorithm will split image in 256x256 textures, remaining are upped to power of 2.
+	// Not exactly how the original dbl images were splitted by devs, but good enough.
+
+	std::vector<uint8_t> buffer;
+	auto writeAny = [&buffer](const auto& val) {uint8_t* ptr = (uint8_t*)&val; buffer.insert(buffer.end(), ptr, ptr + sizeof(val)); };
+	auto write16 = [&](int16_t val) {writeAny(val); };
+	auto write32 = [&](int32_t val) {writeAny(val); };
+	auto bitceil = [](uint32_t val) {
+		for (uint32_t t = 0x80000000; t != 0; t >>= 1) {
+			if (t & val) {
+				return (t == val) ? t : (t << 1);
+			}
+		}
+		return 0u;
+	};
+
+	static constexpr int MAX_LENGTH = 256;
+	int numQuadsX = width / MAX_LENGTH + ((width % MAX_LENGTH) ? 1 : 0);
+	int numQuadsY = height / MAX_LENGTH + ((height % MAX_LENGTH) ? 1 : 0);
+	int numQuads = numQuadsX * numQuadsY;
+	int numVertices = (numQuadsX + 1) * (numQuadsY + 1);
+	write32(numQuads);
+	write32(numVertices);
+	for (int y = 0; y < numQuadsY; ++y) {
+		for (int x = 0; x < numQuadsX; ++x) {
+			write32((y + 1) * (numQuadsX + 1) + x);
+			write32((y + 1) * (numQuadsX + 1) + x + 1);
+			write32(y * (numQuadsX + 1) + x + 1);
+			write32(y * (numQuadsX + 1) + x);
+		}
+	}
+	for (int y = 0; y < numQuadsY + 1; ++y) {
+		for (int x = 0; x < numQuadsX + 1; ++x) {
+			write32(std::min(x * MAX_LENGTH, width));
+			write32(std::min(y * MAX_LENGTH, height));
+		}
+	}
+	for (int y = 0; y < numQuadsY; ++y) {
+		for (int x = 0; x < numQuadsX; ++x) {
+			int px0 = x * MAX_LENGTH;
+			int py0 = y * MAX_LENGTH;
+			int px1 = std::min((x + 1) * MAX_LENGTH, width);
+			int py1 = std::min((y + 1) * MAX_LENGTH, height);
+			int sqwidth = px1 - px0;
+			int sqheight = py1 - py0;
+			int texwidth = bitceil(sqwidth);
+			int texheight = bitceil(sqheight);
+			write16(texwidth);
+			write16(texheight);
+			write16(sqwidth);
+			write16(sqheight);
+			for (int v = py0; v < py0+texheight; ++v) {
+				for (int u = px0; u < px0+texwidth; ++u) {
+					if (u < px1 && v < py1)
+						write32(swap_rb(image[v * width + u]) ^ 0xFF000000);
+					else
+						write32(0);
+				}
+			}
+		}
+	}
+	return buffer;
+}
+
+GLuint GetDblImageTexture(GameObject* obj, void* data, int type, int width, int height, bool opacity, bool refresh) {
 	static GameObject* previousObj = nullptr;
 	static GLuint tex = 0;
-	if (obj == previousObj)
+	if (!refresh && obj == previousObj)
 		return tex;
 	if (tex)
 		glDeleteTextures(1, &tex);
@@ -502,11 +572,32 @@ void IGObjectInfo()
 					}
 					if (name == "Squares") {
 						std::string& name = std::get<std::string>((e + 1)->value);
-						uint32_t width = std::get<uint32_t>((e + 2)->value);
-						uint32_t height = std::get<uint32_t>((e + 3)->value);
-						uint32_t opacity = std::get<uint32_t>((e + 6)->value);
-						uint32_t format = std::get<uint32_t>((e + 12)->value);
+						uint32_t& width = std::get<uint32_t>((e + 2)->value);
+						uint32_t& height = std::get<uint32_t>((e + 3)->value);
+						uint32_t& picSplitX = std::get<uint32_t>((e + 4)->value);
+						uint32_t& picSplitY = std::get<uint32_t>((e + 5)->value);
+						uint32_t& opacity = std::get<uint32_t>((e + 6)->value);
+						uint32_t& format = std::get<uint32_t>((e + 12)->value);
+						uint32_t& picSize = std::get<uint32_t>((e + 13)->value);
+						bool refresh = false;
+						if (ImGui::Button("Import image")) {
+							auto fpath = GuiUtils::OpenDialogBox("PNG Image\0*.png\0\0\0\0", "png");
+							if (!fpath.empty()) {
+								int impWidth, impHeight, impChannels;
+								auto image = stbi_load(fpath.string().c_str(), &impWidth, &impHeight, &impChannels, 4);
+								data = SplitDblImage((uint32_t*)image, impWidth, impHeight);
+								width = impWidth;
+								height = impHeight;
+								picSplitX = 0;
+								picSplitY = 0;
+								format = 0;
+								picSize = 0;
+								stbi_image_free(image);
+								refresh = true;
+							}
+						}
 						if (!data.empty()) {
+							ImGui::SameLine();
 							if (ImGui::Button("Export image")) {
 								auto fname = std::filesystem::path(name).stem().string() + ".png";
 								auto fpath = GuiUtils::SaveDialogBox("PNG Image\0*.png\0\0\0\0", "png", fname.c_str());
@@ -515,7 +606,7 @@ void IGObjectInfo()
 									stbi_write_png(fpath.string().c_str(), width, height, 4, image.data(), 0);
 								}
 							}
-							GLuint tex = GetDblImageTexture(selobj, data.data(), format, width, height, opacity);
+							GLuint tex = GetDblImageTexture(selobj, data.data(), format, width, height, opacity, refresh);
 							int dispHeight = std::min(128u, height);
 							int dispWidth = width * dispHeight / height;
 							ImGui::Image((void*)tex, ImVec2(dispWidth, dispHeight));
