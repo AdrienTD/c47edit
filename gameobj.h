@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <variant>
 #include <vector>
@@ -15,6 +16,7 @@
 
 struct GameObject;
 struct Chunk;
+struct Scene;
 
 class GORef
 {
@@ -51,11 +53,21 @@ struct Light
 	uint32_t param[7];
 };
 
+struct DBLEntry;
+
+struct DBLList {
+	int flags = 0;
+	std::vector<DBLEntry> entries;
+
+	void load(uint8_t* ptr, const std::map<uint32_t, GameObject*>& idobjmap);
+	std::string save();
+};
+
 struct DBLEntry
 {
 	int type = 0;
 	int flags = 0;
-	using VariantType = std::variant<std::monostate, double, float, uint32_t, std::string, std::vector<uint8_t>, GORef, std::vector<GORef>>;
+	using VariantType = std::variant<std::monostate, double, float, uint32_t, std::string, std::vector<uint8_t>, GORef, std::vector<GORef>, DBLList>;
 	VariantType value;
 
 	static const char* getTypeName(int type);
@@ -80,8 +92,7 @@ struct GameObject
 
 	Light *light = nullptr;
 
-	std::vector<DBLEntry> dbl;
-	uint32_t dblflags = 0;
+	DBLList dbl;
 
 	uint32_t refcount = 0;
 

@@ -245,66 +245,8 @@ void Scene::LoadSceneSPK(const char *fn)
 				l->param[i] = p[6 + i];
 		}
 
-		char *dpbeg = (char*)pdbl->maindata.data() + p[0];
-		uint32_t ds = *(uint32_t*)dpbeg & 0xFFFFFF;
-		o->dblflags = (*(uint32_t*)dpbeg >> 24) & 255;
-		char *dp = dpbeg + 4;
-		while (dp - dpbeg < ds)
-		{
-			DBLEntry &e = o->dbl.emplace_back();
-			e.type = *dp & 0x3F;
-			e.flags = *dp & 0xC0;
-			dp++;
-			switch (e.type)
-			{
-			case 0:
-				break;
-			case 1:
-				e.value = *(double*)dp;
-				dp += 8;
-				break;
-			case 2:
-				e.value = *(float*)dp;
-				dp += 4;
-				break;
-			case 3:
-			case 0xA:
-			case 0xB:
-			case 0xC:
-				e.value = *(uint32_t*)dp;
-				dp += 4;
-				break;
-			case 4:
-			case 5:
-				e.value.emplace<std::string>(dp);
-				while (*(dp++));
-				break;
-			case 6:
-				break;
-			case 7: {
-				auto datsize = *(uint32_t*)dp - 4;
-				e.value.emplace<std::vector<uint8_t>>(dp + 4, dp + 4 + datsize);
-				dp += *(uint32_t*)dp;
-				break;
-			}
-			case 8:
-				e.value.emplace<GORef>(idobjmap[*(uint32_t*)dp]);
-				dp += 4;
-				break;
-			case 9: {
-				uint32_t nobjs = (*(uint32_t*)dp - 4) / 4;
-				std::vector<GORef>& objlist = e.value.emplace<std::vector<GORef>>();
-				for (uint32_t i = 0; i < nobjs; i++)
-					objlist.emplace_back(idobjmap[*(uint32_t*)(dp+4+4*i)]);
-				dp += *(uint32_t*)dp;
-				break;
-			}
-			case 0x3F:
-				break;
-			default:
-				ferr("Unknown DBL entry type!");
-			}
-		}
+		uint8_t* dpbeg = pdbl->maindata.data() + p[0];
+		o->dbl.load(dpbeg, idobjmap);
 
 		if (c->subchunks.size() > 0)
 		{
@@ -344,7 +286,7 @@ std::map<GameObject*, uint32_t> objidmap;
 std::map<std::array<float, 3>, uint32_t> g_sav_posmap;
 std::map<std::array<uint32_t, 4>, uint32_t> g_sav_mtxmap;
 std::map<std::string, uint32_t> g_sav_nammap;
-std::unordered_map<std::pair<uint32_t, std::string>, uint32_t, DBLHash> g_sav_dblmap;
+std::unordered_map<std::string, uint32_t> g_sav_dblmap;
 
 uint32_t sbtell(std::stringbuf* sb);
 
@@ -383,71 +325,14 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	else
 		mtxoff = miter->second;
 
-	std::stringbuf dblsav;
-	for (auto e = o->dbl.begin(); e != o->dbl.end(); e++)
-	{
-		uint8_t typ = e->type | e->flags;
-		dblsav.sputc(typ);
-		switch (e->type)
-		{
-		case 0:
-			break;
-		case 1:
-			dblsav.sputn((char*)&std::get<double>(e->value), 8); break;
-		case 2:
-			dblsav.sputn((char*)&std::get<float>(e->value), 4); break;
-		case 3:
-		case 0xA:
-		case 0xB:
-		case 0xC:
-			dblsav.sputn((char*)&std::get<uint32_t>(e->value), 4); break;
-		case 4:
-		case 5: {
-			auto& str = std::get<std::string>(e->value);
-			dblsav.sputn(str.data(), str.size() + 1); break;
-		}
-		case 6:
-		case 0x3f:
-			break;
-		case 7:
-		{
-			auto& vec = std::get<std::vector<uint8_t>>(e->value);
-			uint32_t siz = (uint32_t)vec.size() + 4;
-			dblsav.sputn((char*)&siz, 4);
-			dblsav.sputn((char*)vec.data(), vec.size());
-			break;
-		}
-		case 8:
-		{
-			auto& obj = std::get<GORef>(e->value);
-			uint32_t x = objidmap[obj.get()];
-			dblsav.sputn((char*)&x, 4); break;
-		}
-		case 9:
-		{
-			auto& vec = std::get<std::vector<GORef>>(e->value);
-			uint32_t siz = (uint32_t)vec.size() * 4 + 4;
-			dblsav.sputn((char*)&siz, 4);
-			for (auto& obj : vec) {
-				uint32_t x = objidmap[obj.get()];
-				dblsav.sputn((char*)&x, 4);
-			}
-			break;
-		}
-		}
-	}
 	uint32_t dbloff;
-	std::pair<uint32_t, std::string> cdbl(o->dblflags, dblsav.str());
-	auto diter = g_sav_dblmap.find(cdbl);
+	std::string dblsav = o->dbl.save();
+	auto diter = g_sav_dblmap.find(dblsav);
 	if (diter == g_sav_dblmap.end())
 	{
 		dbloff = sbtell(&dblbuf);
-		g_sav_dblmap.insert(std::make_pair(cdbl, dbloff)); //dblmap[cdbl] = dbloff;
-
-		uint32_t siz = sbtell(&dblsav) + 4;
-		dblbuf.sputn((char*)&siz, 3);
-		dblbuf.sputn((char*)&o->dblflags, 1);
-		dblbuf.sputn(cdbl.second.data(), siz - 4);
+		dblbuf.sputn(dblsav.data(), dblsav.size());
+		g_sav_dblmap.insert(std::make_pair(std::move(dblsav), dbloff));
 	}
 	else
 		dbloff = diter->second;
@@ -688,10 +573,154 @@ void Scene::GiveObject(GameObject *o, GameObject *t)
 const char * DBLEntry::getTypeName(int type)
 {
 	type &= 0x3F;
-	static const char* names[] = { "0", "double", "float", "int", "char*", "5", "EndCpnt", "7", "ZGEOMREF", "ZGEOMREFTAB", "MSG", "SNDREF", "INTC" };
+	static const char* names[] = { "0", "double", "float", "int", "char*", "5", "EndCpnt", "7", "ZGEOMREF", "ZGEOMREFTAB", "MSG", "SNDREF", "Script" };
 	if (type == 0x3F)
 		return "EndDBL";
 	if (type < std::size(names))
 		return names[type];
 	return "?";
+}
+
+void DBLList::load(uint8_t* dpbeg, const std::map<uint32_t, GameObject*>& idobjmap)
+{
+	auto decodeRef = [&idobjmap](uint32_t id) -> GameObject* {
+		if (id != 0)
+			return idobjmap.at(id);
+		else
+			return nullptr;
+	};
+
+	uint32_t ds = *(uint32_t*)dpbeg & 0xFFFFFF;
+	flags = (*(uint32_t*)dpbeg >> 24) & 255;
+	uint8_t* dp = dpbeg + 4;
+	while (dp - dpbeg < ds)
+	{
+		DBLEntry& e = entries.emplace_back();
+		e.type = *dp & 0x3F;
+		e.flags = *dp & 0xC0;
+		dp++;
+		switch (e.type)
+		{
+		case 0:
+			break;
+		case 1:
+			e.value = *(double*)dp;
+			dp += 8;
+			break;
+		case 2:
+			e.value = *(float*)dp;
+			dp += 4;
+			break;
+		case 3:
+		case 0xA:
+		case 0xB:
+			e.value = *(uint32_t*)dp;
+			dp += 4;
+			break;
+		case 4:
+		case 5:
+			e.value.emplace<std::string>((const char*)dp);
+			while (*(dp++));
+			break;
+		case 6:
+			break;
+		case 7: {
+			auto datsize = *(uint32_t*)dp - 4;
+			e.value.emplace<std::vector<uint8_t>>(dp + 4, dp + 4 + datsize);
+			dp += *(uint32_t*)dp;
+			break;
+		}
+		case 8:
+			e.value.emplace<GORef>(decodeRef(*(uint32_t*)dp));
+			dp += 4;
+			break;
+		case 9: {
+			uint32_t nobjs = (*(uint32_t*)dp - 4) / 4;
+			std::vector<GORef>& objlist = e.value.emplace<std::vector<GORef>>();
+			for (uint32_t i = 0; i < nobjs; i++)
+				objlist.emplace_back(decodeRef(*(uint32_t*)(dp + 4 + 4 * i)));
+			dp += *(uint32_t*)dp;
+			break;
+		}
+		case 0xC: {
+			DBLList& sublist = e.value.emplace<DBLList>();
+			uint32_t dblsize = *(uint32_t*)dp;
+			sublist.load(dp, idobjmap);
+			dp += dblsize;
+			break;
+		}
+		case 0x3F:
+			break;
+		default:
+			ferr("Unknown DBL entry type!");
+		}
+	}
+}
+
+std::string DBLList::save()
+{
+	std::stringbuf dblsav;
+	uint32_t zero = 0;
+	dblsav.sputn((char*)&zero, 4);
+	for (auto e = entries.begin(); e != entries.end(); e++)
+	{
+		uint8_t typ = e->type | e->flags;
+		dblsav.sputc(typ);
+		switch (e->type)
+		{
+		case 0:
+			break;
+		case 1:
+			dblsav.sputn((char*)&std::get<double>(e->value), 8); break;
+		case 2:
+			dblsav.sputn((char*)&std::get<float>(e->value), 4); break;
+		case 3:
+		case 0xA:
+		case 0xB:
+			dblsav.sputn((char*)&std::get<uint32_t>(e->value), 4); break;
+		case 4:
+		case 5: {
+			auto& str = std::get<std::string>(e->value);
+			dblsav.sputn(str.data(), str.size() + 1); break;
+		}
+		case 6:
+		case 0x3f:
+			break;
+		case 7:
+		{
+			auto& vec = std::get<std::vector<uint8_t>>(e->value);
+			uint32_t siz = (uint32_t)vec.size() + 4;
+			dblsav.sputn((char*)&siz, 4);
+			dblsav.sputn((char*)vec.data(), vec.size());
+			break;
+		}
+		case 8:
+		{
+			auto& obj = std::get<GORef>(e->value);
+			uint32_t x = objidmap[obj.get()];
+			dblsav.sputn((char*)&x, 4); break;
+		}
+		case 9:
+		{
+			auto& vec = std::get<std::vector<GORef>>(e->value);
+			uint32_t siz = (uint32_t)vec.size() * 4 + 4;
+			dblsav.sputn((char*)&siz, 4);
+			for (auto& obj : vec) {
+				uint32_t x = objidmap[obj.get()];
+				dblsav.sputn((char*)&x, 4);
+			}
+			break;
+		}
+		case 0xC:
+		{
+			auto& sublist = std::get<DBLList>(e->value);
+			auto subdblsav = sublist.save();
+			dblsav.sputn((const char*)subdblsav.data(), subdblsav.size());
+			break;
+		}
+		}
+	}
+	std::string str = dblsav.str();
+	*(uint32_t*)str.data() = (uint32_t)str.size() | (flags << 24);
+	return str;
 }

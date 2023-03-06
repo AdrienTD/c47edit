@@ -142,7 +142,7 @@ const char* ClassInfo::GetObjTypeString(int typeId)
 std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj)
 {
 	static const ClassMember emptyMember = { "", "" };
-	static const ClassMember initialMembers[3] = { {"", "Components"}, {"", "Head1"}, {"", "Head2"} }; // some objects might have less or more initial members...
+	static const ClassMember initialMembers[3] = { {"CHAR*", "Components"}, {"ENUM", "Create", "", {"ROOT", "CLIP"}}, {"SCRIPT", "ZGeomScript"}}; // some objects might have less or more initial members...
 	std::vector<ClassInfo::ObjectMember> members = { {&initialMembers[0]}, {&initialMembers[1]}, {&initialMembers[2]}, {&emptyMember} };
 	auto onClass = [&members](const auto& rec, const nlohmann::json& cl) -> void {
 		if (cl.at("name") == "ZGEOM")
@@ -163,8 +163,8 @@ std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj)
 	};
 	onClass(onClass, *g_classInfo_idJsonMap.at(obj->type));
 
-	if (!obj->dbl.empty()) {
-		const auto& cpntList = std::get<std::string>(obj->dbl[0].value);
+	if (!obj->dbl.entries.empty()) {
+		const auto& cpntList = std::get<std::string>(obj->dbl.entries[0].value);
 		const char* ptr = cpntList.c_str(), *beg;
 		auto skipWhitespace = [&ptr]() {while (*ptr && *ptr == ' ') ++ptr; };
 		auto skipWord = [&ptr]() {while (*ptr && *ptr != ' ' && *ptr != ',') ++ptr; };

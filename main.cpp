@@ -346,9 +346,195 @@ GLuint GetDblImageTexture(GameObject* obj, void* data, int type, int width, int 
 	return tex;
 }
 
+static GameObject* nextobjtosel = 0;
+
+void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members)
+{
+	size_t memberIndex = 0;
+	ImGui::InputScalar("DBL Flags", ImGuiDataType_U32, &dbl.flags);
+	int i = 0;
+	for (auto e = dbl.entries.begin(); e != dbl.entries.end(); e++)
+	{
+		static const ClassInfo::ClassMember oobClassMember = { "", "OOB" };
+		static const ClassInfo::ObjectMember oobObjMember = { &oobClassMember };
+		const auto& [mem, arrayIndex] = (memberIndex < members.size()) ? members[memberIndex++] : oobObjMember;
+		std::string nameIndexed;
+		if (arrayIndex != -1)
+			nameIndexed = mem->name + '[' + std::to_string(arrayIndex) + ']';
+		const std::string& name = (arrayIndex != -1) ? nameIndexed : mem->name;
+		ImGui::PushID(i++);
+		if (mem->isProtected)
+			ImGui::BeginDisabled();
+		ImGui::Text("%1X", e->flags >> 4);
+		ImGui::SameLine();
+		switch (e->type)
+		{
+		case 0:
+			ImGui::Text("0"); break;
+		case 1:
+			ImGui::InputDouble(name.c_str(), &std::get<double>(e->value)); break;
+		case 2:
+			ImGui::InputFloat(name.c_str(), &std::get<float>(e->value)); break;
+		case 3:
+		case 0xA:
+		case 0xB:
+		{
+			uint32_t& ref = std::get<uint32_t>(e->value);
+			if (mem->type == "BOOL") {
+				bool val = ref;
+				if (ImGui::Checkbox(name.c_str(), &val))
+					ref = val ? 1 : 0;
+			}
+			else if (mem->type == "ENUM") {
+				if (ImGui::BeginCombo(name.c_str(), mem->valueChoices[ref].c_str())) {
+					for (size_t i = 0; i < mem->valueChoices.size(); ++i)
+						if (ImGui::Selectable(mem->valueChoices[i].c_str(), ref == (uint32_t)i))
+							ref = (uint32_t)i;
+					ImGui::EndCombo();
+				}
+			}
+			else {
+				ImGui::InputInt(name.c_str(), (int*)&ref);
+			}
+			break;
+		}
+		case 4:
+		case 5:
+		{
+			auto& str = std::get<std::string>(e->value);
+			//IGStdStringInput((e->type == 5) ? "Filename" : "String", str);
+			IGStdStringInput(name.c_str(), str);
+			break;
+		}
+		case 6:
+			ImGui::Separator(); break;
+		case 7: {
+			auto& data = std::get<std::vector<uint8_t>>(e->value);
+			ImGui::Text("Data (%s): %zu bytes", name.c_str(), data.size());
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Export")) {
+				FILE* file;
+				fopen_s(&file, "c47data.bin", "wb");
+				fwrite(data.data(), data.size(), 1, file);
+				fclose(file);
+			}
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Import")) {
+				FILE* file;
+				fopen_s(&file, "c47data.bin", "rb");
+				fseek(file, 0, SEEK_END);
+				auto len = ftell(file);
+				fseek(file, 0, SEEK_SET);
+				data.resize(len);
+				fread(data.data(), data.size(), 1, file);
+				fclose(file);
+			}
+			if (name == "Squares") {
+				std::string& name = std::get<std::string>((e + 1)->value);
+				uint32_t& width = std::get<uint32_t>((e + 2)->value);
+				uint32_t& height = std::get<uint32_t>((e + 3)->value);
+				uint32_t& picSplitX = std::get<uint32_t>((e + 4)->value);
+				uint32_t& picSplitY = std::get<uint32_t>((e + 5)->value);
+				uint32_t& opacity = std::get<uint32_t>((e + 6)->value);
+				uint32_t& format = std::get<uint32_t>((e + 12)->value);
+				uint32_t& picSize = std::get<uint32_t>((e + 13)->value);
+				bool refresh = false;
+				if (ImGui::Button("Import image")) {
+					auto fpath = GuiUtils::OpenDialogBox("PNG Image\0*.png\0\0\0\0", "png");
+					if (!fpath.empty()) {
+						int impWidth, impHeight, impChannels;
+						auto image = stbi_load(fpath.string().c_str(), &impWidth, &impHeight, &impChannels, 4);
+						data = SplitDblImage((uint32_t*)image, impWidth, impHeight);
+						width = impWidth;
+						height = impHeight;
+						picSplitX = 0;
+						picSplitY = 0;
+						format = 0;
+						picSize = 0;
+						stbi_image_free(image);
+						refresh = true;
+					}
+				}
+				if (!data.empty()) {
+					ImGui::SameLine();
+					if (ImGui::Button("Export image")) {
+						auto fname = std::filesystem::path(name).stem().string() + ".png";
+						auto fpath = GuiUtils::SaveDialogBox("PNG Image\0*.png\0\0\0\0", "png", fname.c_str());
+						if (!fpath.empty()) {
+							auto image = UnsplitDblImage(selobj, data.data(), format, width, height, opacity);
+							stbi_write_png(fpath.string().c_str(), width, height, 4, image.data(), 0);
+						}
+					}
+					GLuint tex = GetDblImageTexture(selobj, data.data(), format, width, height, opacity, refresh);
+					int dispHeight = std::min(128u, height);
+					int dispWidth = width * dispHeight / height;
+					ImGui::Image((void*)tex, ImVec2(dispWidth, dispHeight));
+				}
+			}
+			break;
+		}
+		case 8:
+			if (auto& obj = std::get<GORef>(e->value); obj.valid()) {
+				ImGui::LabelText(name.c_str(), "Object %s::%s", ClassInfo::GetObjTypeString(obj->type), obj->name.c_str());
+				if (ImGui::IsItemClicked())
+					nextobjtosel = obj.get();
+			}
+			else
+				ImGui::LabelText(name.c_str(), "Object <Invalid>");
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("GameObject"))
+				{
+					e->value.emplace<GORef>(*(GameObject**)pl->Data);
+				}
+				ImGui::EndDragDropTarget();
+			}
+			break;
+		case 9: {
+			auto& vec = std::get<std::vector<GORef>>(e->value);
+			if (ImGui::BeginListBox("##Objlist", ImVec2(0, 64))) {
+				for (auto& obj : vec)
+				{
+					ImGui::Text("%s", obj->name.c_str());
+					if (ImGui::IsItemClicked())
+						nextobjtosel = obj.get();
+					if (ImGui::BeginDragDropTarget())
+					{
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("GameObject"))
+						{
+							obj = *(GameObject**)pl->Data;
+						}
+						ImGui::EndDragDropTarget();
+					}
+				}
+				ImGui::EndListBox();
+				ImGui::SameLine();
+				ImGui::Text("%s\n%zu objects", name.c_str(), vec.size());
+			}
+			break;
+		}
+		case 0xC: {
+			ImGui::Indent();
+			static const ClassInfo::ClassMember scriptHeader[2] = { {"", "ScriptFile"}, {"", "ScriptMembers"} };
+			static const std::vector<ClassInfo::ObjectMember> oScriptHeader = { {&scriptHeader[0]}, {&scriptHeader[1]} };
+			IGDBLList(std::get<DBLList>(e->value), oScriptHeader);
+			ImGui::Unindent();
+			break;
+		}
+		case 0x3F:
+			ImGui::Text("End"); break;
+		default:
+			ImGui::Text("Unknown type %u", e->type); break;
+		}
+		if (mem->isProtected)
+			ImGui::EndDisabled();
+		ImGui::PopID();
+	}
+}
+
 void IGObjectInfo()
 {
-	GameObject *nextobjtosel = 0;
+	nextobjtosel = 0;
 	ImGui::SetNextWindowPos(ImVec2(1005, 3), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSize(ImVec2(270, 445), ImGuiCond_FirstUseEver);
 	ImGui::Begin("Object information");
@@ -490,179 +676,7 @@ void IGObjectInfo()
 		if (ImGui::CollapsingHeader("DBL"))
 		{
 			auto members = ClassInfo::GetMemberNames(selobj);
-			size_t memberIndex = 0;
-			ImGui::InputScalar("Flags", ImGuiDataType_U32, &selobj->dblflags);
-			int i = 0;
-			for (auto e = selobj->dbl.begin(); e != selobj->dbl.end(); e++)
-			{
-				static const ClassInfo::ClassMember oobClassMember = { "", "OOB" };
-				static const ClassInfo::ObjectMember oobObjMember = { &oobClassMember };
-				const auto& [mem, arrayIndex] = (memberIndex < members.size()) ? members[memberIndex++] : oobObjMember;
-				std::string nameIndexed;
-				if (arrayIndex != -1)
-					nameIndexed = mem->name + '[' + std::to_string(arrayIndex) + ']';
-				const std::string& name = (arrayIndex != -1) ? nameIndexed : mem->name;
-				ImGui::PushID(i++);
-				if (mem->isProtected)
-					ImGui::BeginDisabled();
-				ImGui::Text("%1X", e->flags >> 4);
-				ImGui::SameLine();
-				switch (e->type)
-				{
-				case 0:
-					ImGui::Text("0"); break;
-				case 1:
-					ImGui::InputDouble(name.c_str(), &std::get<double>(e->value)); break;
-				case 2:
-					ImGui::InputFloat(name.c_str(), &std::get<float>(e->value)); break;
-				case 3:
-				case 0xA:
-				case 0xB:
-				case 0xC:
-				{
-					uint32_t& ref = std::get<uint32_t>(e->value);
-					if (mem->type == "BOOL") {
-						bool val = ref;
-						if (ImGui::Checkbox(name.c_str(), &val))
-							ref = val ? 1 : 0;
-					}
-					else if (mem->type == "ENUM") {
-						if (ImGui::BeginCombo(name.c_str(), mem->valueChoices[ref].c_str())) {
-							for (size_t i = 0; i < mem->valueChoices.size(); ++i)
-								if (ImGui::Selectable(mem->valueChoices[i].c_str(), ref == (uint32_t)i))
-									ref = (uint32_t)i;
-							ImGui::EndCombo();
-						}
-					}
-					else {
-						ImGui::InputInt(name.c_str(), (int*)&ref);
-					}
-					break;
-				}
-				case 4:
-				case 5:
-				{
-					auto& str = std::get<std::string>(e->value);
-					//IGStdStringInput((e->type == 5) ? "Filename" : "String", str);
-					IGStdStringInput(name.c_str(), str);
-					break;
-				}
-				case 6:
-					ImGui::Separator(); break;
-				case 7: {
-					auto& data = std::get<std::vector<uint8_t>>(e->value);
-					ImGui::Text("Data (%s): %zu bytes", name.c_str(), data.size());
-					ImGui::SameLine();
-					if (ImGui::SmallButton("Export")) {
-						FILE* file;
-						fopen_s(&file, "c47data.bin", "wb");
-						fwrite(data.data(), data.size(), 1, file);
-						fclose(file);
-					}
-					ImGui::SameLine();
-					if (ImGui::SmallButton("Import")) {
-						FILE* file;
-						fopen_s(&file, "c47data.bin", "rb");
-						fseek(file, 0, SEEK_END);
-						auto len = ftell(file);
-						fseek(file, 0, SEEK_SET);
-						data.resize(len);
-						fread(data.data(), data.size(), 1, file);
-						fclose(file);
-					}
-					if (name == "Squares") {
-						std::string& name = std::get<std::string>((e + 1)->value);
-						uint32_t& width = std::get<uint32_t>((e + 2)->value);
-						uint32_t& height = std::get<uint32_t>((e + 3)->value);
-						uint32_t& picSplitX = std::get<uint32_t>((e + 4)->value);
-						uint32_t& picSplitY = std::get<uint32_t>((e + 5)->value);
-						uint32_t& opacity = std::get<uint32_t>((e + 6)->value);
-						uint32_t& format = std::get<uint32_t>((e + 12)->value);
-						uint32_t& picSize = std::get<uint32_t>((e + 13)->value);
-						bool refresh = false;
-						if (ImGui::Button("Import image")) {
-							auto fpath = GuiUtils::OpenDialogBox("PNG Image\0*.png\0\0\0\0", "png");
-							if (!fpath.empty()) {
-								int impWidth, impHeight, impChannels;
-								auto image = stbi_load(fpath.string().c_str(), &impWidth, &impHeight, &impChannels, 4);
-								data = SplitDblImage((uint32_t*)image, impWidth, impHeight);
-								width = impWidth;
-								height = impHeight;
-								picSplitX = 0;
-								picSplitY = 0;
-								format = 0;
-								picSize = 0;
-								stbi_image_free(image);
-								refresh = true;
-							}
-						}
-						if (!data.empty()) {
-							ImGui::SameLine();
-							if (ImGui::Button("Export image")) {
-								auto fname = std::filesystem::path(name).stem().string() + ".png";
-								auto fpath = GuiUtils::SaveDialogBox("PNG Image\0*.png\0\0\0\0", "png", fname.c_str());
-								if (!fpath.empty()) {
-									auto image = UnsplitDblImage(selobj, data.data(), format, width, height, opacity);
-									stbi_write_png(fpath.string().c_str(), width, height, 4, image.data(), 0);
-								}
-							}
-							GLuint tex = GetDblImageTexture(selobj, data.data(), format, width, height, opacity, refresh);
-							int dispHeight = std::min(128u, height);
-							int dispWidth = width * dispHeight / height;
-							ImGui::Image((void*)tex, ImVec2(dispWidth, dispHeight));
-						}
-					}
-					break;
-				}
-				case 8:
-					if (auto& obj = std::get<GORef>(e->value); obj.valid()) {
-						ImGui::LabelText(name.c_str(), "Object %s::%s", ClassInfo::GetObjTypeString(obj->type), obj->name.c_str());
-						if (ImGui::IsItemClicked())
-							nextobjtosel = obj.get();
-					}
-					else
-						ImGui::LabelText(name.c_str(), "Object <Invalid>");
-					if (ImGui::BeginDragDropTarget())
-					{
-						if (const ImGuiPayload *pl = ImGui::AcceptDragDropPayload("GameObject"))
-						{
-							e->value.emplace<GORef>(*(GameObject**)pl->Data);
-						}
-						ImGui::EndDragDropTarget();
-					}
-					break;
-				case 9: {
-					auto& vec = std::get<std::vector<GORef>>(e->value);
-					if (ImGui::BeginListBox("##Objlist", ImVec2(0, 64))) {
-						for (auto& obj : vec)
-						{
-							ImGui::Text("%s", obj->name.c_str());
-							if (ImGui::IsItemClicked())
-								nextobjtosel = obj.get();
-							if (ImGui::BeginDragDropTarget())
-							{
-								if (const ImGuiPayload *pl = ImGui::AcceptDragDropPayload("GameObject"))
-								{
-									obj = *(GameObject**)pl->Data;
-								}
-								ImGui::EndDragDropTarget();
-							}
-						}
-						ImGui::EndListBox();
-						ImGui::SameLine();
-						ImGui::Text("%s\n%zu objects", name.c_str(), vec.size());
-					}
-					break;
-				}
-				case 0x3F:
-					ImGui::Text("End"); break;
-				default:
-					ImGui::Text("Unknown type %u", e->type); break;
-				}
-				if (mem->isProtected)
-					ImGui::EndDisabled();
-				ImGui::PopID();
-			}
+			IGDBLList(selobj->dbl, members);
 		}
 		if (selobj->mesh && ImGui::CollapsingHeader("Mesh"))
 		{
