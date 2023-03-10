@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <map>
 #include <string_view>
 #include <vector>
 #include "vecmat.h"
@@ -26,14 +27,21 @@ struct StringSplitter {
 
 struct ObjModel {
 	std::vector<Vector3> vertices;
-	std::vector<std::array<int, 3>> triangles;
+	std::vector<Vector3> texCoords;
+	std::vector<std::array<std::array<int, 3>, 3>> triangles;
 	struct Group {
 		std::string name;
 		int start, end;
 	};
 	std::vector<Group> groups;
 
+	struct Material {
+		std::string map_Kd;
+	};
+	std::map<std::string, Material> materials;
+
 	void load(const std::filesystem::path& filename);
+	void loadMaterialLib(const std::filesystem::path& filename);
 	ObjModel() {}
 	ObjModel(const std::filesystem::path& filename) { load(filename); }
 };

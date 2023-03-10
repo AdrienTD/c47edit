@@ -568,19 +568,22 @@ void IGObjectInfo()
 			auto filepath = GuiUtils::OpenDialogBox("Wavefront OBJ model\0*.OBJ\0\0\0", "obj");
 			if (!filepath.empty()) {
 				std::vector<Vector3> objVertices;
-				std::vector<uint16_t> triIndices;
-				std::vector<uint16_t> quadIndices;
+				std::vector<Vector3> objTexCoords;
+				std::vector<std::array<std::array<int, 3>, 3>> triangles;
+				std::vector<std::array<std::array<int, 3>, 4>> quads;
 				//std::vector<std::array<float, 8>> triUvs;
 				//std::vector<std::array<float, 8>> quadUvs;
 
 				ObjModel objmodel;
 				objmodel.load(filepath);
 				objVertices = std::move(objmodel.vertices);
+				objTexCoords = std::move(objmodel.texCoords);
 				for (auto& vec : objVertices)
 					vec *= Vector3(-1.0f, 1.0f, 1.0f);
-				for (auto& tri : objmodel.triangles) {
-					triIndices.insert(triIndices.end(), tri.begin(), tri.end());
-				}
+				//for (auto& tri : objmodel.triangles) {
+				//	triIndices.insert(triIndices.end(), {tri[0], tri[1], tri[2]});
+				//}
+				triangles = std::move(objmodel.triangles);
 
 				selobj->flags |= 0x20;
 				if (!selobj->mesh)
@@ -590,8 +593,8 @@ void IGObjectInfo()
 
 				Mesh* mesh = selobj->mesh;
 				mesh->numverts = std::size(objVertices);
-				mesh->numquads = std::size(quadIndices) / 4;
-				mesh->numtris = std::size(triIndices) / 3;
+				mesh->numquads = std::size(quads);
+				mesh->numtris = std::size(triangles);
 				int faceIndex = g_scene.pfac->maindata.size() / 2;
 				mesh->vertstart = g_scene.pver->maindata.size() / 4;
 				mesh->tristart = (mesh->numtris > 0) ? faceIndex : 0;
@@ -615,29 +618,51 @@ void IGObjectInfo()
 				float* uv2 = (float*)(puvc_newdata.data() + g_scene.puvc->maindata.size() + (mesh->numquads + mesh->numtris) * 4 * 8);
 
 				memcpy(verts, objVertices.data(), objVertices.size() * 12);
-				for (uint16_t x : triIndices)
-					*faces++ = 2 * x;
-				for (uint16_t x : quadIndices)
-					*faces++ = 2 * x;
+				for (auto& tri : triangles)
+					for (auto& [indPos, indTxc, indNrm] : tri)
+						*faces++ = 2 * indPos;
+				for (auto& quad : quads)
+					for (auto& [indPos, indTxc, indNrm] : quad)
+						*faces++ = 2 * indPos;
 				uint32_t numFaces = mesh->numquads + mesh->numtris;
 				ftxHead[0] = uv1 - (float*)puvc_newdata.data();
 				ftxHead[1] = uv2 - (float*)puvc_newdata.data();
 				ftxHead[2] = numFaces;
-				for (uint32_t f = 0; f < numFaces; ++f) {
+				size_t groupIndex = -1, triId = 0;
+				static constexpr uint16_t defaultTexId = 0x0135;
+				uint16_t texId = defaultTexId;
+				for (auto& tri : triangles) {
+					// find texture
+					while (groupIndex == -1 || triId >= objmodel.groups[groupIndex].end) {
+						groupIndex += 1;
+						texId = defaultTexId;
+						auto mit = objmodel.materials.find(objmodel.groups[groupIndex].name);
+						if (mit != objmodel.materials.end()) {
+							const std::string& texname = mit->second.map_Kd;
+							for (auto& texchk : g_scene.g_palPack.subchunks) {
+								const TexInfo* ti = (const TexInfo*)texchk.maindata.data();
+								if (ti->name == texname) {
+									texId = (uint16_t)ti->id;
+								}
+							}
+						}
+					}
+
 					*ftx++ = 0x00A0; // 0: no texture, 0x20 textured, 0x80 lighting/shading
 					*ftx++ = 0;
-					*ftx++ = 0x0135;
+					*ftx++ = texId; // 0x0135;
 					*ftx++ = 0xFFFF;
 					*ftx++ = 0;
 					*ftx++ = 0x0CF8;
-					*uv1++ = 0.0f; *uv1++ = 0.0f;
-					*uv1++ = 0.0f; *uv1++ = 1.0f;
-					*uv1++ = 1.0f; *uv1++ = 1.0f;
-					*uv1++ = 1.0f; *uv1++ = 0.0f;
-					*uv2++ = 0.0f; *uv2++ = 0.0f;
-					*uv2++ = 0.0f; *uv2++ = 1.0f;
-					*uv2++ = 1.0f; *uv2++ = 1.0f;
-					*uv2++ = 1.0f; *uv2++ = 0.0f;
+					const Vector3& txc0 = objTexCoords[tri[0][1]];
+					const Vector3& txc1 = objTexCoords[tri[1][1]];
+					const Vector3& txc2 = objTexCoords[tri[2][1]];
+					Vector3 txc3 = Vector3{ 0,0,0 };
+					for (const Vector3& txc : { txc0, txc1, txc2, txc3 }) {
+						*uv1++ = txc.x; *uv1++ = 1.0f - txc.y;
+						*uv2++ = txc.x; *uv2++ = 1.0f - txc.y;
+					}
+					triId += 1;
 				}
 
 				g_scene.pver->maindata = std::move(pver_newdata);
@@ -646,6 +671,61 @@ void IGObjectInfo()
 				g_scene.puvc->maindata = std::move(puvc_newdata);
 				InvalidateMesh(mesh);
 			}
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Mesh tools")) {
+			ImGui::OpenPopup("MeshTools");
+		}
+		if (ImGui::BeginPopup("MeshTools")) {
+			static Vector3 scale{ 1.0f, 1.0f, 1.0f };
+			static bool doScale = false;
+			static bool invertFaces = false;
+			ImGui::Checkbox("Scale:", &doScale);
+			ImGui::BeginDisabled(!doScale);
+			ImGui::InputFloat3("Factor", &scale.x);
+			ImGui::EndDisabled();
+			ImGui::Checkbox("Invert faces", &invertFaces);
+			if (ImGui::Button("Apply")) {
+				Mesh* mesh = selobj->mesh;
+				if (doScale) {
+					float* verts = (float*)g_scene.pver->maindata.data() + mesh->vertstart;
+					for (uint32_t i = 0; i < mesh->numverts; ++i) {
+						verts[3 * i] *= scale.x;
+						verts[3 * i + 1] *= scale.y;
+						verts[3 * i + 2] *= scale.z;
+					}
+				}
+				if (invertFaces) {
+					uint16_t* triIndices = (uint16_t*)g_scene.pfac->maindata.data() + mesh->tristart;
+					uint16_t* quadIndices = (uint16_t*)g_scene.pfac->maindata.data() + mesh->quadstart;
+					bool hasFtx = selobj->mesh->ftxo && !(selobj->mesh->ftxo & 0x80000000);
+					assert(hasFtx);
+					uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
+					float* uvCoords = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt);
+					using UVQuad = std::array<std::array<float, 2>, 4>;
+					static_assert(sizeof(UVQuad) == 4 * 8);
+					UVQuad* uvQuads = (UVQuad*)uvCoords;
+					uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
+					for (uint32_t i = 0; i < mesh->numtris; ++i) {
+						std::swap(triIndices[0], triIndices[2]);
+						UVQuad& q = *uvQuads;
+						std::swap(q[0], q[2]);
+						triIndices += 3;
+						uvQuads += 1;
+					}
+					for (uint32_t i = 0; i < mesh->numquads; ++i) {
+						std::swap(quadIndices[0], quadIndices[3]);
+						std::swap(quadIndices[1], quadIndices[2]);
+						UVQuad& q = *uvQuads;
+						std::swap(q[0], q[3]);
+						std::swap(q[1], q[2]);
+						quadIndices += 4;
+						uvQuads += 1;
+					}
+				}
+				InvalidateMesh(mesh);
+			}
+			ImGui::EndPopup();
 		}
 		ImGui::Separator();
 
@@ -802,8 +882,8 @@ void IGTextures()
 	ImGui::Begin("Textures", &wndShowTextures);
 
 	if (ImGui::Button("Add")) {
-		auto filepath = GuiUtils::OpenDialogBox("Image\0*.png;*.bmp;*.jpg;*.jpeg;*.gif\0\0\0\0", "png");
-		if (!filepath.empty()) {
+		auto filepaths = GuiUtils::MultiOpenDialogBox("Image\0*.png;*.bmp;*.jpg;*.jpeg;*.gif\0\0\0\0", "png");
+		for (const auto& filepath : filepaths) {
 			AddTexture(g_scene, filepath);
 			GlifyTexture(&g_scene.g_palPack.subchunks.back());
 		}
