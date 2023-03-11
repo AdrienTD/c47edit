@@ -20,6 +20,7 @@
 #include "window.h"
 #include "ObjModel.h"
 #include "GuiUtils.h"
+#include "debug.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -772,6 +773,7 @@ void IGObjectInfo()
 			ImGui::Text("Quad count:   %u", selobj->mesh->numquads);
 			ImGui::Text("Tri count:    %u", selobj->mesh->numtris);
 			ImGui::Text("FTXO offset: 0x%X", selobj->mesh->ftxo);
+			ImGui::Text("Weird: 0x%X", selobj->mesh->weird);
 		}
 		if (selobj->mesh && selobj->mesh->ftxo && ImGui::CollapsingHeader("FTXO")) {
 			// TODO: place this in "DebugUI.cpp"
@@ -785,21 +787,32 @@ void IGObjectInfo()
 				}
 				InvalidateMesh(selobj->mesh);
 			}
-			bool hasFtx = selobj->mesh->ftxo && !(selobj->mesh->ftxo & 0x80000000);
-			uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
-			float* uvCoords = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt);
-			uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
-			size_t numFaces = selobj->mesh->numquads + selobj->mesh->numtris;
-			ImGui::Text("UV  offset 0x%08X", *(uint32_t*)(ftxpnt));
-			ImGui::Text("UV2 offset 0x%08X", *(uint32_t*)(ftxpnt+4));
-			ImGui::Text("Num Faces  0x%08X (0x%08X)", *(uint32_t*)(ftxpnt+8), numFaces);
-			ImGui::Separator();
-			for (size_t i = 0; i < numFaces; ++i) {
-				ImGui::Text("%04X %04X %04X %04X %04X %04X", ftxFace[0], ftxFace[1], ftxFace[2], ftxFace[3], ftxFace[4], ftxFace[5]);
-				ImGui::Text("  (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f)", uvCoords[0], uvCoords[1], uvCoords[2], uvCoords[3], uvCoords[4], uvCoords[5]);
-				ftxFace += 6;
-				uvCoords += 8;
+			bool hasFtx = (selobj->flags & 0x20) && selobj->mesh->ftxo && !(selobj->mesh->ftxo & 0x80000000);
+			if (hasFtx) {
+				uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
+				float* uvCoords = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt);
+				float* uvCoords2 = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt + 4);
+				uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
+				size_t numFaces = selobj->mesh->numquads + selobj->mesh->numtris;
+				ImGui::Text("UV  offset 0x%08X", *(uint32_t*)(ftxpnt));
+				ImGui::Text("UV2 offset 0x%08X", *(uint32_t*)(ftxpnt + 4));
+				ImGui::Text("Num Faces  0x%08X (0x%08X)", *(uint32_t*)(ftxpnt + 8), numFaces);
+				ImGui::Separator();
+				for (size_t i = 0; i < numFaces; ++i) {
+					ImGui::Text("%04X %04X %04X %04X %04X %04X", ftxFace[0], ftxFace[1], ftxFace[2], ftxFace[3], ftxFace[4], ftxFace[5]);
+					if (ftxFace[0] & 0x20) {
+						ImGui::Text(" t (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f)", uvCoords[0], uvCoords[1], uvCoords[2], uvCoords[3], uvCoords[4], uvCoords[5], uvCoords[6], uvCoords[7]);
+						uvCoords += 8;
+					}
+					if (ftxFace[0] & 0x80) {
+						ImGui::Text(" l (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f)", uvCoords2[0], uvCoords2[1], uvCoords2[2], uvCoords2[3], uvCoords2[4], uvCoords2[5], uvCoords2[6], uvCoords2[7]);
+						uvCoords2 += 8;
+					}
+					ftxFace += 6;
+				}
 			}
+			else
+				ImGui::Text("No FTX");
 		}
 		if (selobj->light && ImGui::CollapsingHeader("Light"))
 		{
@@ -1266,9 +1279,7 @@ int main(int argc, char* argv[])
 			IGMain();
 			IGObjectTree();
 			IGObjectInfo();
-//#if 1
-			IGTest();
-//#endif
+			IGDebugWindows();
 			if(wndShowTextures) IGTextures();
 			if(wndShowSounds) IGSounds();
 			if (ImGui::BeginMainMenuBar()) {
@@ -1277,6 +1288,7 @@ int main(int argc, char* argv[])
 					ImGui::MenuItem("Sounds", nullptr, &wndShowSounds);
 					ImGui::EndMenu();
 				}
+				IGDebugMenus();
 				ImGui::EndMainMenuBar();
 			}
 			ImGui::EndFrame();

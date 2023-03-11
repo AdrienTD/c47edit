@@ -724,3 +724,11 @@ std::string DBLList::save()
 	*(uint32_t*)str.data() = (uint32_t)str.size() | (flags << 24);
 	return str;
 }
+
+std::string GameObject::getPath() const
+{
+	std::string str = name;
+	for (const GameObject* obj = parent; obj; obj = obj->parent)
+		str = obj->name + '/' + std::move(str);
+	return str;
+}

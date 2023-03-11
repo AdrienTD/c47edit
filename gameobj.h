@@ -99,6 +99,8 @@ struct GameObject
 	GameObject(const char *nName = "Unnamed", int nType = 0) : name(nName), type(nType) {}
 	GameObject(const GameObject& other) = default;
 	~GameObject() = default;
+
+	std::string getPath() const;
 };
 
 inline void GORef::deref() noexcept { if (m_obj) { m_obj->refcount--; m_obj = nullptr; } }

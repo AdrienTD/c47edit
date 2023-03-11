@@ -123,6 +123,7 @@
   <ItemGroup>
     <ClCompile Include="chunk.cpp" />
     <ClCompile Include="classInfo.cpp" />
+    <ClCompile Include="debug.cpp" />
     <ClCompile Include="gameobj.cpp" />
     <ClCompile Include="GuiUtils.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
@@ -142,6 +143,7 @@
   <ItemGroup>
     <ClInclude Include="chunk.h" />
     <ClInclude Include="classInfo.h" />
+    <ClInclude Include="debug.h" />
     <ClInclude Include="DynArray.h" />
     <ClInclude Include="gameobj.h" />
     <ClInclude Include="global.h" />
