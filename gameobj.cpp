@@ -155,7 +155,8 @@ void Scene::LoadSceneSPK(const char *fn)
 	pftx = spkchk->findSubchunk('XTFP');
 	puvc = spkchk->findSubchunk('CVUP');
 	pdbl = spkchk->findSubchunk('LBDP');
-	if (!(prot && pclp && phea && pnam && ppos && pmtx && pver && pfac && pftx && puvc && pdbl))
+	pdat = spkchk->findSubchunk('TADP');
+	if (!(prot && pclp && phea && pnam && ppos && pmtx && pver && pfac && pftx && puvc && pdbl && pdat))
 		ferr("One or more important chunks were not found in Pack.SPK .");
 
 	rootobj = new GameObject("Root", 0x21 /*ZROOM*/);
@@ -248,7 +249,6 @@ void Scene::LoadSceneSPK(const char *fn)
 			if (isFirstTime) {
 				meshIt->second = std::make_shared<Mesh>();
 				Mesh* m = meshIt->second.get();
-				m->ftxo = p[9];
 				m->weird = p[14];
 
 				float* verts = (float*)pver->maindata.data() + p[6];
@@ -260,6 +260,23 @@ void Scene::LoadSceneSPK(const char *fn)
 				memcpy(m->vertices.data(), verts, 4 * m->vertices.size());
 				memcpy(m->quadindices.data(), quadInds, 2 * m->quadindices.size());
 				memcpy(m->triindices.data(), triInds, 2 * m->triindices.size());
+
+				if (p[9] & 0x80000000) {
+					uint32_t* dat1 = (uint32_t*)(pdat->maindata.data() + (p[9] & 0x7FFFFFFF));
+					m->ftxo = dat1[0];
+					m->extension = std::make_unique<Mesh::Extension>();
+					m->extension->extUnk2 = dat1[1];
+					uint8_t* dat2 = pdat->maindata.data() + dat1[2];
+					uint8_t* ptr2 = dat2;
+					uint32_t numDings = *(uint32_t*)ptr2; ptr2 += 4;
+					m->extension->frames.resize(numDings);
+					memcpy(m->extension->frames.data(), ptr2, 8 * numDings);
+					ptr2 += numDings * 8;
+					m->extension->name = (const char*)ptr2;
+				}
+				else {
+					m->ftxo = p[9];
+				}
 			}
 			o->mesh = meshIt->second;
 		}
@@ -272,14 +289,15 @@ void Scene::LoadSceneSPK(const char *fn)
 			if (isFirstTime) {
 				lineIt->second = std::make_shared<ObjLine>();
 				ObjLine* m = lineIt->second.get();
-				m->quadstart = p[7]; m->tristart = p[8];
-				m->ftxo = p[9];
-				m->numquads = p[11]; m->numtris = p[12];
-				m->weird = p[14];
+				assert(p[7] == 0 && p[11] == 0);
 
 				m->vertices.resize(3 * p[10]);
+				m->terms.resize(p[12]);
 				float* verts = (float*)pver->maindata.data() + p[6];
 				memcpy(m->vertices.data(), verts, 4 * m->vertices.size());
+				memcpy(m->terms.data(), pdat->maindata.data() + p[8], 4 * m->terms.size());
+				m->ftxo = p[9];
+				m->weird = p[14];
 			}
 			o->line = lineIt->second;
 		}
@@ -353,6 +371,7 @@ PackBuffer<std::string, 1, true> g_sav_namPackBuf;
 PackBuffer<std::string, 1> g_sav_dblPackBuf;
 PackBuffer<std::vector<float>, 4> g_sav_verPackBuf;
 PackBuffer<std::vector<uint16_t>, 2> g_sav_facPackBuf;
+PackBuffer<std::string, 1> g_sav_datPackBuf;
 
 uint32_t sbtell(std::stringbuf* sb);
 
@@ -380,7 +399,7 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 
 	uint32_t namoff = g_sav_namPackBuf.add(o->name);
 
-	uint32_t veroff = 0, trifacoff = 0, quadfacoff = 0;
+	uint32_t veroff = 0, trifacoff = 0, quadfacoff = 0, linetermoff = 0, ftxoff = 0;
 	assert(!(o->mesh && o->line));
 	if (o->mesh || o->line) {
 		const auto& vertices = o->mesh ? o->mesh->vertices : o->line->vertices;
@@ -394,6 +413,29 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		}
 		if (!o->mesh->quadindices.empty()) {
 			quadfacoff = g_sav_facPackBuf.add(o->mesh->quadindices);
+		}
+		if (o->mesh->extension) {
+			std::stringbuf sb;
+			uint32_t numFrames = o->mesh->extension->frames.size();
+			sb.sputn((char*)&numFrames, 4);
+			for (auto& [p1,p2] : o->mesh->extension->frames) {
+				sb.sputn((char*)&p1, 4);
+				sb.sputn((char*)&p2, 4);
+			}
+			sb.sputn(o->mesh->extension->name.c_str(), o->mesh->extension->name.size() + 1);
+			uint32_t ext2off = g_sav_datPackBuf.add(sb.str());
+			std::array<uint32_t, 3> ext1 = { o->mesh->ftxo, o->mesh->extension->extUnk2, ext2off };
+			uint32_t ext1off = g_sav_datPackBuf.add(std::string{ (char*)ext1.data(), 12 });
+			ftxoff = ext1off | 0x80000000;
+		}
+		else {
+			ftxoff = o->mesh->ftxo;
+		}
+	}
+	if (o->line) {
+		if (!o->line->terms.empty()) {
+			const char* ptr = (const char*)o->line->terms.data();
+			linetermoff = g_sav_datPackBuf.add(std::string{ ptr, 4 * o->line->terms.size() });
 		}
 	}
 
@@ -412,7 +454,7 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 			heabuf.sputn((char*)&veroff, 4);
 			heabuf.sputn((char*)&quadfacoff, 4);
 			heabuf.sputn((char*)&trifacoff, 4);
-			heabuf.sputn((char*)&o->mesh->ftxo, 4);
+			heabuf.sputn((char*)&ftxoff, 4);
 			uint32_t versize = o->mesh->getNumVertices();
 			uint32_t quadsize = o->mesh->getNumQuads();
 			uint32_t trisize = o->mesh->getNumTris();
@@ -425,14 +467,16 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		if (o->flags & 0x0400)
 		{
 			assert(o->line);
+			uint32_t zero = 0;
 			heabuf.sputn((char*)&veroff, 4);
-			heabuf.sputn((char*)&o->line->quadstart, 4);
-			heabuf.sputn((char*)&o->line->tristart, 4);
+			heabuf.sputn((char*)&zero, 4);
+			heabuf.sputn((char*)&linetermoff, 4);
 			heabuf.sputn((char*)&o->line->ftxo, 4);
 			uint32_t versize = o->line->getNumVertices();
+			uint32_t termsize = o->line->terms.size();
 			heabuf.sputn((char*)&versize, 4);
-			heabuf.sputn((char*)&o->line->numquads, 4);
-			heabuf.sputn((char*)&o->line->numtris, 4);
+			heabuf.sputn((char*)&zero, 4);
+			heabuf.sputn((char*)&termsize, 4);
 			heabuf.sputn((char*)&o->color, 4);
 			heabuf.sputn((char*)&o->line->weird, 4);
 		}
@@ -498,7 +542,7 @@ void Scene::ModifySPK()
 		memcpy(nthg->maindata.data(), buf.data(), nthg->maindata.size());
 	};
 
-	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac;
+	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac, ndat;
 	fillMaindata('AEHP', &nhea, heabuf.str());
 	fillMaindata('MANP', &nnam, g_sav_namPackBuf.buffer);
 	fillMaindata('SOPP', &npos, g_sav_posPackBuf.buffer);
@@ -506,11 +550,12 @@ void Scene::ModifySPK()
 	fillMaindata('LBDP', &ndbl, g_sav_dblPackBuf.buffer);
 	fillMaindata('REVP', &nver, g_sav_verPackBuf.buffer);
 	fillMaindata('CAFP', &nfac, g_sav_facPackBuf.buffer);
+	fillMaindata('TADP', &ndat, g_sav_datPackBuf.buffer);
 
 	heabuf = std::stringbuf();
 	g_sav_namPackBuf = {};
 	g_sav_posPackBuf = {}; g_sav_mtxPackBuf = {}; g_sav_dblPackBuf = {};
-	g_sav_verPackBuf = {}; g_sav_facPackBuf = {};
+	g_sav_verPackBuf = {}; g_sav_facPackBuf = {}; g_sav_datPackBuf = {};
 
 	// Chunk comparison
 	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
@@ -537,6 +582,7 @@ void Scene::ModifySPK()
 	chkcmp(pdbl, &ndbl, "PDBL");
 	chkcmp(pver, &nver, "PVER");
 	chkcmp(pfac, &nfac, "PFAC");
+	chkcmp(pdat, &ndat, "PDAT");
 
 	*phea = std::move(nhea);
 	*pnam = std::move(nnam);
@@ -545,6 +591,7 @@ void Scene::ModifySPK()
 	*pdbl = std::move(ndbl);
 	*pver = std::move(nver);
 	*pfac = std::move(nfac);
+	*pdat = std::move(ndat);
 
 	((uint32_t*)spkchk->maindata.data())[1] = 0x40000;
 

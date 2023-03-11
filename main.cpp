@@ -781,6 +781,23 @@ void IGObjectInfo()
 			ImGui::Text("Tri count:    %zu", selobj->mesh->getNumTris());
 			ImGui::Text("FTXO offset: 0x%X", selobj->mesh->ftxo);
 			ImGui::Text("Weird: 0x%X", selobj->mesh->weird);
+			if (selobj->mesh->extension) {
+				ImGui::TextUnformatted("--- EXTENSION ---");
+				ImGui::Text("Unk: %u", selobj->mesh->extension->extUnk2);
+				ImGui::Text("Frames size: %zu", selobj->mesh->extension->frames.size());
+				ImGui::Text("Name: %s", selobj->mesh->extension->name.c_str());
+			}
+		}
+		if (selobj->line && ImGui::CollapsingHeader("Line")) {
+			ImVec4 c = ImGui::ColorConvertU32ToFloat4(swap_rb(selobj->color));
+			if (ImGui::ColorEdit4("Color", &c.x, 0))
+				selobj->color = swap_rb(ImGui::ColorConvertFloat4ToU32(c));
+			ImGui::Text("Vertex count: %zu", selobj->line->getNumVertices());
+			std::string termstr;
+			for (uint32_t t : selobj->line->terms)
+				termstr += std::to_string(t) + ',';
+			ImGui::Text("Terms: %s", termstr.c_str());
+
 		}
 		if (selobj->mesh && selobj->mesh->ftxo && ImGui::CollapsingHeader("FTXO")) {
 			// TODO: place this in "DebugUI.cpp"

@@ -150,8 +150,8 @@ void IGDebugMenus()
 			auto walkObj = [&](GameObject* obj, auto& rec) -> void {
 				if (obj->mesh) {
 					if (obj->flags & 0x400) {
-						printf("--> %s\n    %i %i\n", obj->getPath().c_str(), obj->line->tristart, obj->line->quadstart);
-						assert(obj->line->quadstart == 0);
+						//printf("--> %s\n    %i %i\n", obj->getPath().c_str(), obj->line->tristart, obj->line->quadstart);
+						//assert(obj->line->quadstart == 0);
 						//cver.cover(4 * obj->mesh->vertstart, 4 * 3 * obj->mesh->numverts, 32);
 						// it seems tristart points to PDAT here
 					}
@@ -186,8 +186,8 @@ void IGDebugMenus()
 			auto walkObj = [&](GameObject* obj, auto& rec) -> void {
 				if (obj->mesh) {
 					if (obj->flags & 0x400) {
-						uint32_t odat = obj->line->tristart;
-						cdat.cover(odat, 4 * obj->line->numtris, 4);
+						//uint32_t odat = obj->line->tristart;
+						//cdat.cover(odat, 4 * obj->line->numtris, 4);
 					}
 					else if (obj->flags & 0x20) {
 						if (obj->mesh->ftxo & 0x80000000) {

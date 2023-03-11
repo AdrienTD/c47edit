@@ -48,6 +48,13 @@ struct Mesh
 	std::vector<uint16_t> quadindices, triindices;
 	uint32_t ftxo, weird;
 
+	struct Extension {
+		uint32_t extUnk2;
+		std::vector<std::pair<uint32_t, uint32_t>> frames;
+		std::string name;
+	};
+	std::shared_ptr<Extension> extension; // TODO deep copy would be better
+
 	size_t getNumVertices() const { return vertices.size() / 3u; }
 	size_t getNumQuads() const { return quadindices.size() / 4u; }
 	size_t getNumTris() const { return triindices.size() / 3u; }
@@ -56,7 +63,8 @@ struct Mesh
 struct ObjLine
 {
 	std::vector<float> vertices;
-	uint32_t quadstart, tristart, ftxo, numquads, numtris, weird;
+	std::vector<uint32_t> terms; // sum = num vertices
+	uint32_t ftxo, weird;
 
 	size_t getNumVertices() const { return vertices.size() / 3u; }
 };
@@ -121,7 +129,7 @@ inline void GORef::deref() noexcept { if (m_obj) { m_obj->refcount--; m_obj = nu
 inline void GORef::set(GameObject * obj) noexcept { deref(); m_obj = obj; if (m_obj) m_obj->refcount++; }
 
 struct Scene {
-	Chunk* spkchk, * prot, * pclp, * phea, * pnam, * ppos, * pmtx, * pver, * pfac, * pftx, * puvc, *pdbl;
+	Chunk* spkchk, * prot, * pclp, * phea, * pnam, * ppos, * pmtx, * pver, * pfac, * pftx, * puvc, *pdbl, *pdat;
 	GameObject* rootobj, * cliprootobj, * superroot;
 	std::string lastspkfn;
 	void* zipmem = nullptr;
