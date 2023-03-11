@@ -93,7 +93,7 @@ struct ProMesh {
 
 		ProMesh pro;
 		uint16_t *faces = (uint16_t*)g_scene.pfac->maindata.data();
-		float *verts = (float*)g_scene.pver->maindata.data() + mesh->vertstart;
+		float *verts = mesh->vertices.data();
 		uint8_t *ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + mesh->ftxo - 1;
 		uint16_t *ftxFace = (uint16_t*)(ftxpnt + 12);
 		bool hasFtx = mesh->ftxo && !(mesh->ftxo & 0x80000000);
@@ -144,7 +144,7 @@ void DrawMesh(Mesh* mesh)
 {
 	if (!rendertextures)
 	{
-		glVertexPointer(3, GL_FLOAT, 6, (float*)g_scene.pver->maindata.data() + mesh->vertstart);
+		glVertexPointer(3, GL_FLOAT, 6, (float*)mesh->vertices.data());
 		glDrawElements(GL_QUADS, mesh->numquads * 4, GL_UNSIGNED_SHORT, (uint16_t*)g_scene.pfac->maindata.data() + mesh->quadstart);
 		glDrawElements(GL_TRIANGLES, mesh->numtris * 3, GL_UNSIGNED_SHORT, (uint16_t*)g_scene.pfac->maindata.data() + mesh->tristart);
 	}

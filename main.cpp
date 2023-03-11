@@ -588,30 +588,31 @@ void IGObjectInfo()
 
 				selobj->flags |= 0x20;
 				if (!selobj->mesh)
-					selobj->mesh = new Mesh;
+					selobj->mesh = std::make_shared<Mesh>();
 				else
 					*selobj->mesh = {};
 
-				Mesh* mesh = selobj->mesh;
-				mesh->numverts = std::size(objVertices);
+				Mesh* mesh = selobj->mesh.get();
+				//mesh->numverts = std::size(objVertices);
 				mesh->numquads = std::size(quads);
 				mesh->numtris = std::size(triangles);
 				int faceIndex = g_scene.pfac->maindata.size() / 2;
-				mesh->vertstart = g_scene.pver->maindata.size() / 4;
+				//mesh->vertstart = g_scene.pver->maindata.size() / 4;
 				mesh->tristart = (mesh->numtris > 0) ? faceIndex : 0;
 				mesh->quadstart = (mesh->numquads > 0) ? faceIndex + 3 * mesh->numtris : 0;
 				mesh->ftxo = g_scene.pftx->maindata.size() + 1;
 
-				Chunk::DataBuffer pver_newdata(g_scene.pver->maindata.size() + mesh->numverts * 12);
+				//Chunk::DataBuffer pver_newdata(g_scene.pver->maindata.size() + mesh->vertices.size() * 12);
 				Chunk::DataBuffer pfac_newdata(g_scene.pfac->maindata.size() + mesh->numquads * 8 + mesh->numtris * 6);
 				Chunk::DataBuffer pftx_newdata(g_scene.pftx->maindata.size() + 12 + (mesh->numquads + mesh->numtris) * 12);
 				Chunk::DataBuffer puvc_newdata(g_scene.puvc->maindata.size() + (mesh->numquads + mesh->numtris) * 4 * 8 * 2); // 8 floats per face, 2 sets
-				memcpy(pver_newdata.data(), g_scene.pver->maindata.data(), g_scene.pver->maindata.size());
+				//memcpy(pver_newdata.data(), g_scene.pver->maindata.data(), g_scene.pver->maindata.size());
 				memcpy(pfac_newdata.data(), g_scene.pfac->maindata.data(), g_scene.pfac->maindata.size());
 				memcpy(pftx_newdata.data(), g_scene.pftx->maindata.data(), g_scene.pftx->maindata.size());
 				memcpy(puvc_newdata.data(), g_scene.puvc->maindata.data(), g_scene.puvc->maindata.size());
 
-				float* verts = (float*)pver_newdata.data() + mesh->vertstart;
+				mesh->vertices.resize(3 * std::size(objVertices));
+				float* verts = mesh->vertices.data();
 				uint16_t* faces = (uint16_t*)pfac_newdata.data() + faceIndex;
 				uint32_t* ftxHead = (uint32_t*)(pftx_newdata.data() + g_scene.pftx->maindata.size());
 				uint16_t* ftx = (uint16_t*)(ftxHead + 3);
@@ -666,7 +667,7 @@ void IGObjectInfo()
 					triId += 1;
 				}
 
-				g_scene.pver->maindata = std::move(pver_newdata);
+				//g_scene.pver->maindata = std::move(pver_newdata);
 				g_scene.pfac->maindata = std::move(pfac_newdata);
 				g_scene.pftx->maindata = std::move(pftx_newdata);
 				g_scene.puvc->maindata = std::move(puvc_newdata);
@@ -687,13 +688,13 @@ void IGObjectInfo()
 			ImGui::EndDisabled();
 			ImGui::Checkbox("Invert faces", &invertFaces);
 			if (ImGui::Button("Apply")) {
-				Mesh* mesh = selobj->mesh;
+				Mesh* mesh = selobj->mesh.get();
 				if (doScale) {
-					float* verts = (float*)g_scene.pver->maindata.data() + mesh->vertstart;
-					for (uint32_t i = 0; i < mesh->numverts; ++i) {
-						verts[3 * i] *= scale.x;
-						verts[3 * i + 1] *= scale.y;
-						verts[3 * i + 2] *= scale.z;
+					float* verts = mesh->vertices.data();
+					for (size_t i = 0; i < mesh->vertices.size(); i += 3) {
+						verts[i] *= scale.x;
+						verts[i + 1] *= scale.y;
+						verts[i + 2] *= scale.z;
 					}
 				}
 				if (invertFaces) {
@@ -761,15 +762,18 @@ void IGObjectInfo()
 		}
 		if (selobj->mesh && ImGui::CollapsingHeader("Mesh"))
 		{
-			//ImGui::Separator();
-			//ImGui::Text("Mesh");
+			ImGui::AlignTextToFramePadding();
+			ImGui::Text("Ref count: %li", selobj->mesh.use_count());
+			ImGui::SameLine();
+			if (ImGui::Button("Make unique"))
+				selobj->mesh = std::make_unique<Mesh>(*selobj->mesh);
 			ImVec4 c = ImGui::ColorConvertU32ToFloat4(swap_rb(selobj->color));
 			if (ImGui::ColorEdit4("Color", &c.x, 0))
 				selobj->color = swap_rb(ImGui::ColorConvertFloat4ToU32(c));
-			ImGui::Text("Vertex start index: %u", selobj->mesh->vertstart);
+			//ImGui::Text("Vertex start index: %u", selobj->mesh->vertstart);
 			ImGui::Text("Quad start index:   %u", selobj->mesh->quadstart);
 			ImGui::Text("Tri start index:    %u", selobj->mesh->tristart);
-			ImGui::Text("Vertex count: %u", selobj->mesh->numverts);
+			ImGui::Text("Vertex count: %zu", selobj->mesh->vertices.size());
 			ImGui::Text("Quad count:   %u", selobj->mesh->numquads);
 			ImGui::Text("Tri count:    %u", selobj->mesh->numtris);
 			ImGui::Text("FTXO offset: 0x%X", selobj->mesh->ftxo);
@@ -785,7 +789,7 @@ void IGObjectInfo()
 					ftxFace[2] = curtexid;
 					ftxFace += 6;
 				}
-				InvalidateMesh(selobj->mesh);
+				InvalidateMesh(selobj->mesh.get());
 			}
 			bool hasFtx = (selobj->flags & 0x20) && selobj->mesh->ftxo && !(selobj->mesh->ftxo & 0x80000000);
 			if (hasFtx) {
@@ -1080,7 +1084,7 @@ void RenderObject(GameObject *o)
 			uint32_t clr = swap_rb(o->color);
 			glColor4ubv((uint8_t*)&clr);
 		}
-		DrawMesh(o->mesh);
+		DrawMesh(o->mesh.get());
 	}
 	for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
 		RenderObject(*e);
@@ -1089,10 +1093,10 @@ void RenderObject(GameObject *o)
 
 Vector3 finalintersectpnt = Vector3(0, 0, 0);
 
-bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, int startvertex, int startface, int numverts, Matrix *worldmtx)
+bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, float* bver, int startface, int numverts, Matrix *worldmtx)
 {
 	uint16_t *bfac = (uint16_t*)g_scene.pfac->maindata.data() + startface;
-	float *bver = (float*)g_scene.pver->maindata.data() + startvertex;
+	//float *bver = (float*)g_scene.pver->maindata.data() + startvertex;
 
 	std::unique_ptr<Vector3[]> pnts = std::make_unique<Vector3[]>(numverts);
 	for (int i = 0; i < 3; i++)
@@ -1150,9 +1154,9 @@ GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObje
 	objmtx *= *worldmtx;
 	if (o->mesh)
 	{
-		Mesh *m = o->mesh;
+		Mesh *m = o->mesh.get();
 		for (int i = 0; i < m->numquads; i++)
-			if (IsRayIntersectingFace(raystart, raydir, m->vertstart, m->quadstart + i*4, 4, &objmtx))
+			if (IsRayIntersectingFace(raystart, raydir, m->vertices.data(), m->quadstart + i * 4, 4, &objmtx))
 				if ((d = (finalintersectpnt - campos).sqlen2xz()) < bestpickdist)
 				{
 					bestpickdist = d;
@@ -1160,7 +1164,7 @@ GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObje
 					bestpickintersectionpnt = finalintersectpnt;
 				}
 		for(int i = 0; i < m->numtris; i++)
-			if (IsRayIntersectingFace(raystart, raydir, m->vertstart, m->tristart  + i*3, 3, &objmtx))
+			if (IsRayIntersectingFace(raystart, raydir, m->vertices.data(), m->tristart + i * 3, 3, &objmtx))
 				if ((d = (finalintersectpnt - campos).sqlen2xz()) < bestpickdist)
 				{
 					bestpickdist = d;

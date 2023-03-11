@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
@@ -43,9 +44,15 @@ public:
 
 struct Mesh
 {
-	//float *vertices;
+	std::vector<float> vertices;
 	//uint16_t *quadindices, *triindices;
-	uint32_t vertstart, quadstart, tristart, ftxo, numverts, numquads, numtris, weird;
+	uint32_t quadstart, tristart, ftxo, numquads, numtris, weird;
+};
+
+struct ObjLine
+{
+	std::vector<float> vertices;
+	uint32_t quadstart, tristart, ftxo, numquads, numtris, weird;
 };
 
 struct Light
@@ -87,10 +94,11 @@ struct GameObject
 	GameObject* root = nullptr;
 
 	// Mesh
-	Mesh* mesh = nullptr;
+	std::shared_ptr<Mesh> mesh;
+	std::shared_ptr<ObjLine> line;
 	uint32_t color = 0;
 
-	Light *light = nullptr;
+	std::shared_ptr<Light> light;
 
 	DBLList dbl;
 

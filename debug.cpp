@@ -152,11 +152,11 @@ void IGDebugMenus()
 					if (obj->flags & 0x400) {
 						printf("--> %s\n    %i %i\n", obj->getPath().c_str(), obj->mesh->tristart, obj->mesh->quadstart);
 						assert(obj->mesh->quadstart == 0);
-						cver.cover(4 * obj->mesh->vertstart, 4 * 3 * obj->mesh->numverts, 32);
+						//cver.cover(4 * obj->mesh->vertstart, 4 * 3 * obj->mesh->numverts, 32);
 						// it seems tristart points to PDAT here
 					}
 					else if (obj->flags & 0x20) {
-						cver.cover(4 * obj->mesh->vertstart, 4 * 3 * obj->mesh->numverts, 16);
+						//cver.cover(4 * obj->mesh->vertstart, 4 * 3 * obj->mesh->numverts, 16);
 						cfac.cover(2 * obj->mesh->tristart, 2 * 3 * obj->mesh->numtris, 1);
 						cfac.cover(2 * obj->mesh->quadstart, 2 * 4 * obj->mesh->numquads, 2);
 					}
