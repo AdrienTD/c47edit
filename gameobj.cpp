@@ -319,45 +319,51 @@ struct DBLHash
 	}
 };
 
+template<typename Unit, uint32_t OffsetUnit, bool IncludeStringNullTerminator = false>
+struct PackBuffer {
+	using Elem = typename Unit::value_type;
+
+	std::vector<uint8_t> buffer;
+	std::map<Unit, uint32_t> offmap;
+
+	[[nodiscard]] uint32_t addByteOffset(const Unit& elem) {
+		auto [it, inserted] = offmap.try_emplace(elem, buffer.size());
+		if (inserted) {
+			uint8_t* ptr = (uint8_t*)std::data(elem);
+			size_t len = sizeof(Elem) * (std::size(elem) + (IncludeStringNullTerminator ? 1 : 0));
+			buffer.insert(buffer.end(), ptr, ptr + len);
+		}
+		return it->second;
+	}
+	[[nodiscard]] uint32_t add(const Unit& elem) {
+		return addByteOffset(elem) / OffsetUnit;
+	}
+};
+
 // All global variables below are used during saving.
 // Should be fine as long as a scene is saved one at a time.
-
-std::stringbuf heabuf, nambuf, dblbuf;
-std::vector<std::array<float,3> > posbuf;
-std::vector<std::array<uint32_t, 4> > mtxbuf;
-std::vector<float> verbuf;
-std::vector<uint16_t> facbuf;
 
 uint32_t moc_objcount;
 std::map<GameObject*, uint32_t> objidmap;
 
-std::map<std::array<float, 3>, uint32_t> g_sav_posmap;
-std::map<std::array<uint32_t, 4>, uint32_t> g_sav_mtxmap;
-std::map<std::string, uint32_t> g_sav_nammap;
-std::unordered_map<std::string, uint32_t> g_sav_dblmap;
-std::map<std::vector<float>, uint32_t> g_sav_vermap;
-std::map<std::vector<uint16_t>, uint32_t> g_sav_facmap;
+std::stringbuf heabuf;
+PackBuffer<std::array<float, 3>, 1> g_sav_posPackBuf;
+PackBuffer<std::array<uint32_t, 4>, 16> g_sav_mtxPackBuf;
+PackBuffer<std::string, 1, true> g_sav_namPackBuf;
+PackBuffer<std::string, 1> g_sav_dblPackBuf;
+PackBuffer<std::vector<float>, 4> g_sav_verPackBuf;
+PackBuffer<std::vector<uint16_t>, 2> g_sav_facPackBuf;
 
 uint32_t sbtell(std::stringbuf* sb);
 
 void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 {
 	moc_objcount++;
-	memset(c, 0, sizeof(Chunk));
+	*c = {};
 
-	uint32_t posoff;
 	std::array<float, 3> cpos = { o->position.x, o->position.y, o->position.z };
-	auto piter = g_sav_posmap.find(cpos);
-	if (piter == g_sav_posmap.end())
-	{
-		posoff = posbuf.size() * 12;
-		posbuf.push_back(cpos);
-		g_sav_posmap[cpos] = posoff;
-	}
-	else
-		posoff = piter->second;
+	uint32_t posoff = g_sav_posPackBuf.add(cpos);
 
-	uint32_t mtxoff;
 	std::array<uint32_t, 4> cmtx;
 	cmtx[0] = (uint32_t)(o->matrix._31 * 1073741824.0f) & ~1; // multiply by 2^30
 	cmtx[1] = o->matrix._32 * 1073741824.0f;
@@ -365,66 +371,29 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	cmtx[2] = (uint32_t)(o->matrix._21 * 1073741824.0f) & ~1;
 	cmtx[3] = o->matrix._22 * 1073741824.0f;
 	if (o->matrix._23 < 0) cmtx[2] |= 1;
-	auto miter = g_sav_mtxmap.find(cmtx);
-	if (miter == g_sav_mtxmap.end())
-	{
-		mtxoff = mtxbuf.size();
-		mtxbuf.push_back(cmtx);
-		g_sav_mtxmap[cmtx] = mtxoff;
-	}
-	else
-		mtxoff = miter->second;
+	uint32_t mtxoff = g_sav_mtxPackBuf.add(cmtx);
 
-	uint32_t dbloff;
 	std::string dblsav = o->dbl.save();
-	auto diter = g_sav_dblmap.find(dblsav);
-	if (diter == g_sav_dblmap.end())
-	{
-		dbloff = sbtell(&dblbuf);
-		dblbuf.sputn(dblsav.data(), dblsav.size());
-		g_sav_dblmap.insert(std::make_pair(std::move(dblsav), dbloff));
-	}
-	else
-		dbloff = diter->second;
+	uint32_t dbloff = g_sav_dblPackBuf.add(dblsav);
 
 	uint32_t heaoff = sbtell(&heabuf);
 
-	auto itNammap = g_sav_nammap.find(o->name);
-	uint32_t namoff = 0;
-	if (itNammap == g_sav_nammap.end()) {
-		namoff = sbtell(&nambuf);
-		g_sav_nammap.insert({ o->name, namoff });
-		nambuf.sputn(o->name.data(), o->name.size() + 1);
-	}
-	else
-		namoff = itNammap->second;
+	uint32_t namoff = g_sav_namPackBuf.add(o->name);
 
 	uint32_t veroff = 0, trifacoff = 0, quadfacoff = 0;
 	assert(!(o->mesh && o->line));
 	if (o->mesh || o->line) {
 		const auto& vertices = o->mesh ? o->mesh->vertices : o->line->vertices;
 		if (!vertices.empty()) {
-			auto [itVermap, inserted] = g_sav_vermap.try_emplace(vertices, verbuf.size());
-			if (inserted) {
-				verbuf.insert(verbuf.end(), vertices.begin(), vertices.end());
-			}
-			veroff = itVermap->second;
+			veroff = g_sav_verPackBuf.add(vertices);
 		}
 	}
 	if (o->mesh) {
 		if (!o->mesh->triindices.empty()) {
-			auto [itFacmap, inserted] = g_sav_facmap.try_emplace(o->mesh->triindices, facbuf.size());
-			if (inserted) {
-				facbuf.insert(facbuf.end(), o->mesh->triindices.begin(), o->mesh->triindices.end());
-			}
-			trifacoff = itFacmap->second;
+			trifacoff = g_sav_facPackBuf.add(o->mesh->triindices);
 		}
 		if (!o->mesh->quadindices.empty()) {
-			auto [itFacmap, inserted] = g_sav_facmap.try_emplace(o->mesh->quadindices, facbuf.size());
-			if (inserted) {
-				facbuf.insert(facbuf.end(), o->mesh->quadindices.begin(), o->mesh->quadindices.end());
-			}
-			quadfacoff = itFacmap->second;
+			quadfacoff = g_sav_facPackBuf.add(o->mesh->quadindices);
 		}
 	}
 
@@ -504,13 +473,6 @@ void Scene::ModifySPK()
 	z(cliprootobj, z);
 	z(rootobj, z);
 
-	g_sav_posmap.clear();
-	g_sav_mtxmap.clear();
-	g_sav_nammap.clear();
-	g_sav_dblmap.clear();
-	g_sav_vermap.clear();
-	g_sav_facmap.clear();
-
 	auto f = [this](Chunk *c, GameObject *o) {
 		c->subchunks.resize(o->subobj.size());
 		moc_objcount = 0;
@@ -538,17 +500,17 @@ void Scene::ModifySPK()
 
 	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac;
 	fillMaindata('AEHP', &nhea, heabuf.str());
-	fillMaindata('MANP', &nnam, nambuf.str());
-	fillMaindata('SOPP', &npos, posbuf);
-	fillMaindata('XTMP', &nmtx, mtxbuf);
-	fillMaindata('LBDP', &ndbl, dblbuf.str());
-	fillMaindata('REVP', &nver, verbuf);
-	fillMaindata('CAFP', &nfac, facbuf);
+	fillMaindata('MANP', &nnam, g_sav_namPackBuf.buffer);
+	fillMaindata('SOPP', &npos, g_sav_posPackBuf.buffer);
+	fillMaindata('XTMP', &nmtx, g_sav_mtxPackBuf.buffer);
+	fillMaindata('LBDP', &ndbl, g_sav_dblPackBuf.buffer);
+	fillMaindata('REVP', &nver, g_sav_verPackBuf.buffer);
+	fillMaindata('CAFP', &nfac, g_sav_facPackBuf.buffer);
 
 	heabuf = std::stringbuf();
-	nambuf = std::stringbuf();
-	posbuf.clear(); mtxbuf.clear(); dblbuf = std::stringbuf();
-	verbuf.clear(); facbuf.clear();
+	g_sav_namPackBuf = {};
+	g_sav_posPackBuf = {}; g_sav_mtxPackBuf = {}; g_sav_dblPackBuf = {};
+	g_sav_verPackBuf = {}; g_sav_facPackBuf = {};
 
 	// Chunk comparison
 	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
