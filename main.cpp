@@ -593,40 +593,43 @@ void IGObjectInfo()
 					*selobj->mesh = {};
 
 				Mesh* mesh = selobj->mesh.get();
+				mesh->vertices.resize(3 * std::size(objVertices));
+				mesh->quadindices.resize(4 * std::size(quads));
+				mesh->triindices.resize(3 * std::size(triangles));
+				size_t numFaces = std::size(quads) + std::size(triangles);
 				//mesh->numverts = std::size(objVertices);
-				mesh->numquads = std::size(quads);
-				mesh->numtris = std::size(triangles);
+				//mesh->numquads = std::size(quads);
+				//mesh->numtris = std::size(triangles);
 				int faceIndex = g_scene.pfac->maindata.size() / 2;
 				//mesh->vertstart = g_scene.pver->maindata.size() / 4;
-				mesh->tristart = (mesh->numtris > 0) ? faceIndex : 0;
-				mesh->quadstart = (mesh->numquads > 0) ? faceIndex + 3 * mesh->numtris : 0;
+				//mesh->tristart = (mesh->numtris > 0) ? faceIndex : 0;
+				//mesh->quadstart = (mesh->numquads > 0) ? faceIndex + 3 * mesh->numtris : 0;
 				mesh->ftxo = g_scene.pftx->maindata.size() + 1;
 
 				//Chunk::DataBuffer pver_newdata(g_scene.pver->maindata.size() + mesh->vertices.size() * 12);
-				Chunk::DataBuffer pfac_newdata(g_scene.pfac->maindata.size() + mesh->numquads * 8 + mesh->numtris * 6);
-				Chunk::DataBuffer pftx_newdata(g_scene.pftx->maindata.size() + 12 + (mesh->numquads + mesh->numtris) * 12);
-				Chunk::DataBuffer puvc_newdata(g_scene.puvc->maindata.size() + (mesh->numquads + mesh->numtris) * 4 * 8 * 2); // 8 floats per face, 2 sets
+				//Chunk::DataBuffer pfac_newdata(g_scene.pfac->maindata.size() + mesh->numquads * 8 + mesh->numtris * 6);
+				Chunk::DataBuffer pftx_newdata(g_scene.pftx->maindata.size() + 12 + numFaces * 12);
+				Chunk::DataBuffer puvc_newdata(g_scene.puvc->maindata.size() + numFaces * 4 * 8 * 2); // 8 floats per face, 2 sets
 				//memcpy(pver_newdata.data(), g_scene.pver->maindata.data(), g_scene.pver->maindata.size());
-				memcpy(pfac_newdata.data(), g_scene.pfac->maindata.data(), g_scene.pfac->maindata.size());
+				//memcpy(pfac_newdata.data(), g_scene.pfac->maindata.data(), g_scene.pfac->maindata.size());
 				memcpy(pftx_newdata.data(), g_scene.pftx->maindata.data(), g_scene.pftx->maindata.size());
 				memcpy(puvc_newdata.data(), g_scene.puvc->maindata.data(), g_scene.puvc->maindata.size());
 
-				mesh->vertices.resize(3 * std::size(objVertices));
 				float* verts = mesh->vertices.data();
-				uint16_t* faces = (uint16_t*)pfac_newdata.data() + faceIndex;
+				uint16_t* qfaces = mesh->quadindices.data();
+				uint16_t* tfaces = mesh->triindices.data();
 				uint32_t* ftxHead = (uint32_t*)(pftx_newdata.data() + g_scene.pftx->maindata.size());
 				uint16_t* ftx = (uint16_t*)(ftxHead + 3);
 				float* uv1 = (float*)(puvc_newdata.data() + g_scene.puvc->maindata.size());
-				float* uv2 = (float*)(puvc_newdata.data() + g_scene.puvc->maindata.size() + (mesh->numquads + mesh->numtris) * 4 * 8);
+				float* uv2 = (float*)(puvc_newdata.data() + g_scene.puvc->maindata.size() + numFaces * 4 * 8);
 
 				memcpy(verts, objVertices.data(), objVertices.size() * 12);
 				for (auto& tri : triangles)
 					for (auto& [indPos, indTxc, indNrm] : tri)
-						*faces++ = 2 * indPos;
+						*tfaces++ = 2 * indPos;
 				for (auto& quad : quads)
 					for (auto& [indPos, indTxc, indNrm] : quad)
-						*faces++ = 2 * indPos;
-				uint32_t numFaces = mesh->numquads + mesh->numtris;
+						*qfaces++ = 2 * indPos;
 				ftxHead[0] = uv1 - (float*)puvc_newdata.data();
 				ftxHead[1] = uv2 - (float*)puvc_newdata.data();
 				ftxHead[2] = numFaces;
@@ -668,7 +671,7 @@ void IGObjectInfo()
 				}
 
 				//g_scene.pver->maindata = std::move(pver_newdata);
-				g_scene.pfac->maindata = std::move(pfac_newdata);
+				//g_scene.pfac->maindata = std::move(pfac_newdata);
 				g_scene.pftx->maindata = std::move(pftx_newdata);
 				g_scene.puvc->maindata = std::move(puvc_newdata);
 				InvalidateMesh(mesh);
@@ -698,8 +701,8 @@ void IGObjectInfo()
 					}
 				}
 				if (invertFaces) {
-					uint16_t* triIndices = (uint16_t*)g_scene.pfac->maindata.data() + mesh->tristart;
-					uint16_t* quadIndices = (uint16_t*)g_scene.pfac->maindata.data() + mesh->quadstart;
+					uint16_t* triIndices = mesh->triindices.data();
+					uint16_t* quadIndices = mesh->quadindices.data();
 					bool hasFtx = selobj->mesh->ftxo && !(selobj->mesh->ftxo & 0x80000000);
 					assert(hasFtx);
 					uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
@@ -708,14 +711,14 @@ void IGObjectInfo()
 					static_assert(sizeof(UVQuad) == 4 * 8);
 					UVQuad* uvQuads = (UVQuad*)uvCoords;
 					uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
-					for (uint32_t i = 0; i < mesh->numtris; ++i) {
+					for (uint32_t i = 0; i < mesh->getNumTris(); ++i) {
 						std::swap(triIndices[0], triIndices[2]);
 						UVQuad& q = *uvQuads;
 						std::swap(q[0], q[2]);
 						triIndices += 3;
 						uvQuads += 1;
 					}
-					for (uint32_t i = 0; i < mesh->numquads; ++i) {
+					for (uint32_t i = 0; i < mesh->getNumQuads(); ++i) {
 						std::swap(quadIndices[0], quadIndices[3]);
 						std::swap(quadIndices[1], quadIndices[2]);
 						UVQuad& q = *uvQuads;
@@ -771,11 +774,11 @@ void IGObjectInfo()
 			if (ImGui::ColorEdit4("Color", &c.x, 0))
 				selobj->color = swap_rb(ImGui::ColorConvertFloat4ToU32(c));
 			//ImGui::Text("Vertex start index: %u", selobj->mesh->vertstart);
-			ImGui::Text("Quad start index:   %u", selobj->mesh->quadstart);
-			ImGui::Text("Tri start index:    %u", selobj->mesh->tristart);
-			ImGui::Text("Vertex count: %zu", selobj->mesh->vertices.size());
-			ImGui::Text("Quad count:   %u", selobj->mesh->numquads);
-			ImGui::Text("Tri count:    %u", selobj->mesh->numtris);
+			//ImGui::Text("Quad start index:   %u", selobj->mesh->quadstart);
+			//ImGui::Text("Tri start index:    %u", selobj->mesh->tristart);
+			ImGui::Text("Vertex count: %zu", selobj->mesh->getNumVertices());
+			ImGui::Text("Quad count:   %zu", selobj->mesh->getNumQuads());
+			ImGui::Text("Tri count:    %zu", selobj->mesh->getNumTris());
 			ImGui::Text("FTXO offset: 0x%X", selobj->mesh->ftxo);
 			ImGui::Text("Weird: 0x%X", selobj->mesh->weird);
 		}
@@ -797,7 +800,7 @@ void IGObjectInfo()
 				float* uvCoords = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt);
 				float* uvCoords2 = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt + 4);
 				uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
-				size_t numFaces = selobj->mesh->numquads + selobj->mesh->numtris;
+				size_t numFaces = selobj->mesh->getNumQuads() + selobj->mesh->getNumTris();
 				ImGui::Text("UV  offset 0x%08X", *(uint32_t*)(ftxpnt));
 				ImGui::Text("UV2 offset 0x%08X", *(uint32_t*)(ftxpnt + 4));
 				ImGui::Text("Num Faces  0x%08X (0x%08X)", *(uint32_t*)(ftxpnt + 8), numFaces);
@@ -1093,9 +1096,9 @@ void RenderObject(GameObject *o)
 
 Vector3 finalintersectpnt = Vector3(0, 0, 0);
 
-bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, float* bver, int startface, int numverts, Matrix *worldmtx)
+bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, float* bver, uint16_t* bfac, int numverts, Matrix *worldmtx)
 {
-	uint16_t *bfac = (uint16_t*)g_scene.pfac->maindata.data() + startface;
+	//uint16_t *bfac = (uint16_t*)g_scene.pfac->maindata.data() + startface;
 	//float *bver = (float*)g_scene.pver->maindata.data() + startvertex;
 
 	std::unique_ptr<Vector3[]> pnts = std::make_unique<Vector3[]>(numverts);
@@ -1155,16 +1158,16 @@ GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObje
 	if (o->mesh)
 	{
 		Mesh *m = o->mesh.get();
-		for (int i = 0; i < m->numquads; i++)
-			if (IsRayIntersectingFace(raystart, raydir, m->vertices.data(), m->quadstart + i * 4, 4, &objmtx))
+		for (int i = 0; i < m->getNumQuads(); i++)
+			if (IsRayIntersectingFace(raystart, raydir, m->vertices.data(), m->quadindices.data() + i * 4, 4, &objmtx))
 				if ((d = (finalintersectpnt - campos).sqlen2xz()) < bestpickdist)
 				{
 					bestpickdist = d;
 					bestpickobj = o;
 					bestpickintersectionpnt = finalintersectpnt;
 				}
-		for(int i = 0; i < m->numtris; i++)
-			if (IsRayIntersectingFace(raystart, raydir, m->vertices.data(), m->tristart + i * 3, 3, &objmtx))
+		for(int i = 0; i < m->getNumTris(); i++)
+			if (IsRayIntersectingFace(raystart, raydir, m->vertices.data(), m->triindices.data() + i * 3, 3, &objmtx))
 				if ((d = (finalintersectpnt - campos).sqlen2xz()) < bestpickdist)
 				{
 					bestpickdist = d;

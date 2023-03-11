@@ -45,14 +45,20 @@ public:
 struct Mesh
 {
 	std::vector<float> vertices;
-	//uint16_t *quadindices, *triindices;
-	uint32_t quadstart, tristart, ftxo, numquads, numtris, weird;
+	std::vector<uint16_t> quadindices, triindices;
+	uint32_t ftxo, weird;
+
+	size_t getNumVertices() const { return vertices.size() / 3u; }
+	size_t getNumQuads() const { return quadindices.size() / 4u; }
+	size_t getNumTris() const { return triindices.size() / 3u; }
 };
 
 struct ObjLine
 {
 	std::vector<float> vertices;
 	uint32_t quadstart, tristart, ftxo, numquads, numtris, weird;
+
+	size_t getNumVertices() const { return vertices.size() / 3u; }
 };
 
 struct Light

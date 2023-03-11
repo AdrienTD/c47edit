@@ -86,7 +86,7 @@ void IGDebugMenus()
 							ftxo = obj->mesh->ftxo & 0x7FFFFFFF;
 						uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + ftxo - 1;
 						uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
-						size_t numFaces = obj->mesh->numquads + obj->mesh->numtris;
+						size_t numFaces = obj->mesh->getNumQuads() + obj->mesh->getNumTris();
 						assert(*(uint32_t*)(ftxpnt + 8) == numFaces);
 						size_t numTexturedFaces = 0;
 						size_t numLitFaces = 0;
@@ -150,15 +150,15 @@ void IGDebugMenus()
 			auto walkObj = [&](GameObject* obj, auto& rec) -> void {
 				if (obj->mesh) {
 					if (obj->flags & 0x400) {
-						printf("--> %s\n    %i %i\n", obj->getPath().c_str(), obj->mesh->tristart, obj->mesh->quadstart);
-						assert(obj->mesh->quadstart == 0);
+						printf("--> %s\n    %i %i\n", obj->getPath().c_str(), obj->line->tristart, obj->line->quadstart);
+						assert(obj->line->quadstart == 0);
 						//cver.cover(4 * obj->mesh->vertstart, 4 * 3 * obj->mesh->numverts, 32);
 						// it seems tristart points to PDAT here
 					}
 					else if (obj->flags & 0x20) {
 						//cver.cover(4 * obj->mesh->vertstart, 4 * 3 * obj->mesh->numverts, 16);
-						cfac.cover(2 * obj->mesh->tristart, 2 * 3 * obj->mesh->numtris, 1);
-						cfac.cover(2 * obj->mesh->quadstart, 2 * 4 * obj->mesh->numquads, 2);
+						//cfac.cover(2 * obj->mesh->tristart, 2 * 3 * obj->mesh->numtris, 1);
+						//cfac.cover(2 * obj->mesh->quadstart, 2 * 4 * obj->mesh->numquads, 2);
 					}
 				}
 				for (auto* child : obj->subobj) {
@@ -186,8 +186,8 @@ void IGDebugMenus()
 			auto walkObj = [&](GameObject* obj, auto& rec) -> void {
 				if (obj->mesh) {
 					if (obj->flags & 0x400) {
-						uint32_t odat = obj->mesh->tristart;
-						cdat.cover(odat, 4 * obj->mesh->numtris, 4);
+						uint32_t odat = obj->line->tristart;
+						cdat.cover(odat, 4 * obj->line->numtris, 4);
 					}
 					else if (obj->flags & 0x20) {
 						if (obj->mesh->ftxo & 0x80000000) {

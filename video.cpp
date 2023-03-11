@@ -92,8 +92,9 @@ struct ProMesh {
 		static const int uvit[4] = { 0,1,2,3 };
 
 		ProMesh pro;
-		uint16_t *faces = (uint16_t*)g_scene.pfac->maindata.data();
 		float *verts = mesh->vertices.data();
+		size_t numQuads = mesh->getNumQuads();
+		size_t numTris = mesh->getNumTris();
 		uint8_t *ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + mesh->ftxo - 1;
 		uint16_t *ftxFace = (uint16_t*)(ftxpnt + 12);
 		bool hasFtx = mesh->ftxo && !(mesh->ftxo & 0x80000000);
@@ -102,7 +103,7 @@ struct ProMesh {
 		if (hasFtx)
 			uvCoords = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt);
 
-		for (uint32_t i = 0; i < mesh->numtris; i++)
+		for (size_t i = 0; i < numTris; i++)
 		{
 			uint16_t texid = hasFtx ? ftxFace[2] : 65535;
 			auto& part = pro.parts[texid];
@@ -110,7 +111,7 @@ struct ProMesh {
 			for (int j = 0; j < 3; j++) {
 				float* uu = uvCoords + uvit[j] * 2;
 				part.texcoords.push_back({ uu[0], uu[1] });
-				float *v = verts + faces[mesh->tristart + i * 3 + j] * 3 / 2;
+				float *v = verts + mesh->triindices[i * 3 + j] * 3 / 2;
 				part.vertices.push_back({ v[0], v[1], v[2] });
 			}
 			for (int j : {0, 1, 2})
@@ -118,7 +119,7 @@ struct ProMesh {
 			ftxFace += 6;
 			uvCoords += 8; // Ignore 4th UV.
 		}
-		for (uint32_t i = 0; i < mesh->numquads; i++)
+		for (uint32_t i = 0; i < numQuads; i++)
 		{
 			uint16_t texid = hasFtx ? ftxFace[2] : 65535;
 			auto& part = pro.parts[texid];
@@ -126,7 +127,7 @@ struct ProMesh {
 			for (int j = 0; j < 4; j++) {
 				float* uu = uvCoords + uvit[j] * 2;
 				part.texcoords.push_back({ uu[0], uu[1] });
-				float *v = verts + faces[mesh->quadstart + i * 4 + j] * 3 / 2;
+				float *v = verts + mesh->quadindices[i * 4 + j] * 3 / 2;
 				part.vertices.push_back({ v[0], v[1], v[2] });
 			}
 			for (int j : {0, 1, 3, 3, 1, 2 })
@@ -144,9 +145,9 @@ void DrawMesh(Mesh* mesh)
 {
 	if (!rendertextures)
 	{
-		glVertexPointer(3, GL_FLOAT, 6, (float*)mesh->vertices.data());
-		glDrawElements(GL_QUADS, mesh->numquads * 4, GL_UNSIGNED_SHORT, (uint16_t*)g_scene.pfac->maindata.data() + mesh->quadstart);
-		glDrawElements(GL_TRIANGLES, mesh->numtris * 3, GL_UNSIGNED_SHORT, (uint16_t*)g_scene.pfac->maindata.data() + mesh->tristart);
+		glVertexPointer(3, GL_FLOAT, 6, mesh->vertices.data());
+		glDrawElements(GL_QUADS, mesh->quadindices.size(), GL_UNSIGNED_SHORT, mesh->quadindices.data());
+		glDrawElements(GL_TRIANGLES, mesh->triindices.size(), GL_UNSIGNED_SHORT, mesh->triindices.data());
 	}
 	else
 	{

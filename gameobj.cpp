@@ -248,14 +248,18 @@ void Scene::LoadSceneSPK(const char *fn)
 			if (isFirstTime) {
 				meshIt->second = std::make_shared<Mesh>();
 				Mesh* m = meshIt->second.get();
-				m->quadstart = p[7]; m->tristart = p[8];
 				m->ftxo = p[9];
-				m->numquads = p[11]; m->numtris = p[12];
 				m->weird = p[14];
 
-				m->vertices.resize(3 * p[10]);
 				float* verts = (float*)pver->maindata.data() + p[6];
+				uint16_t* quadInds = (uint16_t*)pfac->maindata.data() + p[7];
+				uint16_t* triInds = (uint16_t*)pfac->maindata.data() + p[8];
+				m->vertices.resize(3 * p[10]);
+				m->quadindices.resize(4 * p[11]);
+				m->triindices.resize(3 * p[12]);
 				memcpy(m->vertices.data(), verts, 4 * m->vertices.size());
+				memcpy(m->quadindices.data(), quadInds, 2 * m->quadindices.size());
+				memcpy(m->triindices.data(), triInds, 2 * m->triindices.size());
 			}
 			o->mesh = meshIt->second;
 		}
@@ -322,6 +326,7 @@ std::stringbuf heabuf, nambuf, dblbuf;
 std::vector<std::array<float,3> > posbuf;
 std::vector<std::array<uint32_t, 4> > mtxbuf;
 std::vector<float> verbuf;
+std::vector<uint16_t> facbuf;
 
 uint32_t moc_objcount;
 std::map<GameObject*, uint32_t> objidmap;
@@ -331,6 +336,7 @@ std::map<std::array<uint32_t, 4>, uint32_t> g_sav_mtxmap;
 std::map<std::string, uint32_t> g_sav_nammap;
 std::unordered_map<std::string, uint32_t> g_sav_dblmap;
 std::map<std::vector<float>, uint32_t> g_sav_vermap;
+std::map<std::vector<uint16_t>, uint32_t> g_sav_facmap;
 
 uint32_t sbtell(std::stringbuf* sb);
 
@@ -393,15 +399,33 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	else
 		namoff = itNammap->second;
 
-	uint32_t veroff = 0;
+	uint32_t veroff = 0, trifacoff = 0, quadfacoff = 0;
 	assert(!(o->mesh && o->line));
 	if (o->mesh || o->line) {
 		const auto& vertices = o->mesh ? o->mesh->vertices : o->line->vertices;
-		auto [itVermap, inserted] = g_sav_vermap.try_emplace(vertices, verbuf.size());
-		if (inserted) {
-			verbuf.insert(verbuf.end(), vertices.begin(), vertices.end());
+		if (!vertices.empty()) {
+			auto [itVermap, inserted] = g_sav_vermap.try_emplace(vertices, verbuf.size());
+			if (inserted) {
+				verbuf.insert(verbuf.end(), vertices.begin(), vertices.end());
+			}
+			veroff = itVermap->second;
 		}
-		veroff = itVermap->second;
+	}
+	if (o->mesh) {
+		if (!o->mesh->triindices.empty()) {
+			auto [itFacmap, inserted] = g_sav_facmap.try_emplace(o->mesh->triindices, facbuf.size());
+			if (inserted) {
+				facbuf.insert(facbuf.end(), o->mesh->triindices.begin(), o->mesh->triindices.end());
+			}
+			trifacoff = itFacmap->second;
+		}
+		if (!o->mesh->quadindices.empty()) {
+			auto [itFacmap, inserted] = g_sav_facmap.try_emplace(o->mesh->quadindices, facbuf.size());
+			if (inserted) {
+				facbuf.insert(facbuf.end(), o->mesh->quadindices.begin(), o->mesh->quadindices.end());
+			}
+			quadfacoff = itFacmap->second;
+		}
 	}
 
 	if(true)
@@ -417,13 +441,15 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		{
 			assert(o->mesh);
 			heabuf.sputn((char*)&veroff, 4);
-			heabuf.sputn((char*)&o->mesh->quadstart, 4);
-			heabuf.sputn((char*)&o->mesh->tristart, 4);
+			heabuf.sputn((char*)&quadfacoff, 4);
+			heabuf.sputn((char*)&trifacoff, 4);
 			heabuf.sputn((char*)&o->mesh->ftxo, 4);
-			uint32_t versize = o->mesh->vertices.size() / 3;
+			uint32_t versize = o->mesh->getNumVertices();
+			uint32_t quadsize = o->mesh->getNumQuads();
+			uint32_t trisize = o->mesh->getNumTris();
 			heabuf.sputn((char*)&versize, 4);
-			heabuf.sputn((char*)&o->mesh->numquads, 4);
-			heabuf.sputn((char*)&o->mesh->numtris, 4);
+			heabuf.sputn((char*)&quadsize, 4);
+			heabuf.sputn((char*)&trisize, 4);
 			heabuf.sputn((char*)&o->color, 4);
 			heabuf.sputn((char*)&o->mesh->weird, 4);
 		}
@@ -434,7 +460,7 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 			heabuf.sputn((char*)&o->line->quadstart, 4);
 			heabuf.sputn((char*)&o->line->tristart, 4);
 			heabuf.sputn((char*)&o->line->ftxo, 4);
-			uint32_t versize = o->line->vertices.size() / 3;
+			uint32_t versize = o->line->getNumVertices();
 			heabuf.sputn((char*)&versize, 4);
 			heabuf.sputn((char*)&o->line->numquads, 4);
 			heabuf.sputn((char*)&o->line->numtris, 4);
@@ -483,6 +509,7 @@ void Scene::ModifySPK()
 	g_sav_nammap.clear();
 	g_sav_dblmap.clear();
 	g_sav_vermap.clear();
+	g_sav_facmap.clear();
 
 	auto f = [this](Chunk *c, GameObject *o) {
 		c->subchunks.resize(o->subobj.size());
@@ -509,18 +536,19 @@ void Scene::ModifySPK()
 		memcpy(nthg->maindata.data(), buf.data(), nthg->maindata.size());
 	};
 
-	Chunk nhea, nnam, npos, nmtx, ndbl, nver;
+	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac;
 	fillMaindata('AEHP', &nhea, heabuf.str());
 	fillMaindata('MANP', &nnam, nambuf.str());
 	fillMaindata('SOPP', &npos, posbuf);
 	fillMaindata('XTMP', &nmtx, mtxbuf);
 	fillMaindata('LBDP', &ndbl, dblbuf.str());
 	fillMaindata('REVP', &nver, verbuf);
+	fillMaindata('CAFP', &nfac, facbuf);
 
 	heabuf = std::stringbuf();
 	nambuf = std::stringbuf();
 	posbuf.clear(); mtxbuf.clear(); dblbuf = std::stringbuf();
-	verbuf.clear();
+	verbuf.clear(); facbuf.clear();
 
 	// Chunk comparison
 	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
@@ -546,6 +574,7 @@ void Scene::ModifySPK()
 	chkcmp(pmtx, &nmtx, "PMTX");
 	chkcmp(pdbl, &ndbl, "PDBL");
 	chkcmp(pver, &nver, "PVER");
+	chkcmp(pfac, &nfac, "PFAC");
 
 	*phea = std::move(nhea);
 	*pnam = std::move(nnam);
@@ -553,6 +582,7 @@ void Scene::ModifySPK()
 	*pmtx = std::move(nmtx);
 	*pdbl = std::move(ndbl);
 	*pver = std::move(nver);
+	*pfac = std::move(nfac);
 
 	((uint32_t*)spkchk->maindata.data())[1] = 0x40000;
 
