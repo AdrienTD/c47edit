@@ -15,7 +15,8 @@ struct TexInfo {
 	uint32_t numMipmaps;
 	uint32_t flags;
 	uint32_t random;
-	const char name[];
+	const char name[1];
+	TexInfo() = delete;
 };
 
 extern std::map<uint32_t, void*> texmap;

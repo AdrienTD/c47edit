@@ -1,5 +1,6 @@
 #include "texture.h"
 
+#include <cassert>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -14,9 +15,7 @@
 #include <Windows.h>
 #include <GL/GL.h>
 
-#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
-#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 #include "squish.h"
 
@@ -25,9 +24,9 @@ std::map<uint32_t, void*> texmap;
 void GlifyTexture(Chunk* c) {
 	uint8_t* d = (uint8_t*)c->maindata.data();
 	uint32_t texid = *(uint32_t*)d;
-	uint32_t texh = *(uint16_t*)(d + 4);
-	uint32_t texw = *(uint16_t*)(d + 6);
-	uint32_t nmipmaps = *(uint16_t*)(d + 8);
+	int texh = *(uint16_t*)(d + 4);
+	int texw = *(uint16_t*)(d + 6);
+	int nmipmaps = *(uint16_t*)(d + 8);
 	uint8_t* firstbmp = d + 20;
 	while (*(firstbmp++));
 
@@ -53,8 +52,8 @@ void GlifyTexture(Chunk* c) {
 	for (int m = 0; m < nmipmaps; m++)
 	{
 		uint32_t mmsize = *(uint32_t*)bmp; bmp += 4;
-		uint32_t mmWidth = std::max(texw >> m, 1u);
-		uint32_t mmHeight = std::max(texh >> m, 1u);
+		int mmWidth = std::max(texw >> m, 1);
+		int mmHeight = std::max(texh >> m, 1);
 		if (c->tag == 'PALN')
 		{
 			uint32_t* pix32 = new uint32_t[mmsize];
@@ -156,7 +155,7 @@ DynArray<uint32_t> ConvertTextureToRGBA8(Chunk* texChunk) {
 	{
 		uint32_t pal[256];
 		uint8_t* pnt = firstbmp;
-		for (int m = 0; m < ti->numMipmaps; m++)
+		for (int m = 0; m < (int)ti->numMipmaps; m++)
 			pnt += *(uint32_t*)pnt + 4;
 		uint32_t npalentries = *(uint32_t*)pnt; pnt += 4;
 		if (npalentries > 256) npalentries = 256;

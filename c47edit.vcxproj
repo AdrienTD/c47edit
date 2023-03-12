@@ -135,6 +135,7 @@
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ObjModel.cpp" />
+    <ClCompile Include="stb_implementations.cpp" />
     <ClCompile Include="texture.cpp" />
     <ClCompile Include="vecmat.cpp" />
     <ClCompile Include="video.cpp" />
