@@ -10,6 +10,7 @@
 #include "gameobj.h"
 
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <Windows.h>
 #include <GL/GL.h>
 
@@ -44,7 +45,7 @@ void GlifyTexture(Chunk* c) {
 	GLuint gltex;
 	glGenTextures(1, &gltex);
 	glBindTexture(GL_TEXTURE_2D, gltex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (nmipmaps > 1) ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	texmap[texid] = (void*)gltex;
 
@@ -52,16 +53,18 @@ void GlifyTexture(Chunk* c) {
 	for (int m = 0; m < nmipmaps; m++)
 	{
 		uint32_t mmsize = *(uint32_t*)bmp; bmp += 4;
+		uint32_t mmWidth = std::max(texw >> m, 1u);
+		uint32_t mmHeight = std::max(texh >> m, 1u);
 		if (c->tag == 'PALN')
 		{
 			uint32_t* pix32 = new uint32_t[mmsize];
 			for (uint32_t p = 0; p < mmsize; p++)
 				pix32[p] = pal[bmp[p]];
-			glTexImage2D(GL_TEXTURE_2D, m, 4, texw >> m, texh >> m, 0, GL_RGBA, GL_UNSIGNED_BYTE, pix32);
+			glTexImage2D(GL_TEXTURE_2D, m, 4, mmWidth, mmHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, pix32);
 			delete[] pix32;
 		}
 		else if (c->tag == 'RGBA')
-			glTexImage2D(GL_TEXTURE_2D, m, 4, texw >> m, texh >> m, 0, GL_RGBA, GL_UNSIGNED_BYTE, bmp);
+			glTexImage2D(GL_TEXTURE_2D, m, 4, mmWidth, mmHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, bmp);
 		else
 			ferr("Unknown texture format in Pack(Repeat).PAL.");
 		bmp += mmsize;
@@ -70,11 +73,10 @@ void GlifyTexture(Chunk* c) {
 
 void GlifyAllTextures()
 {
-	for (size_t i = 0; i < g_scene.g_palPack.subchunks.size(); i++)
-	{
-		Chunk* c = &g_scene.g_palPack.subchunks[i];
-		GlifyTexture(c);
-	}
+	for (Chunk& c : g_scene.g_palPack.subchunks)
+		GlifyTexture(&c);
+	for (Chunk& c : g_scene.g_lgtPack.subchunks)
+		GlifyTexture(&c);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
@@ -193,6 +195,12 @@ std::pair<Chunk*, Chunk*> FindTextureChunk(Scene& scene, uint32_t id)
 			int nth = &chk - scene.g_palPack.subchunks.data();
 			assert(*(uint32_t*)scene.g_dxtPack.subchunks[nth].maindata.data() == id);
 			return { &chk, &scene.g_dxtPack.subchunks[nth] };
+		}
+	}
+	for (Chunk& chk : scene.g_lgtPack.subchunks) {
+		uint32_t chkid = *(uint32_t*)chk.maindata.data();
+		if (chkid == id) {
+			return { &chk, nullptr };
 		}
 	}
 	return { nullptr, nullptr };

@@ -111,11 +111,13 @@ static void ReadAssetPacks(Scene* scene, mz_zip_archive* zip)
 
 	readPack("PAL", scene->g_palPack);
 	readPack("DXT", scene->g_dxtPack);
+	readPack("LGT", scene->g_lgtPack);
 	readPack("WAV", scene->g_wavPack);
 	readPack("ANM", scene->g_anmPack, &scene->g_hasAnmPack);
 
 	if (scene->g_palPack.tag != 'PAL') ferr("Not a PAL chunk in Repeat.PAL");
 	if (scene->g_dxtPack.tag != 'DXT') ferr("Not a DXT chunk in Repeat.DXT");
+	if (scene->g_lgtPack.tag != 'LGT') ferr("Not a LGT chunk in Repeat.LGT");
 	assert(scene->g_palPack.subchunks.size() == scene->g_dxtPack.subchunks.size());
 }
 
@@ -660,7 +662,7 @@ void Scene::SaveSceneSPK(const char *fn)
 
 	int nfiles = mz_zip_reader_get_num_files(&inzip);
 	// Determine files to copy from original ZIP
-	static constexpr const char* nocopyFiles[] = {"Pack.SPK", "Pack.PAL", "Pack.DXT", "Pack.ANM", "Pack.WAV",
+	static constexpr const char* nocopyFiles[] = {"Pack.SPK", "Pack.PAL", "Pack.DXT", "Pack.ANM", "Pack.WAV", "Pack.LGT",
 		"PackRepeat.PAL", "PackRepeat.DXT", "PackRepeat.ANM", "PackRepeat.WAV" };
 	std::vector<bool> allowCopy = std::vector<bool>(nfiles, true);
 	for (size_t i = 0; i < std::size(nocopyFiles); ++i) {
@@ -683,6 +685,7 @@ void Scene::SaveSceneSPK(const char *fn)
 	saveChunk(spkchk, "Pack.SPK");
 	saveChunk(&g_palPack, "Pack.PAL");
 	saveChunk(&g_dxtPack, "Pack.DXT");
+	saveChunk(&g_lgtPack, "Pack.LGT");
 	saveChunk(&g_wavPack, "Pack.WAV");
 	if (g_hasAnmPack)
 		saveChunk(&g_anmPack, "Pack.ANM");

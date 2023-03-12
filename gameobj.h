@@ -140,7 +140,7 @@ struct Scene {
 	std::string lastspkfn;
 	void* zipmem = nullptr;
 	uint32_t zipsize = 0;
-	Chunk g_palPack, g_dxtPack, g_anmPack, g_wavPack;
+	Chunk g_palPack, g_dxtPack, g_lgtPack, g_anmPack, g_wavPack;
 	bool g_hasAnmPack = false;
 
 	void LoadSceneSPK(const char *fn);

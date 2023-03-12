@@ -974,12 +974,19 @@ void IGTextures()
 		}
 	}
 
+	static int packShown = 0;
+	ImGui::SameLine();
+	ImGui::RadioButton("Tex", &packShown, 0);
+	ImGui::SameLine();
+	ImGui::RadioButton("Lgt", &packShown, 1);
+	auto& pack = (packShown == 0) ? g_scene.g_palPack : g_scene.g_lgtPack;
+
 	if (ImGui::BeginTable("TextureColumnsa", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoHostExtendY | ImGuiTableFlags_NoHostExtendX, ImGui::GetContentRegionAvail())) {
 		ImGui::TableSetupColumn("TexListCol", ImGuiTableColumnFlags_WidthFixed, 256.0f);
 		ImGui::TableNextRow();
 		ImGui::TableNextColumn();
 		ImGui::BeginChild("TextureList");
-		for (Chunk& chk : g_scene.g_palPack.subchunks) {
+		for (Chunk& chk : pack.subchunks) {
 			TexInfo* ti = (TexInfo*)chk.maindata.data();
 			ImGui::PushID(ti);
 			static const float imgsize = ImGui::GetTextLineHeightWithSpacing() * 2.0f;
