@@ -46,7 +46,13 @@ struct Mesh
 {
 	std::vector<float> vertices;
 	std::vector<uint16_t> quadindices, triindices;
-	uint32_t ftxo, weird;
+	uint32_t weird;
+
+	// FTX
+	using FTXFace = std::array<uint16_t, 6>;
+	std::vector<float> textureCoords;
+	std::vector<float> lightCoords;
+	std::vector<FTXFace> ftxFaces;
 
 	struct Extension {
 		uint32_t extUnk2;

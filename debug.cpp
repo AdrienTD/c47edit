@@ -76,31 +76,31 @@ void IGDebugMenus()
 			assert(pdat);
 			auto walkObj = [&](GameObject* obj, auto& rec) -> void {
 				if ((obj->flags & 0x20) && obj->mesh) {
-					if (obj->mesh->ftxo) {
-						uint32_t ftxo;
-						if (obj->mesh->ftxo & 0x80000000) {
-							uint32_t* dat = (uint32_t*)((uint8_t*)pdat->maindata.data() + (obj->mesh->ftxo & 0x7FFF'FFFF));
-							ftxo = dat[0];
-						}
-						else
-							ftxo = obj->mesh->ftxo & 0x7FFFFFFF;
-						uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + ftxo - 1;
-						uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
-						size_t numFaces = obj->mesh->getNumQuads() + obj->mesh->getNumTris();
-						assert(*(uint32_t*)(ftxpnt + 8) == numFaces);
-						size_t numTexturedFaces = 0;
-						size_t numLitFaces = 0;
-						for (size_t f = 0; f < numFaces; ++f) {
-							uint16_t flags = ftxFace[0];
-							if (flags & 0x20)
-								numTexturedFaces += 1;
-							if (flags & 0x80)
-								numLitFaces += 1;
-							ftxFace += 6;
-						}
-						uvcover.cover(*(uint32_t*)ftxpnt * sizeof(float), sizeof(float) * 2 * 4 * numTexturedFaces, 1);
-						uvcover.cover(*(uint32_t*)(ftxpnt + 4) * sizeof(float), sizeof(float) * 2 * 4 * numLitFaces, 2);
-					}
+					//if (obj->mesh->ftxo) {
+					//	uint32_t ftxo;
+					//	if (obj->mesh->ftxo & 0x80000000) {
+					//		uint32_t* dat = (uint32_t*)((uint8_t*)pdat->maindata.data() + (obj->mesh->ftxo & 0x7FFF'FFFF));
+					//		ftxo = dat[0];
+					//	}
+					//	else
+					//		ftxo = obj->mesh->ftxo & 0x7FFFFFFF;
+					//	uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + ftxo - 1;
+					//	uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
+					//	size_t numFaces = obj->mesh->getNumQuads() + obj->mesh->getNumTris();
+					//	assert(*(uint32_t*)(ftxpnt + 8) == numFaces);
+					//	size_t numTexturedFaces = 0;
+					//	size_t numLitFaces = 0;
+					//	for (size_t f = 0; f < numFaces; ++f) {
+					//		uint16_t flags = ftxFace[0];
+					//		if (flags & 0x20)
+					//			numTexturedFaces += 1;
+					//		if (flags & 0x80)
+					//			numLitFaces += 1;
+					//		ftxFace += 6;
+					//	}
+					//	uvcover.cover(*(uint32_t*)ftxpnt * sizeof(float), sizeof(float) * 2 * 4 * numTexturedFaces, 1);
+					//	uvcover.cover(*(uint32_t*)(ftxpnt + 4) * sizeof(float), sizeof(float) * 2 * 4 * numLitFaces, 2);
+					//}
 				}
 				for (auto* child : obj->subobj) {
 					rec(child, rec);
@@ -118,21 +118,21 @@ void IGDebugMenus()
 			auto walkObj = [&](GameObject* obj, const std::string& indent, auto& rec) -> void {
 				if ((obj->flags & 0x20) && obj->mesh) {
 					printf("%s%s: ", indent.c_str(), obj->name.c_str());
-					if (obj->mesh->ftxo == 0) {
-						printf("\x1B[91mNo FTXO (%08X)\x1B[0m\n", obj->mesh->ftxo);
-					}
-					else {
-						uint32_t ftxo;
-						if (obj->mesh->ftxo & 0x80000000) {
-							uint32_t* dat = (uint32_t*)((uint8_t*)pdat->maindata.data() + (obj->mesh->ftxo & 0x7FFF'FFFF));
-							ftxo = dat[0];
-						}
-						else {
-							ftxo = obj->mesh->ftxo;
-						}
-						uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + ftxo - 1;
-						printf("FTXO:%08X  UV1:%08X  UV2:%08X\n", obj->mesh->ftxo - 1, *(uint32_t*)ftxpnt, *(uint32_t*)(ftxpnt + 4));
-					}
+					//if (obj->mesh->ftxo == 0) {
+					//	printf("\x1B[91mNo FTXO (%08X)\x1B[0m\n", obj->mesh->ftxo);
+					//}
+					//else {
+					//	uint32_t ftxo;
+					//	if (obj->mesh->ftxo & 0x80000000) {
+					//		uint32_t* dat = (uint32_t*)((uint8_t*)pdat->maindata.data() + (obj->mesh->ftxo & 0x7FFF'FFFF));
+					//		ftxo = dat[0];
+					//	}
+					//	else {
+					//		ftxo = obj->mesh->ftxo;
+					//	}
+					//	uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + ftxo - 1;
+					//	printf("FTXO:%08X  UV1:%08X  UV2:%08X\n", obj->mesh->ftxo - 1, *(uint32_t*)ftxpnt, *(uint32_t*)(ftxpnt + 4));
+					//}
 				}
 				std::string subindent = indent + ' ';
 				for (auto* child : obj->subobj) {
@@ -190,20 +190,20 @@ void IGDebugMenus()
 						//cdat.cover(odat, 4 * obj->line->numtris, 4);
 					}
 					else if (obj->flags & 0x20) {
-						if (obj->mesh->ftxo & 0x80000000) {
-							uint32_t odat1 = obj->mesh->ftxo & 0x7FFF'FFFF;
-							uint32_t* dat1 = (uint32_t*)((uint8_t*)pdat->maindata.data() + odat1);
+						//if (obj->mesh->ftxo & 0x80000000) {
+						//	uint32_t odat1 = obj->mesh->ftxo & 0x7FFF'FFFF;
+						//	uint32_t* dat1 = (uint32_t*)((uint8_t*)pdat->maindata.data() + odat1);
 
-							uint32_t odat2 = dat1[2];
-							uint8_t* dat2 = (uint8_t*)pdat->maindata.data() + odat2;
-							uint8_t* ptr2 = dat2;
-							uint32_t numDings = *(uint32_t*)ptr2; ptr2 += 4;
-							ptr2 += numDings * 8;
-							while (*ptr2++); // skip string
+						//	uint32_t odat2 = dat1[2];
+						//	uint8_t* dat2 = (uint8_t*)pdat->maindata.data() + odat2;
+						//	uint8_t* ptr2 = dat2;
+						//	uint32_t numDings = *(uint32_t*)ptr2; ptr2 += 4;
+						//	ptr2 += numDings * 8;
+						//	while (*ptr2++); // skip string
 
-							cdat.cover(odat1, 12, 1);
-							cdat.cover(odat2, ptr2 - dat2, 2);
-						}
+						//	cdat.cover(odat1, 12, 1);
+						//	cdat.cover(odat2, ptr2 - dat2, 2);
+						//}
 					}
 				}
 				for (auto* child : obj->subobj) {

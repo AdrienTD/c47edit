@@ -261,9 +261,10 @@ void Scene::LoadSceneSPK(const char *fn)
 				memcpy(m->quadindices.data(), quadInds, 2 * m->quadindices.size());
 				memcpy(m->triindices.data(), triInds, 2 * m->triindices.size());
 
+				uint32_t ftxo = 0;
 				if (p[9] & 0x80000000) {
 					uint32_t* dat1 = (uint32_t*)(pdat->maindata.data() + (p[9] & 0x7FFFFFFF));
-					m->ftxo = dat1[0];
+					ftxo = dat1[0];
 					m->extension = std::make_unique<Mesh::Extension>();
 					m->extension->extUnk2 = dat1[1];
 					uint8_t* dat2 = pdat->maindata.data() + dat1[2];
@@ -275,7 +276,29 @@ void Scene::LoadSceneSPK(const char *fn)
 					m->extension->name = (const char*)ptr2;
 				}
 				else {
-					m->ftxo = p[9];
+					ftxo = p[9];
+				}
+				if (ftxo != 0) {
+					uint8_t* ftx = pftx->maindata.data() + ftxo - 1;
+					uint32_t uv1off = *(uint32_t*)ftx;
+					uint32_t uv2off = *(uint32_t*)(ftx + 4);
+					uint32_t numFaces = *(uint32_t*)(ftx + 8);
+					assert(numFaces == m->getNumTris() + m->getNumQuads());
+					float* uv1 = (float*)puvc->maindata.data() + uv1off;
+					float* uv2 = (float*)puvc->maindata.data() + uv2off;
+					m->ftxFaces.resize(numFaces);
+					memcpy(m->ftxFaces.data(), ftx + 12, numFaces * 12);
+					uint32_t numTexturedFaces = 0, numLitFaces = 0;
+					for (auto& face : m->ftxFaces) {
+						if (face[0] & 0x20)
+							numTexturedFaces += 1;
+						if (face[0] & 0x80)
+							numLitFaces += 1;
+					}
+					m->textureCoords.resize(numTexturedFaces * 8);
+					m->lightCoords.resize(numLitFaces * 8);
+					memcpy(m->textureCoords.data(), uv1, numTexturedFaces * 8 * 4);
+					memcpy(m->lightCoords.data(), uv2, numLitFaces * 8 * 4);
 				}
 			}
 			o->mesh = meshIt->second;
@@ -372,6 +395,8 @@ PackBuffer<std::string, 1> g_sav_dblPackBuf;
 PackBuffer<std::vector<float>, 4> g_sav_verPackBuf;
 PackBuffer<std::vector<uint16_t>, 2> g_sav_facPackBuf;
 PackBuffer<std::string, 1> g_sav_datPackBuf;
+PackBuffer<std::string, 1> g_sav_ftxPackBuf;
+PackBuffer<std::vector<float>, 4> g_sav_uvcPackBuf;
 
 uint32_t sbtell(std::stringbuf* sb);
 
@@ -414,6 +439,22 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		if (!o->mesh->quadindices.empty()) {
 			quadfacoff = g_sav_facPackBuf.add(o->mesh->quadindices);
 		}
+		uint32_t realftxoff = 0;
+		if (!o->mesh->ftxFaces.empty()) {
+			uint32_t tcOff = 0, lcOff = 0;
+			if (!o->mesh->textureCoords.empty()) {
+				tcOff = g_sav_uvcPackBuf.add(o->mesh->textureCoords);
+			}
+			if (!o->mesh->lightCoords.empty()) {
+				lcOff = g_sav_uvcPackBuf.add(o->mesh->lightCoords);
+			}
+			std::stringbuf sb;
+			uint32_t numFaces = (uint32_t)o->mesh->ftxFaces.size();
+			std::array<uint32_t, 3> header = { tcOff, lcOff, numFaces };
+			sb.sputn((char*)header.data(), 12);
+			sb.sputn((char*)o->mesh->ftxFaces.data(), numFaces * 12);
+			realftxoff = g_sav_ftxPackBuf.add(sb.str()) + 1;
+		}
 		if (o->mesh->extension) {
 			std::stringbuf sb;
 			uint32_t numFrames = o->mesh->extension->frames.size();
@@ -424,12 +465,12 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 			}
 			sb.sputn(o->mesh->extension->name.c_str(), o->mesh->extension->name.size() + 1);
 			uint32_t ext2off = g_sav_datPackBuf.add(sb.str());
-			std::array<uint32_t, 3> ext1 = { o->mesh->ftxo, o->mesh->extension->extUnk2, ext2off };
+			std::array<uint32_t, 3> ext1 = { realftxoff, o->mesh->extension->extUnk2, ext2off };
 			uint32_t ext1off = g_sav_datPackBuf.add(std::string{ (char*)ext1.data(), 12 });
 			ftxoff = ext1off | 0x80000000;
 		}
 		else {
-			ftxoff = o->mesh->ftxo;
+			ftxoff = realftxoff;
 		}
 	}
 	if (o->line) {
@@ -542,7 +583,7 @@ void Scene::ModifySPK()
 		memcpy(nthg->maindata.data(), buf.data(), nthg->maindata.size());
 	};
 
-	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac, ndat;
+	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac, ndat, nftx, nuvc;
 	fillMaindata('AEHP', &nhea, heabuf.str());
 	fillMaindata('MANP', &nnam, g_sav_namPackBuf.buffer);
 	fillMaindata('SOPP', &npos, g_sav_posPackBuf.buffer);
@@ -551,11 +592,14 @@ void Scene::ModifySPK()
 	fillMaindata('REVP', &nver, g_sav_verPackBuf.buffer);
 	fillMaindata('CAFP', &nfac, g_sav_facPackBuf.buffer);
 	fillMaindata('TADP', &ndat, g_sav_datPackBuf.buffer);
+	fillMaindata('XTFP', &nftx, g_sav_ftxPackBuf.buffer);
+	fillMaindata('CVUP', &nuvc, g_sav_uvcPackBuf.buffer);
 
 	heabuf = std::stringbuf();
 	g_sav_namPackBuf = {};
 	g_sav_posPackBuf = {}; g_sav_mtxPackBuf = {}; g_sav_dblPackBuf = {};
 	g_sav_verPackBuf = {}; g_sav_facPackBuf = {}; g_sav_datPackBuf = {};
+	g_sav_ftxPackBuf = {}; g_sav_uvcPackBuf = {};
 
 	// Chunk comparison
 	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
@@ -583,6 +627,8 @@ void Scene::ModifySPK()
 	chkcmp(pver, &nver, "PVER");
 	chkcmp(pfac, &nfac, "PFAC");
 	chkcmp(pdat, &ndat, "PDAT");
+	chkcmp(pftx, &nftx, "PFTX");
+	chkcmp(puvc, &nuvc, "PUVC");
 
 	*phea = std::move(nhea);
 	*pnam = std::move(nnam);
@@ -592,6 +638,8 @@ void Scene::ModifySPK()
 	*pver = std::move(nver);
 	*pfac = std::move(nfac);
 	*pdat = std::move(ndat);
+	*pftx = std::move(nftx);
+	*puvc = std::move(nuvc);
 
 	((uint32_t*)spkchk->maindata.data())[1] = 0x40000;
 

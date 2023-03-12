@@ -92,48 +92,51 @@ struct ProMesh {
 		static const int uvit[4] = { 0,1,2,3 };
 
 		ProMesh pro;
-		float *verts = mesh->vertices.data();
+		const float *verts = mesh->vertices.data();
 		size_t numQuads = mesh->getNumQuads();
 		size_t numTris = mesh->getNumTris();
-		uint8_t *ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + mesh->ftxo - 1;
-		uint16_t *ftxFace = (uint16_t*)(ftxpnt + 12);
-		bool hasFtx = mesh->ftxo && !(mesh->ftxo & 0x80000000);
+		const uint16_t *ftxFace = (uint16_t*)mesh->ftxFaces.data();
+		bool hasFtx = !mesh->ftxFaces.empty();
 
 		float *uvCoords = (float*)defUvs;
 		if (hasFtx)
-			uvCoords = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt);
+			uvCoords = (float*)mesh->textureCoords.data();
 
 		for (size_t i = 0; i < numTris; i++)
 		{
+			bool isTextured = hasFtx && (ftxFace[0] & 0x20);
 			uint16_t texid = hasFtx ? ftxFace[2] : 65535;
 			auto& part = pro.parts[texid];
 			IndexType prostart = (IndexType)part.vertices.size();
 			for (int j = 0; j < 3; j++) {
-				float* uu = uvCoords + uvit[j] * 2;
+				const float* uu = (isTextured ? uvCoords : defUvs) + uvit[j] * 2;
 				part.texcoords.push_back({ uu[0], uu[1] });
-				float *v = verts + mesh->triindices[i * 3 + j] * 3 / 2;
+				const float *v = verts + mesh->triindices[i * 3 + j] * 3 / 2;
 				part.vertices.push_back({ v[0], v[1], v[2] });
 			}
 			for (int j : {0, 1, 2})
 				part.indices.push_back((IndexType)(prostart + j));
 			ftxFace += 6;
-			uvCoords += 8; // Ignore 4th UV.
+			if (isTextured)
+				uvCoords += 8; // Ignore 4th UV.
 		}
 		for (uint32_t i = 0; i < numQuads; i++)
 		{
+			bool isTextured = hasFtx && (ftxFace[0] & 0x20);
 			uint16_t texid = hasFtx ? ftxFace[2] : 65535;
 			auto& part = pro.parts[texid];
 			IndexType prostart = (IndexType)part.vertices.size();
 			for (int j = 0; j < 4; j++) {
-				float* uu = uvCoords + uvit[j] * 2;
+				const float* uu = (isTextured ? uvCoords : defUvs) + uvit[j] * 2;
 				part.texcoords.push_back({ uu[0], uu[1] });
-				float *v = verts + mesh->quadindices[i * 4 + j] * 3 / 2;
+				const float *v = verts + mesh->quadindices[i * 4 + j] * 3 / 2;
 				part.vertices.push_back({ v[0], v[1], v[2] });
 			}
 			for (int j : {0, 1, 3, 3, 1, 2 })
 				part.indices.push_back((IndexType)(prostart + j));
 			ftxFace += 6;
-			uvCoords += 8;
+			if (isTextured)
+				uvCoords += 8;
 		}
 
 		g_proMeshes[mesh] = std::move(pro);

@@ -597,31 +597,34 @@ void IGObjectInfo()
 				mesh->quadindices.resize(4 * std::size(quads));
 				mesh->triindices.resize(3 * std::size(triangles));
 				size_t numFaces = std::size(quads) + std::size(triangles);
+				mesh->ftxFaces.resize(numFaces);
+				mesh->textureCoords.resize(numFaces * 8);
+				mesh->lightCoords.resize(numFaces * 8);
 				//mesh->numverts = std::size(objVertices);
 				//mesh->numquads = std::size(quads);
 				//mesh->numtris = std::size(triangles);
-				int faceIndex = g_scene.pfac->maindata.size() / 2;
+				//int faceIndex = g_scene.pfac->maindata.size() / 2;
 				//mesh->vertstart = g_scene.pver->maindata.size() / 4;
 				//mesh->tristart = (mesh->numtris > 0) ? faceIndex : 0;
 				//mesh->quadstart = (mesh->numquads > 0) ? faceIndex + 3 * mesh->numtris : 0;
-				mesh->ftxo = g_scene.pftx->maindata.size() + 1;
+				//mesh->ftxo = g_scene.pftx->maindata.size() + 1; // ALERT
 
 				//Chunk::DataBuffer pver_newdata(g_scene.pver->maindata.size() + mesh->vertices.size() * 12);
 				//Chunk::DataBuffer pfac_newdata(g_scene.pfac->maindata.size() + mesh->numquads * 8 + mesh->numtris * 6);
-				Chunk::DataBuffer pftx_newdata(g_scene.pftx->maindata.size() + 12 + numFaces * 12);
-				Chunk::DataBuffer puvc_newdata(g_scene.puvc->maindata.size() + numFaces * 4 * 8 * 2); // 8 floats per face, 2 sets
+				//Chunk::DataBuffer pftx_newdata(g_scene.pftx->maindata.size() + 12 + numFaces * 12);
+				//Chunk::DataBuffer puvc_newdata(g_scene.puvc->maindata.size() + numFaces * 4 * 8 * 2); // 8 floats per face, 2 sets
 				//memcpy(pver_newdata.data(), g_scene.pver->maindata.data(), g_scene.pver->maindata.size());
 				//memcpy(pfac_newdata.data(), g_scene.pfac->maindata.data(), g_scene.pfac->maindata.size());
-				memcpy(pftx_newdata.data(), g_scene.pftx->maindata.data(), g_scene.pftx->maindata.size());
-				memcpy(puvc_newdata.data(), g_scene.puvc->maindata.data(), g_scene.puvc->maindata.size());
+				//memcpy(pftx_newdata.data(), g_scene.pftx->maindata.data(), g_scene.pftx->maindata.size());
+				//memcpy(puvc_newdata.data(), g_scene.puvc->maindata.data(), g_scene.puvc->maindata.size());
 
 				float* verts = mesh->vertices.data();
 				uint16_t* qfaces = mesh->quadindices.data();
 				uint16_t* tfaces = mesh->triindices.data();
-				uint32_t* ftxHead = (uint32_t*)(pftx_newdata.data() + g_scene.pftx->maindata.size());
-				uint16_t* ftx = (uint16_t*)(ftxHead + 3);
-				float* uv1 = (float*)(puvc_newdata.data() + g_scene.puvc->maindata.size());
-				float* uv2 = (float*)(puvc_newdata.data() + g_scene.puvc->maindata.size() + numFaces * 4 * 8);
+				//uint32_t* ftxHead = (uint32_t*)(pftx_newdata.data() + g_scene.pftx->maindata.size());
+				uint16_t* ftx = (uint16_t*)mesh->ftxFaces.data();
+				float* uv1 = (float*)mesh->textureCoords.data();
+				float* uv2 = (float*)mesh->lightCoords.data();
 
 				memcpy(verts, objVertices.data(), objVertices.size() * 12);
 				for (auto& tri : triangles)
@@ -630,9 +633,9 @@ void IGObjectInfo()
 				for (auto& quad : quads)
 					for (auto& [indPos, indTxc, indNrm] : quad)
 						*qfaces++ = 2 * indPos;
-				ftxHead[0] = uv1 - (float*)puvc_newdata.data();
-				ftxHead[1] = uv2 - (float*)puvc_newdata.data();
-				ftxHead[2] = numFaces;
+				//ftxHead[0] = uv1 - (float*)puvc_newdata.data();
+				//ftxHead[1] = uv2 - (float*)puvc_newdata.data();
+				//ftxHead[2] = numFaces;
 				size_t groupIndex = -1, triId = 0;
 				static constexpr uint16_t defaultTexId = 0x0135;
 				uint16_t texId = defaultTexId;
@@ -672,8 +675,8 @@ void IGObjectInfo()
 
 				//g_scene.pver->maindata = std::move(pver_newdata);
 				//g_scene.pfac->maindata = std::move(pfac_newdata);
-				g_scene.pftx->maindata = std::move(pftx_newdata);
-				g_scene.puvc->maindata = std::move(puvc_newdata);
+				//g_scene.pftx->maindata = std::move(pftx_newdata);
+				//g_scene.puvc->maindata = std::move(puvc_newdata);
 				InvalidateMesh(mesh);
 			}
 		}
@@ -703,14 +706,14 @@ void IGObjectInfo()
 				if (invertFaces) {
 					uint16_t* triIndices = mesh->triindices.data();
 					uint16_t* quadIndices = mesh->quadindices.data();
-					bool hasFtx = selobj->mesh->ftxo && !(selobj->mesh->ftxo & 0x80000000);
+					bool hasFtx = !selobj->mesh->ftxFaces.empty();
 					assert(hasFtx);
-					uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
-					float* uvCoords = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt);
+					//uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
+					float* uvCoords = (float*)selobj->mesh->textureCoords.data();
 					using UVQuad = std::array<std::array<float, 2>, 4>;
 					static_assert(sizeof(UVQuad) == 4 * 8);
 					UVQuad* uvQuads = (UVQuad*)uvCoords;
-					uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
+					uint16_t* ftxFace = (uint16_t*)selobj->mesh->ftxFaces.data();
 					for (uint32_t i = 0; i < mesh->getNumTris(); ++i) {
 						std::swap(triIndices[0], triIndices[2]);
 						UVQuad& q = *uvQuads;
@@ -779,7 +782,7 @@ void IGObjectInfo()
 			ImGui::Text("Vertex count: %zu", selobj->mesh->getNumVertices());
 			ImGui::Text("Quad count:   %zu", selobj->mesh->getNumQuads());
 			ImGui::Text("Tri count:    %zu", selobj->mesh->getNumTris());
-			ImGui::Text("FTXO offset: 0x%X", selobj->mesh->ftxo);
+			//ImGui::Text("FTXO offset: 0x%X", selobj->mesh->ftxo);
 			ImGui::Text("Weird: 0x%X", selobj->mesh->weird);
 			if (selobj->mesh->extension) {
 				ImGui::TextUnformatted("--- EXTENSION ---");
@@ -799,28 +802,34 @@ void IGObjectInfo()
 			ImGui::Text("Terms: %s", termstr.c_str());
 
 		}
-		if (selobj->mesh && selobj->mesh->ftxo && ImGui::CollapsingHeader("FTXO")) {
+		if (selobj->mesh && ImGui::CollapsingHeader("FTXO")) {
 			// TODO: place this in "DebugUI.cpp"
 			if (ImGui::Button("Change texture")) {
-				uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
-				uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
-				uint32_t numFaces = *(uint32_t*)(ftxpnt + 8);
+				//uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
+				uint16_t* ftxFace = (uint16_t*)selobj->mesh->ftxFaces.data();
+				uint32_t numFaces = selobj->mesh->ftxFaces.size();
 				for (size_t i = 0; i < numFaces; ++i) {
 					ftxFace[2] = curtexid;
 					ftxFace += 6;
 				}
 				InvalidateMesh(selobj->mesh.get());
 			}
-			bool hasFtx = (selobj->flags & 0x20) && selobj->mesh->ftxo && !(selobj->mesh->ftxo & 0x80000000);
-			if (hasFtx) {
-				uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
-				float* uvCoords = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt);
-				float* uvCoords2 = (float*)g_scene.puvc->maindata.data() + *(uint32_t*)(ftxpnt + 4);
-				uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
+			if (!selobj->mesh->ftxFaces.empty()) {
+				//uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
+				float* uvCoords = (float*)selobj->mesh->textureCoords.data();
+				float* uvCoords2 = (float*)selobj->mesh->lightCoords.data();
+				uint16_t* ftxFace = (uint16_t*)selobj->mesh->ftxFaces.data();
 				size_t numFaces = selobj->mesh->getNumQuads() + selobj->mesh->getNumTris();
-				ImGui::Text("UV  offset 0x%08X", *(uint32_t*)(ftxpnt));
-				ImGui::Text("UV2 offset 0x%08X", *(uint32_t*)(ftxpnt + 4));
-				ImGui::Text("Num Faces  0x%08X (0x%08X)", *(uint32_t*)(ftxpnt + 8), numFaces);
+				//ImGui::Text("UV  offset 0x%08X", *(uint32_t*)(ftxpnt));
+				//ImGui::Text("UV2 offset 0x%08X", *(uint32_t*)(ftxpnt + 4));
+				size_t numTexFaces = 0, numLitFaces = 0;
+				for (auto& ftxFace : selobj->mesh->ftxFaces) {
+					if (ftxFace[0] & 0x20) ++numTexFaces;
+					if (ftxFace[0] & 0x80) ++numLitFaces;
+				}
+				ImGui::Text("Num     Faces:  %zu (%zu)", selobj->mesh->ftxFaces.size(), numFaces);
+				ImGui::Text("Num Tex Faces:  %zu (%zu)", selobj->mesh->textureCoords.size() / 8, numTexFaces);
+				ImGui::Text("Num Lit Faces:  %zu (%zu)", selobj->mesh->lightCoords.size() / 8, numLitFaces);
 				ImGui::Separator();
 				for (size_t i = 0; i < numFaces; ++i) {
 					ImGui::Text("%04X %04X %04X %04X %04X %04X", ftxFace[0], ftxFace[1], ftxFace[2], ftxFace[3], ftxFace[4], ftxFace[5]);
