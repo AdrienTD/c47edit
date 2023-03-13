@@ -24,6 +24,8 @@ HDC whdc; HGLRC glrc;
 int drawframes = 0;
 extern HWND hWindow;
 bool rendertextures = false;
+bool renderColorTextures = true, renderLightmaps = true;
+bool enableAlphaTest = true;
 
 void InitVideo()
 {
@@ -76,7 +78,7 @@ struct ProMesh {
 		std::vector<uint32_t> colors;
 		std::vector<IndexType> indices;
 	};
-	std::map<std::pair<uint16_t, uint16_t>, Part> parts;
+	std::map<std::tuple<uint16_t, uint16_t, uint16_t>, Part> parts;
 
 	inline static std::map<Mesh*, ProMesh> g_proMeshes;
 
@@ -90,8 +92,9 @@ struct ProMesh {
 		// Else make one and return it:
 
 		static const float defUvs[8] = { 0,0, 0,1, 1,1, 1,0 };
-		static const uint32_t defColors[4] = { 0xFF0000FF, 0xFF00FF00, 0xFFFF0000, 0xFF0000FF };
+		static const uint32_t defColors[4] = { 0xFF0000FF, 0xFF00FF00, 0xFFFF0000, 0xFF000000 };
 		static const int uvit[4] = { 0,1,2,3 };
+		static const int lgtit[4] = { 0,1,3,2 };
 
 		ProMesh pro;
 		const float *verts = mesh->vertices.data();
@@ -120,7 +123,7 @@ struct ProMesh {
 			bool isLit = hasFtx && (ftxFace[0] & 0x80);
 			uint16_t texid = isTextured ? ftxFace[2] : 0xFFFF;
 			uint16_t lgtid = isLit ? ftxFace[3] : 0xFFFF;
-			auto& part = pro.parts[std::make_pair(texid, lgtid)];
+			auto& part = pro.parts[std::make_tuple(ftxFace[0] & 0x0202, texid, lgtid)];
 			IndexType prostart = (IndexType)part.vertices.size();
 			for (int j = 0; j < shape; j++) {
 				const float* uu = (isTextured ? uvCoords : defUvs) + uvit[j] * 2;
@@ -133,7 +136,7 @@ struct ProMesh {
 					lmOffsetV = 0.5f / lgtInfo->height;
 				}
 				part.lightmapCoords.push_back({ lu[0] + lmOffsetU, lu[1] + lmOffsetV });
-				uint32_t color = (isLit && ftxFace[3] == 0xFFFF) ? colorMap[4 * (ftxFace[5] - 1) + j] : 0xFFFFFFFF;
+				uint32_t color = (isLit && ftxFace[3] == 0xFFFF) ? colorMap[4 * (ftxFace[5] - 1) + lgtit[j]] : 0xFFFFFFFF;
 				part.colors.push_back(color);
 				const float* v = verts + indices[j] * 3 / 2;
 				part.vertices.push_back({ v[0], v[1], v[2] });
@@ -170,19 +173,37 @@ void DrawMesh(Mesh* mesh)
 	{
 		ProMesh* pro = ProMesh::getProMesh(mesh);
 		for (auto& [mat,part] : pro->parts) {
-			auto& [texid, lgtid] = mat;
+			auto& [flags, texid, lgtid] = mat;
 			if (texid == 0xFFFF)
 				continue;
-			auto t = texmap.find(texid);
-			GLuint gltex = (t != texmap.end()) ? (GLuint)t->second : 0;
-			t = texmap.find(lgtid);
-			GLuint gllgt = (t != texmap.end()) ? (GLuint)t->second : 0;
+			GLuint gltex = 0, gllgt = 0;
+			if (renderColorTextures)
+				if (auto t = texmap.find(texid); t != texmap.end())
+					gltex = (GLuint)(uintptr_t)t->second;
+			if (renderLightmaps)
+				if (auto t = texmap.find(lgtid); t != texmap.end())
+					gllgt = (GLuint)(uintptr_t)t->second;
 			glActiveTextureARB(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, gltex);
 			glActiveTextureARB(GL_TEXTURE1);
 			glBindTexture(GL_TEXTURE_2D, gllgt);
+			if (enableAlphaTest && (flags & 0x0200)) {
+				glEnable(GL_ALPHA_TEST);
+				glAlphaFunc(GL_GEQUAL, 0.1f);
+			}
+			else {
+				glDisable(GL_ALPHA_TEST);
+			}
+			//if (flags & 0x0002) {
+			//	glEnable(GL_BLEND);
+			//	glBlendFunc(GL_ONE, GL_ONE);
+			//}
+			//else {
+			//	glDisable(GL_BLEND);
+			//}
 			glVertexPointer(3, GL_FLOAT, 12, part.vertices.data());
-			glColorPointer(4, GL_UNSIGNED_BYTE, 4, part.colors.data());
+			if (renderLightmaps)
+				glColorPointer(4, GL_UNSIGNED_BYTE, 4, part.colors.data());
 			glClientActiveTextureARB(GL_TEXTURE0);
 			glTexCoordPointer(2, GL_FLOAT, 8, part.texcoords.data());
 			glClientActiveTextureARB(GL_TEXTURE1);
@@ -209,7 +230,10 @@ void BeginMeshDraw()
 		if (!GLEW_ARB_multitexture)
 			ferr("Your OpenGL driver doesn't support multitextures. Big oof.");
 		glEnableClientState(GL_VERTEX_ARRAY);
-		glEnableClientState(GL_COLOR_ARRAY);
+		if (renderLightmaps)
+			glEnableClientState(GL_COLOR_ARRAY);
+		else
+			glDisableClientState(GL_COLOR_ARRAY);
 		glActiveTextureARB(GL_TEXTURE0);
 		glClientActiveTextureARB(GL_TEXTURE0);
 		glEnable(GL_TEXTURE_2D);
@@ -229,8 +253,10 @@ void EndMeshDraw()
 		glClientActiveTextureARB(GL_TEXTURE1);
 		glDisable(GL_TEXTURE_2D);
 		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-
 		glActiveTextureARB(GL_TEXTURE0);
 		glClientActiveTextureARB(GL_TEXTURE0);
+
+		glDisable(GL_ALPHA_TEST);
+		glDisable(GL_BLEND);
 	}
 }

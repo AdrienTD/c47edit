@@ -46,7 +46,7 @@ void GlifyTexture(Chunk* c) {
 	glBindTexture(GL_TEXTURE_2D, gltex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (nmipmaps > 1) ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	texmap[texid] = (void*)gltex;
+	texmap[texid] = (void*)(uintptr_t)gltex;
 
 	uint8_t* bmp = firstbmp;
 	for (int m = 0; m < nmipmaps; m++)
@@ -82,7 +82,7 @@ void GlifyAllTextures()
 
 void InvalidateTexture(uint32_t texid)
 {
-	GLuint gltex = (GLuint)texmap.at(texid);
+	GLuint gltex = (GLuint)(uintptr_t)texmap.at(texid);
 	glDeleteTextures(1, &gltex);
 	GlifyTexture(FindTextureChunk(g_scene, texid).first);
 }

@@ -469,7 +469,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 					GLuint tex = GetDblImageTexture(selobj, data.data(), format, width, height, opacity, refresh);
 					int dispHeight = std::min(128u, height);
 					int dispWidth = width * dispHeight / height;
-					ImGui::Image((void*)tex, ImVec2(dispWidth, dispHeight));
+					ImGui::Image((void*)(uintptr_t)tex, ImVec2(dispWidth, dispHeight));
 				}
 			}
 			break;
@@ -909,6 +909,11 @@ void IGMain()
 	ImGui::Checkbox("Textured", &rendertextures);
 	ImGui::SameLine();
 	ImGui::Checkbox("EXC", &renderExc);
+	ImGui::Checkbox("Color Tex", &renderColorTextures);
+	ImGui::SameLine();
+	ImGui::Checkbox("Lightmaps", &renderLightmaps);
+	ImGui::SameLine();
+	ImGui::Checkbox("Alpha Test", &enableAlphaTest);
 	ImGui::Text("FPS: %u", framespersec);
 	ImGui::End();
 }

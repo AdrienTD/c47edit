@@ -9,6 +9,8 @@ struct Mesh;
 
 extern int drawframes;
 extern bool rendertextures;
+extern bool renderColorTextures, renderLightmaps;
+extern bool enableAlphaTest;
 
 void InitVideo();
 void BeginDrawing();
