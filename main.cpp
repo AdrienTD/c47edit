@@ -1359,6 +1359,7 @@ int main(int argc, char* argv[])
 				//glTranslatef(-viewobj->position.x, -viewobj->position.y, -viewobj->position.z);
 				RenderObject(viewobj);
 			}
+			EndMeshDraw();
 
 			if (renderExc && viewobj) {
 				if (Chunk* pexc = g_scene.spkchk->findSubchunk('CXEP')) {

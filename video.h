@@ -14,5 +14,6 @@ void InitVideo();
 void BeginDrawing();
 void EndDrawing();
 void BeginMeshDraw();
+void EndMeshDraw();
 void DrawMesh(Mesh* mesh);
 void InvalidateMesh(Mesh* mesh);

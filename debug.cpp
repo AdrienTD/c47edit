@@ -7,6 +7,7 @@
 #include <vector>
 
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <Windows.h>
 
 #include "gameobj.h"
@@ -215,6 +216,28 @@ void IGDebugMenus()
 			cdat.print();
 			cdat.printStatus();
 			printf("---------------\n");
+		}
+		if (ImGui::MenuItem("FTX Stats")) {
+			uint16_t minI4 = 0xFFFF, maxI4 = 0;
+			uint16_t minI5 = 0xFFFF, maxI5 = 0;
+			auto walkObj = [&](GameObject* obj, auto& rec) -> void {
+				if (obj->mesh) {
+					for (auto& face : obj->mesh->ftxFaces) {
+						if (face[0] & 0x80) {
+							minI4 = std::min(minI4, face[4]);
+							maxI4 = std::max(maxI4, face[4]);
+							minI5 = std::min(minI5, face[5]);
+							maxI5 = std::max(maxI5, face[5]);
+						}
+					}
+				}
+				for (auto* child : obj->subobj) {
+					rec(child, rec);
+				}
+			};
+			walkObj(g_scene.superroot, walkObj);
+			printf("face[4] in [0x%04X, 0x%04X]\n", minI4, maxI4);
+			printf("face[5] in [0x%04X, 0x%04X]\n", minI5, maxI5);
 		}
 		ImGui::EndMenu();
 	}

@@ -3,6 +3,8 @@
 // Licensed under the GPL3+.
 // See LICENSE file for more details.
 
+#include <cassert>
+
 #include "video.h"
 #include "global.h"
 #include "texture.h"
@@ -12,7 +14,8 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include <gl/GL.h>
+#include <GL/glew.h>
+#include <GL/wglew.h>
 
 #define glprocvalid(x) (! ( ((uintptr_t)x==-1) || (((uintptr_t)x >= 0) && ((uintptr_t)x <= 3)) ) )
 typedef BOOL(APIENTRY *gli_wglSwapIntervalEXT)(int n);
@@ -41,18 +44,15 @@ void InitVideo()
 
 	glrc = wglCreateContext(whdc);
 	wglMakeCurrent(whdc, glrc);
+	glewInit();
 
-	// Set VSYNC if enabled
-	//if (VSYNCenabled)
-	if(1)
-	{
-		gli_wglSwapIntervalEXT wglSwapIntervalEXT = (gli_wglSwapIntervalEXT)wglGetProcAddress("wglSwapIntervalEXT");
-		if (glprocvalid(wglSwapIntervalEXT))
-		{
-			if (!wglSwapIntervalEXT(1))
-				printf("wglSwapIntervalEXT returned FALSE.\n");
-		}
-		else printf("wglSwapIntervalEXT unsupported.\n");
+	// Set VSYNC
+	if (WGLEW_EXT_swap_control) {
+		if (!wglSwapIntervalEXT(1))
+			printf("wglSwapIntervalEXT returned FALSE.\n");
+	}
+	else {
+		printf("wglSwapIntervalEXT unsupported.\n");
 	}
 }
 
@@ -72,9 +72,11 @@ struct ProMesh {
 	struct Part {
 		std::vector<Vector3> vertices;
 		std::vector<std::pair<float, float>> texcoords;
+		std::vector<std::pair<float, float>> lightmapCoords;
+		std::vector<uint32_t> colors;
 		std::vector<IndexType> indices;
 	};
-	std::map<uint16_t, Part> parts;
+	std::map<std::pair<uint16_t, uint16_t>, Part> parts;
 
 	inline static std::map<Mesh*, ProMesh> g_proMeshes;
 
@@ -99,44 +101,56 @@ struct ProMesh {
 		bool hasFtx = !mesh->ftxFaces.empty();
 
 		float *uvCoords = (float*)defUvs;
-		if (hasFtx)
+		float *lgtCoords = (float*)defUvs;
+		if (hasFtx) {
 			uvCoords = (float*)mesh->textureCoords.data();
-
-		for (size_t i = 0; i < numTris; i++)
-		{
-			bool isTextured = hasFtx && (ftxFace[0] & 0x20);
-			uint16_t texid = hasFtx ? ftxFace[2] : 65535;
-			auto& part = pro.parts[texid];
-			IndexType prostart = (IndexType)part.vertices.size();
-			for (int j = 0; j < 3; j++) {
-				const float* uu = (isTextured ? uvCoords : defUvs) + uvit[j] * 2;
-				part.texcoords.push_back({ uu[0], uu[1] });
-				const float *v = verts + mesh->triindices[i * 3 + j] * 3 / 2;
-				part.vertices.push_back({ v[0], v[1], v[2] });
-			}
-			for (int j : {0, 1, 2})
-				part.indices.push_back((IndexType)(prostart + j));
-			ftxFace += 6;
-			if (isTextured)
-				uvCoords += 8; // Ignore 4th UV.
+			lgtCoords = (float*)mesh->lightCoords.data();
 		}
-		for (uint32_t i = 0; i < numQuads; i++)
-		{
+
+		assert(g_scene.g_lgtPack.subchunks[0].tag == 'RGBA');
+		uint8_t* colorMapData = g_scene.g_lgtPack.subchunks[0].maindata.data();
+		assert(*(uint16_t*)(colorMapData + 6) == 2); // the width of color map must be 2
+		colorMapData += 0x14; // skip texture header until name
+		while (*colorMapData++); // skip texture name
+		colorMapData += 4; // skip mipmap size
+		uint32_t* colorMap = (uint32_t*)colorMapData;
+
+		auto nextFace = [&](int shape, ProMesh::IndexType* indices) {
 			bool isTextured = hasFtx && (ftxFace[0] & 0x20);
-			uint16_t texid = hasFtx ? ftxFace[2] : 65535;
-			auto& part = pro.parts[texid];
+			bool isLit = hasFtx && (ftxFace[0] & 0x80);
+			uint16_t texid = isTextured ? ftxFace[2] : 0xFFFF;
+			uint16_t lgtid = isLit ? ftxFace[3] : 0xFFFF;
+			auto& part = pro.parts[std::make_pair(texid, lgtid)];
 			IndexType prostart = (IndexType)part.vertices.size();
-			for (int j = 0; j < 4; j++) {
+			for (int j = 0; j < shape; j++) {
 				const float* uu = (isTextured ? uvCoords : defUvs) + uvit[j] * 2;
 				part.texcoords.push_back({ uu[0], uu[1] });
-				const float *v = verts + mesh->quadindices[i * 4 + j] * 3 / 2;
+				const float* lu = (isLit ? lgtCoords : defUvs) + uvit[j] * 2;
+				float lmOffsetU = 0.0f, lmOffsetV = 0.0f;
+				if (lgtid != 0xFFFF) {
+					const TexInfo* lgtInfo = (const TexInfo*)FindTextureChunk(g_scene, lgtid).first->maindata.data();
+					lmOffsetU = 0.5f / lgtInfo->width;
+					lmOffsetV = 0.5f / lgtInfo->height;
+				}
+				part.lightmapCoords.push_back({ lu[0] + lmOffsetU, lu[1] + lmOffsetV });
+				uint32_t color = (isLit && ftxFace[3] == 0xFFFF) ? colorMap[4 * (ftxFace[5] - 1) + j] : 0xFFFFFFFF;
+				part.colors.push_back(color);
+				const float* v = verts + indices[j] * 3 / 2;
 				part.vertices.push_back({ v[0], v[1], v[2] });
 			}
-			for (int j : {0, 1, 3, 3, 1, 2 })
-				part.indices.push_back((IndexType)(prostart + j));
+			for (int s = 2; s < shape; ++s)
+				for (int j : {0, s - 1, s})
+					part.indices.push_back((IndexType)(prostart + j));
 			ftxFace += 6;
-			if (isTextured)
-				uvCoords += 8;
+			if (isTextured) uvCoords += 8; // for triangles, 4th UV is ignored.
+			if (isLit) lgtCoords += 8;
+		};
+
+		for (size_t i = 0; i < numTris; i++) {
+			nextFace(3, mesh->triindices.data() + 3 * i);
+		}
+		for (size_t i = 0; i < numQuads; i++) {
+			nextFace(4, mesh->quadindices.data() + 4 * i);
 		}
 
 		g_proMeshes[mesh] = std::move(pro);
@@ -155,18 +169,24 @@ void DrawMesh(Mesh* mesh)
 	else
 	{
 		ProMesh* pro = ProMesh::getProMesh(mesh);
-		for (auto& [texid,part] : pro->parts) {
-			if (texid == 65535)
+		for (auto& [mat,part] : pro->parts) {
+			auto& [texid, lgtid] = mat;
+			if (texid == 0xFFFF)
 				continue;
 			auto t = texmap.find(texid);
-			if (t != texmap.end())
-				glBindTexture(GL_TEXTURE_2D, (GLuint)t->second);
-			else if (false)
-				glBindTexture(GL_TEXTURE_2D, 0);
-			else
-				continue;
+			GLuint gltex = (t != texmap.end()) ? (GLuint)t->second : 0;
+			t = texmap.find(lgtid);
+			GLuint gllgt = (t != texmap.end()) ? (GLuint)t->second : 0;
+			glActiveTextureARB(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, gltex);
+			glActiveTextureARB(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, gllgt);
 			glVertexPointer(3, GL_FLOAT, 12, part.vertices.data());
+			glColorPointer(4, GL_UNSIGNED_BYTE, 4, part.colors.data());
+			glClientActiveTextureARB(GL_TEXTURE0);
 			glTexCoordPointer(2, GL_FLOAT, 8, part.texcoords.data());
+			glClientActiveTextureARB(GL_TEXTURE1);
+			glTexCoordPointer(2, GL_FLOAT, 8, part.lightmapCoords.data());
 			glDrawElements(GL_TRIANGLES, part.indices.size(), GL_UNSIGNED_SHORT, part.indices.data());
 		}
 	}
@@ -181,13 +201,36 @@ void BeginMeshDraw()
 {
 	if (!rendertextures) {
 		glEnableClientState(GL_VERTEX_ARRAY);
+		glDisableClientState(GL_COLOR_ARRAY);
 		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 		glDisable(GL_TEXTURE_2D);
 	}
 	else {
+		if (!GLEW_ARB_multitexture)
+			ferr("Your OpenGL driver doesn't support multitextures. Big oof.");
 		glEnableClientState(GL_VERTEX_ARRAY);
-		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		glEnableClientState(GL_COLOR_ARRAY);
+		glActiveTextureARB(GL_TEXTURE0);
+		glClientActiveTextureARB(GL_TEXTURE0);
 		glEnable(GL_TEXTURE_2D);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		glActiveTextureARB(GL_TEXTURE1);
+		glClientActiveTextureARB(GL_TEXTURE1);
+		glEnable(GL_TEXTURE_2D);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	}
 	glColor4f(1, 1, 1, 1);
+}
+
+void EndMeshDraw()
+{
+	if (rendertextures) {
+		glActiveTextureARB(GL_TEXTURE1);
+		glClientActiveTextureARB(GL_TEXTURE1);
+		glDisable(GL_TEXTURE_2D);
+		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+		glActiveTextureARB(GL_TEXTURE0);
+		glClientActiveTextureARB(GL_TEXTURE0);
+	}
 }
