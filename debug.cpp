@@ -37,12 +37,12 @@ struct DataCoverage {
 		for (size_t o = 1; o < counts.size(); ++o) {
 			auto cn = std::make_pair(counts[o], contexts[o]);
 			if (cn != c) {
-				printf("%3i,%i: %08X - %08X\n", c.first, c.second, start, o);
+				printf("%3i,%i: %08zX - %08zX\n", c.first, c.second, start, o);
 				start = o;
 				c = cn;
 			}
 		}
-		printf("%3i,%i: %08X - %08X\n", c.first, c.second, start, counts.size());
+		printf("%3i,%i: %08zX - %08zX\n", c.first, c.second, start, counts.size());
 	}
 	void printStatus() {
 		printf("Coverage ");
@@ -69,160 +69,13 @@ void EnableVT100()
 void IGDebugMenus()
 {
 	if (ImGui::BeginMenu("Debug")) {
-		if (ImGui::MenuItem("UV Coverage")) {
-			EnableVT100();
-			DataCoverage uvcover;
-			uvcover.setSize(g_scene.puvc->maindata.size());
-			Chunk* pdat = g_scene.spkchk->findSubchunk('TADP');
-			assert(pdat);
-			auto walkObj = [&](GameObject* obj, auto& rec) -> void {
-				if ((obj->flags & 0x20) && obj->mesh) {
-					//if (obj->mesh->ftxo) {
-					//	uint32_t ftxo;
-					//	if (obj->mesh->ftxo & 0x80000000) {
-					//		uint32_t* dat = (uint32_t*)((uint8_t*)pdat->maindata.data() + (obj->mesh->ftxo & 0x7FFF'FFFF));
-					//		ftxo = dat[0];
-					//	}
-					//	else
-					//		ftxo = obj->mesh->ftxo & 0x7FFFFFFF;
-					//	uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + ftxo - 1;
-					//	uint16_t* ftxFace = (uint16_t*)(ftxpnt + 12);
-					//	size_t numFaces = obj->mesh->getNumQuads() + obj->mesh->getNumTris();
-					//	assert(*(uint32_t*)(ftxpnt + 8) == numFaces);
-					//	size_t numTexturedFaces = 0;
-					//	size_t numLitFaces = 0;
-					//	for (size_t f = 0; f < numFaces; ++f) {
-					//		uint16_t flags = ftxFace[0];
-					//		if (flags & 0x20)
-					//			numTexturedFaces += 1;
-					//		if (flags & 0x80)
-					//			numLitFaces += 1;
-					//		ftxFace += 6;
-					//	}
-					//	uvcover.cover(*(uint32_t*)ftxpnt * sizeof(float), sizeof(float) * 2 * 4 * numTexturedFaces, 1);
-					//	uvcover.cover(*(uint32_t*)(ftxpnt + 4) * sizeof(float), sizeof(float) * 2 * 4 * numLitFaces, 2);
-					//}
-				}
-				for (auto* child : obj->subobj) {
-					rec(child, rec);
-				}
-			};
-			walkObj(g_scene.superroot, walkObj);
-			printf("---------------\n");
-			uvcover.print();
-			uvcover.printStatus();
-		}
-		if (ImGui::MenuItem("List all FTXO")) {
-			EnableVT100();
-			Chunk* pdat = g_scene.spkchk->findSubchunk('TADP');
-			assert(pdat);
-			auto walkObj = [&](GameObject* obj, const std::string& indent, auto& rec) -> void {
-				if ((obj->flags & 0x20) && obj->mesh) {
-					printf("%s%s: ", indent.c_str(), obj->name.c_str());
-					//if (obj->mesh->ftxo == 0) {
-					//	printf("\x1B[91mNo FTXO (%08X)\x1B[0m\n", obj->mesh->ftxo);
-					//}
-					//else {
-					//	uint32_t ftxo;
-					//	if (obj->mesh->ftxo & 0x80000000) {
-					//		uint32_t* dat = (uint32_t*)((uint8_t*)pdat->maindata.data() + (obj->mesh->ftxo & 0x7FFF'FFFF));
-					//		ftxo = dat[0];
-					//	}
-					//	else {
-					//		ftxo = obj->mesh->ftxo;
-					//	}
-					//	uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + ftxo - 1;
-					//	printf("FTXO:%08X  UV1:%08X  UV2:%08X\n", obj->mesh->ftxo - 1, *(uint32_t*)ftxpnt, *(uint32_t*)(ftxpnt + 4));
-					//}
-				}
-				std::string subindent = indent + ' ';
-				for (auto* child : obj->subobj) {
-					rec(child, subindent, rec);
-				}
-			};
-			walkObj(g_scene.superroot, "", walkObj);
-			printf("---------------\n");
-		}
-		if (ImGui::MenuItem("PVER PFAC Coverage")) {
-			EnableVT100();
-			DataCoverage cver, cfac;
-			cver.setSize(g_scene.pver->maindata.size());
-			cfac.setSize(g_scene.pfac->maindata.size());
-			auto walkObj = [&](GameObject* obj, auto& rec) -> void {
-				if (obj->mesh) {
-					if (obj->flags & 0x400) {
-						//printf("--> %s\n    %i %i\n", obj->getPath().c_str(), obj->line->tristart, obj->line->quadstart);
-						//assert(obj->line->quadstart == 0);
-						//cver.cover(4 * obj->mesh->vertstart, 4 * 3 * obj->mesh->numverts, 32);
-						// it seems tristart points to PDAT here
-					}
-					else if (obj->flags & 0x20) {
-						//cver.cover(4 * obj->mesh->vertstart, 4 * 3 * obj->mesh->numverts, 16);
-						//cfac.cover(2 * obj->mesh->tristart, 2 * 3 * obj->mesh->numtris, 1);
-						//cfac.cover(2 * obj->mesh->quadstart, 2 * 4 * obj->mesh->numquads, 2);
-					}
-				}
-				for (auto* child : obj->subobj) {
-					rec(child, rec);
-				}
-			};
-			walkObj(g_scene.superroot, walkObj);
-			printf("--- PVER ------\n");
-			cver.print();
-			printf("--- PFAC ------\n");
-			cfac.print();
-			printf("---------------\n");
-			printf("PVER ");
-			cver.printStatus();
-			printf("PFAC ");
-			cfac.printStatus();
-			printf("---------------\n");
-		}
-		if (ImGui::MenuItem("PDAT Coverage")) {
-			EnableVT100();
-			Chunk* pdat = g_scene.spkchk->findSubchunk('TADP');
-			assert(pdat);
-			DataCoverage cdat;
-			cdat.setSize(pdat->maindata.size());
-			auto walkObj = [&](GameObject* obj, auto& rec) -> void {
-				if (obj->mesh) {
-					if (obj->flags & 0x400) {
-						//uint32_t odat = obj->line->tristart;
-						//cdat.cover(odat, 4 * obj->line->numtris, 4);
-					}
-					else if (obj->flags & 0x20) {
-						//if (obj->mesh->ftxo & 0x80000000) {
-						//	uint32_t odat1 = obj->mesh->ftxo & 0x7FFF'FFFF;
-						//	uint32_t* dat1 = (uint32_t*)((uint8_t*)pdat->maindata.data() + odat1);
-
-						//	uint32_t odat2 = dat1[2];
-						//	uint8_t* dat2 = (uint8_t*)pdat->maindata.data() + odat2;
-						//	uint8_t* ptr2 = dat2;
-						//	uint32_t numDings = *(uint32_t*)ptr2; ptr2 += 4;
-						//	ptr2 += numDings * 8;
-						//	while (*ptr2++); // skip string
-
-						//	cdat.cover(odat1, 12, 1);
-						//	cdat.cover(odat2, ptr2 - dat2, 2);
-						//}
-					}
-				}
-				for (auto* child : obj->subobj) {
-					rec(child, rec);
-				}
-			};
-			walkObj(g_scene.superroot, walkObj);
-			printf("--- PDAT ------\n");
-			cdat.print();
-			cdat.printStatus();
-			printf("---------------\n");
-		}
 		if (ImGui::MenuItem("FTX Stats")) {
 			uint16_t minI4 = 0xFFFF, maxI4 = 0;
 			uint16_t minI5 = 0xFFFF, maxI5 = 0;
 			auto walkObj = [&](GameObject* obj, auto& rec) -> void {
 				if (obj->mesh) {
 					for (auto& face : obj->mesh->ftxFaces) {
+						face[0] &= ~0x0200u;
 						if (face[0] & 0x80) {
 							minI4 = std::min(minI4, face[4]);
 							maxI4 = std::max(maxI4, face[4]);

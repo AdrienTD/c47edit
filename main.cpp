@@ -600,28 +600,10 @@ void IGObjectInfo()
 				mesh->ftxFaces.resize(numFaces);
 				mesh->textureCoords.resize(numFaces * 8);
 				mesh->lightCoords.resize(numFaces * 8);
-				//mesh->numverts = std::size(objVertices);
-				//mesh->numquads = std::size(quads);
-				//mesh->numtris = std::size(triangles);
-				//int faceIndex = g_scene.pfac->maindata.size() / 2;
-				//mesh->vertstart = g_scene.pver->maindata.size() / 4;
-				//mesh->tristart = (mesh->numtris > 0) ? faceIndex : 0;
-				//mesh->quadstart = (mesh->numquads > 0) ? faceIndex + 3 * mesh->numtris : 0;
-				//mesh->ftxo = g_scene.pftx->maindata.size() + 1; // ALERT
-
-				//Chunk::DataBuffer pver_newdata(g_scene.pver->maindata.size() + mesh->vertices.size() * 12);
-				//Chunk::DataBuffer pfac_newdata(g_scene.pfac->maindata.size() + mesh->numquads * 8 + mesh->numtris * 6);
-				//Chunk::DataBuffer pftx_newdata(g_scene.pftx->maindata.size() + 12 + numFaces * 12);
-				//Chunk::DataBuffer puvc_newdata(g_scene.puvc->maindata.size() + numFaces * 4 * 8 * 2); // 8 floats per face, 2 sets
-				//memcpy(pver_newdata.data(), g_scene.pver->maindata.data(), g_scene.pver->maindata.size());
-				//memcpy(pfac_newdata.data(), g_scene.pfac->maindata.data(), g_scene.pfac->maindata.size());
-				//memcpy(pftx_newdata.data(), g_scene.pftx->maindata.data(), g_scene.pftx->maindata.size());
-				//memcpy(puvc_newdata.data(), g_scene.puvc->maindata.data(), g_scene.puvc->maindata.size());
 
 				float* verts = mesh->vertices.data();
 				uint16_t* qfaces = mesh->quadindices.data();
 				uint16_t* tfaces = mesh->triindices.data();
-				//uint32_t* ftxHead = (uint32_t*)(pftx_newdata.data() + g_scene.pftx->maindata.size());
 				uint16_t* ftx = (uint16_t*)mesh->ftxFaces.data();
 				float* uv1 = (float*)mesh->textureCoords.data();
 				float* uv2 = (float*)mesh->lightCoords.data();
@@ -633,9 +615,6 @@ void IGObjectInfo()
 				for (auto& quad : quads)
 					for (auto& [indPos, indTxc, indNrm] : quad)
 						*qfaces++ = 2 * indPos;
-				//ftxHead[0] = uv1 - (float*)puvc_newdata.data();
-				//ftxHead[1] = uv2 - (float*)puvc_newdata.data();
-				//ftxHead[2] = numFaces;
 				size_t groupIndex = -1, triId = 0;
 				static constexpr uint16_t defaultTexId = 0x0135;
 				uint16_t texId = defaultTexId;
@@ -673,10 +652,6 @@ void IGObjectInfo()
 					triId += 1;
 				}
 
-				//g_scene.pver->maindata = std::move(pver_newdata);
-				//g_scene.pfac->maindata = std::move(pfac_newdata);
-				//g_scene.pftx->maindata = std::move(pftx_newdata);
-				//g_scene.puvc->maindata = std::move(puvc_newdata);
 				InvalidateMesh(mesh);
 			}
 		}
@@ -708,7 +683,6 @@ void IGObjectInfo()
 					uint16_t* quadIndices = mesh->quadindices.data();
 					bool hasFtx = !selobj->mesh->ftxFaces.empty();
 					assert(hasFtx);
-					//uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
 					float* uvCoords = (float*)selobj->mesh->textureCoords.data();
 					using UVQuad = std::array<std::array<float, 2>, 4>;
 					static_assert(sizeof(UVQuad) == 4 * 8);
@@ -776,13 +750,9 @@ void IGObjectInfo()
 			ImVec4 c = ImGui::ColorConvertU32ToFloat4(swap_rb(selobj->color));
 			if (ImGui::ColorEdit4("Color", &c.x, 0))
 				selobj->color = swap_rb(ImGui::ColorConvertFloat4ToU32(c));
-			//ImGui::Text("Vertex start index: %u", selobj->mesh->vertstart);
-			//ImGui::Text("Quad start index:   %u", selobj->mesh->quadstart);
-			//ImGui::Text("Tri start index:    %u", selobj->mesh->tristart);
 			ImGui::Text("Vertex count: %zu", selobj->mesh->getNumVertices());
 			ImGui::Text("Quad count:   %zu", selobj->mesh->getNumQuads());
 			ImGui::Text("Tri count:    %zu", selobj->mesh->getNumTris());
-			//ImGui::Text("FTXO offset: 0x%X", selobj->mesh->ftxo);
 			ImGui::Text("Weird: 0x%X", selobj->mesh->weird);
 			if (selobj->mesh->extension) {
 				ImGui::TextUnformatted("--- EXTENSION ---");
@@ -805,7 +775,6 @@ void IGObjectInfo()
 		if (selobj->mesh && ImGui::CollapsingHeader("FTXO")) {
 			// TODO: place this in "DebugUI.cpp"
 			if (ImGui::Button("Change texture")) {
-				//uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
 				uint16_t* ftxFace = (uint16_t*)selobj->mesh->ftxFaces.data();
 				uint32_t numFaces = selobj->mesh->ftxFaces.size();
 				for (size_t i = 0; i < numFaces; ++i) {
@@ -815,13 +784,10 @@ void IGObjectInfo()
 				InvalidateMesh(selobj->mesh.get());
 			}
 			if (!selobj->mesh->ftxFaces.empty()) {
-				//uint8_t* ftxpnt = (uint8_t*)g_scene.pftx->maindata.data() + selobj->mesh->ftxo - 1;
 				float* uvCoords = (float*)selobj->mesh->textureCoords.data();
 				float* uvCoords2 = (float*)selobj->mesh->lightCoords.data();
 				uint16_t* ftxFace = (uint16_t*)selobj->mesh->ftxFaces.data();
 				size_t numFaces = selobj->mesh->getNumQuads() + selobj->mesh->getNumTris();
-				//ImGui::Text("UV  offset 0x%08X", *(uint32_t*)(ftxpnt));
-				//ImGui::Text("UV2 offset 0x%08X", *(uint32_t*)(ftxpnt + 4));
 				size_t numTexFaces = 0, numLitFaces = 0;
 				for (auto& ftxFace : selobj->mesh->ftxFaces) {
 					if (ftxFace[0] & 0x20) ++numTexFaces;
@@ -849,8 +815,6 @@ void IGObjectInfo()
 		}
 		if (selobj->light && ImGui::CollapsingHeader("Light"))
 		{
-			//ImGui::Separator();
-			//ImGui::Text("Light");
 			char s[] = "Param ?\0";
 			for (int i = 0; i < 7; i++)
 			{
@@ -909,22 +873,13 @@ void IGMain()
 	ImGui::Checkbox("Textured", &rendertextures);
 	ImGui::SameLine();
 	ImGui::Checkbox("EXC", &renderExc);
-	ImGui::Checkbox("Color Tex", &renderColorTextures);
+	ImGui::Checkbox("Diffuse Tex", &renderColorTextures);
 	ImGui::SameLine();
 	ImGui::Checkbox("Lightmaps", &renderLightmaps);
 	ImGui::SameLine();
 	ImGui::Checkbox("Alpha Test", &enableAlphaTest);
 	ImGui::Text("FPS: %u", framespersec);
 	ImGui::End();
-}
-
-void IGTest()
-{
-	//ImGui::Begin("Debug/Test");
-
-//#include "unused/moredebug.inc"
-
-	//ImGui::End();
 }
 
 void IGTextures()
@@ -1090,10 +1045,11 @@ void IGSounds()
 		ImGui::PushID(i);
 		if (ImGui::Selectable("##Sound", selectedSound == i)) {
 			selectedSound = i;
+			PlaySoundA(nullptr, nullptr, 0);
 			// copy for playing, to prevent sound corruption when sound is replaced/deleted while being played
 			static Chunk::DataBuffer playingWav;
 			playingWav = chk.maindata;
-			PlaySoundA((const char*)chk.maindata.data(), nullptr, SND_MEMORY | SND_ASYNC);
+			PlaySoundA((const char*)playingWav.data(), nullptr, SND_MEMORY | SND_ASYNC);
 		}
 		ImGui::SameLine();
 		ImGui::Text("%3i: %s", sndId, sndName);
@@ -1136,9 +1092,6 @@ Vector3 finalintersectpnt = Vector3(0, 0, 0);
 
 bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, float* bver, uint16_t* bfac, int numverts, Matrix *worldmtx)
 {
-	//uint16_t *bfac = (uint16_t*)g_scene.pfac->maindata.data() + startface;
-	//float *bver = (float*)g_scene.pver->maindata.data() + startvertex;
-
 	std::unique_ptr<Vector3[]> pnts = std::make_unique<Vector3[]>(numverts);
 	for (int i = 0; i < 3; i++)
 	{
