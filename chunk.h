@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 #include "DynArray.h"
 
@@ -23,6 +24,7 @@ struct Chunk
 	Chunk *findSubchunk(uint32_t tag);
 
 	void load(void *bytes);
+	std::string saveToString();
 	void saveToMem(void **pnt, size_t *size);
 	static Chunk reconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void *repeat);
 };

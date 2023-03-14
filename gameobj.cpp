@@ -69,6 +69,14 @@ const char *GetObjTypeString(uint32_t ot)
 	return otname;
 }
 
+uint32_t ComputeBytesum(void* data, size_t length) {
+	uint32_t sum = 0;
+	uint8_t* bytes = (uint8_t*)data;
+	for (size_t i = 0; i < length; ++i)
+		sum += bytes[i];
+	return sum;
+}
+
 static void ReadAssetPacks(Scene* scene, mz_zip_archive* zip)
 {
 	static const auto readFile = [](const char* filename) {
@@ -158,7 +166,8 @@ void Scene::LoadSceneSPK(const char *fn)
 	puvc = spkchk->findSubchunk('CVUP');
 	pdbl = spkchk->findSubchunk('LBDP');
 	pdat = spkchk->findSubchunk('TADP');
-	if (!(prot && pclp && phea && pnam && ppos && pmtx && pver && pfac && pftx && puvc && pdbl && pdat))
+	pexc = spkchk->findSubchunk('CXEP');
+	if (!(prot && pclp && phea && pnam && ppos && pmtx && pver && pfac && pftx && puvc && pdbl && pdat && pexc))
 		ferr("One or more important chunks were not found in Pack.SPK .");
 
 	rootobj = new GameObject("Root", 0x21 /*ZROOM*/);
@@ -222,8 +231,6 @@ void Scene::LoadSceneSPK(const char *fn)
 
 		GameObject *o = chkobjmap[c];
 		o->state = (c->tag >> 24) & 255;
-		o->pdbloff = p[0];
-		o->pexcoff = p[1];
 		o->flags = *((unsigned short*)(&p[5]) + 1);
 		o->root = o->parent->root;
 
@@ -337,6 +344,12 @@ void Scene::LoadSceneSPK(const char *fn)
 		uint8_t* dpbeg = pdbl->maindata.data() + p[0];
 		o->dbl.load(dpbeg, idobjmap);
 
+		uint32_t pexcoff = p[1];
+		if (pexcoff != 0) {
+			o->excChunk = std::make_shared<Chunk>();
+			o->excChunk->load(pexc->maindata.data() + pexcoff - 1);
+		}
+
 		if (c->subchunks.size() > 0)
 		{
 			for (uint32_t i = 0; i < (uint32_t)c->subchunks.size(); i++)
@@ -399,6 +412,7 @@ PackBuffer<std::vector<uint16_t>, 2> g_sav_facPackBuf;
 PackBuffer<std::string, 1> g_sav_datPackBuf;
 PackBuffer<std::string, 1> g_sav_ftxPackBuf;
 PackBuffer<std::vector<float>, 4> g_sav_uvcPackBuf;
+PackBuffer<std::string, 1> g_sav_excPackBuf;
 
 uint32_t sbtell(std::stringbuf* sb);
 
@@ -482,10 +496,15 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 		}
 	}
 
+	uint32_t pexcoff = 0;
+	if (o->excChunk) {
+		pexcoff = g_sav_excPackBuf.add(o->excChunk->saveToString()) + 1;
+	}
+
 	if(true)
 	{
 		heabuf.sputn((char*)&dbloff, 4);
-		heabuf.sputn((char*)&o->pexcoff, 4);
+		heabuf.sputn((char*)&pexcoff, 4);
 		heabuf.sputn((char*)&namoff, 4);
 		heabuf.sputn((char*)&mtxoff, 4);
 		heabuf.sputn((char*)&posoff, 4);
@@ -585,7 +604,7 @@ void Scene::ModifySPK()
 		memcpy(nthg->maindata.data(), buf.data(), nthg->maindata.size());
 	};
 
-	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac, ndat, nftx, nuvc;
+	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac, ndat, nftx, nuvc, nexc;
 	fillMaindata('AEHP', &nhea, heabuf.str());
 	fillMaindata('MANP', &nnam, g_sav_namPackBuf.buffer);
 	fillMaindata('SOPP', &npos, g_sav_posPackBuf.buffer);
@@ -596,12 +615,13 @@ void Scene::ModifySPK()
 	fillMaindata('TADP', &ndat, g_sav_datPackBuf.buffer);
 	fillMaindata('XTFP', &nftx, g_sav_ftxPackBuf.buffer);
 	fillMaindata('CVUP', &nuvc, g_sav_uvcPackBuf.buffer);
+	fillMaindata('CXEP', &nexc, g_sav_excPackBuf.buffer);
 
 	heabuf = std::stringbuf();
 	g_sav_namPackBuf = {};
 	g_sav_posPackBuf = {}; g_sav_mtxPackBuf = {}; g_sav_dblPackBuf = {};
 	g_sav_verPackBuf = {}; g_sav_facPackBuf = {}; g_sav_datPackBuf = {};
-	g_sav_ftxPackBuf = {}; g_sav_uvcPackBuf = {};
+	g_sav_ftxPackBuf = {}; g_sav_uvcPackBuf = {}; g_sav_excPackBuf = {};
 
 	// Chunk comparison
 	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
@@ -619,6 +639,12 @@ void Scene::ModifySPK()
 					mdcmp += 1;
 			if (mdcmp != 0)
 				printf("Different maindata content: %u bytes are different\n", mdcmp);
+			auto sum_a = ComputeBytesum(chka->maindata.data(), chka->maindata.size());
+			auto sum_b = ComputeBytesum(chkb->maindata.data(), chkb->maindata.size());
+			if (sum_a != sum_b)
+				printf("Different bytesum\n");
+			else
+				printf("Same bytesum\n");
 		}
 	};
 	chkcmp(phea, &nhea, "PHEA");
@@ -631,6 +657,7 @@ void Scene::ModifySPK()
 	chkcmp(pdat, &ndat, "PDAT");
 	chkcmp(pftx, &nftx, "PFTX");
 	chkcmp(puvc, &nuvc, "PUVC");
+	chkcmp(pexc, &nexc, "PEXC");
 
 	*phea = std::move(nhea);
 	*pnam = std::move(nnam);
@@ -642,6 +669,7 @@ void Scene::ModifySPK()
 	*pdat = std::move(ndat);
 	*pftx = std::move(nftx);
 	*puvc = std::move(nuvc);
+	*pexc = std::move(nexc);
 
 	((uint32_t*)spkchk->maindata.data())[1] = 0x40000;
 

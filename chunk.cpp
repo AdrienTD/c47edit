@@ -133,17 +133,16 @@ void WriteChunkToStringBuf(std::stringbuf *sb, Chunk *chk)
 	sb->pubseekpos(endoff);
 }
 
-void Chunk::saveToMem(void **pnt, size_t *size)
+std::string Chunk::saveToString()
 {
 	std::stringbuf sb;
 	WriteChunkToStringBuf(&sb, this);
-	std::string m = sb.str();
-	/*
-	FILE *f;
-	assert(f = fopen("out.spk", "wb"));
-	fwrite(m.data(), m.length(), 1, f);
-	fclose(f);
-	*/
+	return sb.str();
+}
+
+void Chunk::saveToMem(void** pnt, size_t* size)
+{
+	auto m = saveToString();
 	size_t l = m.length();
 	*pnt = malloc(l);
 	*size = l;

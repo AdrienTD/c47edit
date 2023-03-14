@@ -104,7 +104,6 @@ struct DBLEntry
 struct GameObject
 {
 	uint32_t state = 0;
-	uint32_t pdbloff = 0, pexcoff = 0;
 	std::string name;
 	Matrix matrix = Matrix::getIdentity();
 	Vector3 position = Vector3(0.0f, 0.0f, 0.0f);
@@ -122,6 +121,7 @@ struct GameObject
 	std::shared_ptr<Light> light;
 
 	DBLList dbl;
+	std::shared_ptr<Chunk> excChunk;
 
 	uint32_t refcount = 0;
 
@@ -136,7 +136,7 @@ inline void GORef::deref() noexcept { if (m_obj) { m_obj->refcount--; m_obj = nu
 inline void GORef::set(GameObject * obj) noexcept { deref(); m_obj = obj; if (m_obj) m_obj->refcount++; }
 
 struct Scene {
-	Chunk* spkchk, * prot, * pclp, * phea, * pnam, * ppos, * pmtx, * pver, * pfac, * pftx, * puvc, *pdbl, *pdat;
+	Chunk* spkchk, * prot, * pclp, * phea, * pnam, * ppos, * pmtx, * pver, * pfac, * pftx, * puvc, *pdbl, *pdat, *pexc;
 	GameObject* rootobj, * cliprootobj, * superroot;
 	std::string lastspkfn;
 	void* zipmem = nullptr;

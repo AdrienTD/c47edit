@@ -716,8 +716,6 @@ void IGObjectInfo()
 		ImGui::InputScalar("Type", ImGuiDataType_U32, &selobj->type);
 		ImGui::InputScalar("Flags", ImGuiDataType_U32, &selobj->flags, nullptr, nullptr, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
 		ImGui::Separator();
-		ImGui::InputScalar("PDBL offset", ImGuiDataType_U32, &selobj->pdbloff, 0, 0, "%08X", ImGuiInputTextFlags_CharsHexadecimal);
-		ImGui::InputScalar("PEXC offset", ImGuiDataType_U32, &selobj->pexcoff, 0, 0, "%08X", ImGuiInputTextFlags_CharsHexadecimal);
 		ImGui::DragFloat3("Position", &selobj->position.x);
 		/*for (int i = 0; i < 3; i++) {
 			ImGui::PushID(i);
@@ -821,6 +819,17 @@ void IGObjectInfo()
 				s[6] = '0' + i;
 				ImGui::InputScalar(s, ImGuiDataType_U32, &selobj->light->param[i], 0, 0, "%08X", ImGuiInputTextFlags_CharsHexadecimal);
 			}
+		}
+		if (selobj->excChunk && ImGui::CollapsingHeader("EXC")) {
+			auto walkChunk = [](Chunk* chk, auto& rec) -> void {
+				std::string tag{ (char*)&chk->tag, 4};
+				if (ImGui::TreeNode(chk, "%s", tag.c_str())) {
+					for (Chunk& sub : chk->subchunks)
+						rec(&sub, rec);
+					ImGui::TreePop();
+				}
+			};
+			walkChunk(selobj->excChunk.get(), walkChunk);
 		}
 		if (wannadel)
 		{
@@ -1325,10 +1334,8 @@ int main(int argc, char* argv[])
 					glBegin(GL_POINTS);
 					auto renderAnim = [pexc](auto rec, GameObject* obj, const Matrix& prevmat) -> void {
 						Matrix mat = obj->matrix * Matrix::getTranslationMatrix(obj->position) * prevmat;
-						if (obj->pexcoff) {
-							uint8_t* excptr = (uint8_t*)pexc->maindata.data() + obj->pexcoff - 1;
-							Chunk exchk;
-							exchk.load(excptr);
+						if (obj->excChunk) {
+							Chunk& exchk = *obj->excChunk;
 							assert(exchk.tag == 'HEAD');
 							if (auto* keys = exchk.findSubchunk('KEYS')) {
 								uint32_t cnt = *(uint32_t*)(keys->multidata[0].data());
