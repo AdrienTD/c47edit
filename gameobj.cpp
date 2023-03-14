@@ -117,16 +117,16 @@ static void ReadAssetPacks(Scene* scene, mz_zip_archive* zip)
 			free(packmem);
 	};
 
-	readPack("PAL", scene->g_palPack);
-	readPack("DXT", scene->g_dxtPack);
-	readPack("LGT", scene->g_lgtPack);
-	readPack("WAV", scene->g_wavPack);
-	readPack("ANM", scene->g_anmPack, &scene->g_hasAnmPack);
+	readPack("PAL", scene->palPack);
+	readPack("DXT", scene->dxtPack);
+	readPack("LGT", scene->lgtPack);
+	readPack("WAV", scene->wavPack);
+	readPack("ANM", scene->anmPack, &scene->hasAnmPack);
 
-	if (scene->g_palPack.tag != 'PAL') ferr("Not a PAL chunk in Repeat.PAL");
-	if (scene->g_dxtPack.tag != 'DXT') ferr("Not a DXT chunk in Repeat.DXT");
-	if (scene->g_lgtPack.tag != 'LGT') ferr("Not a LGT chunk in Repeat.LGT");
-	assert(scene->g_palPack.subchunks.size() == scene->g_dxtPack.subchunks.size());
+	if (scene->palPack.tag != 'PAL') ferr("Not a PAL chunk in Repeat.PAL");
+	if (scene->dxtPack.tag != 'DXT') ferr("Not a DXT chunk in Repeat.DXT");
+	if (scene->lgtPack.tag != 'LGT') ferr("Not a LGT chunk in Repeat.LGT");
+	assert(scene->palPack.subchunks.size() == scene->dxtPack.subchunks.size());
 }
 
 void Scene::LoadSceneSPK(const char *fn)
@@ -402,16 +402,16 @@ struct SceneSaver {
 	std::map<GameObject*, uint32_t> objidmap;
 
 	ByteWriter<std::vector<uint8_t>> heabuf;
-	PackBuffer<std::array<float, 3>, 1> g_sav_posPackBuf;
-	PackBuffer<std::array<uint32_t, 4>, 16> g_sav_mtxPackBuf;
-	PackBuffer<std::string, 1, true> g_sav_namPackBuf;
-	PackBuffer<std::string, 1> g_sav_dblPackBuf;
-	PackBuffer<std::vector<float>, 4> g_sav_verPackBuf;
-	PackBuffer<std::vector<uint16_t>, 2> g_sav_facPackBuf;
-	PackBuffer<std::string, 1> g_sav_datPackBuf;
-	PackBuffer<std::string, 1> g_sav_ftxPackBuf;
-	PackBuffer<std::vector<float>, 4> g_sav_uvcPackBuf;
-	PackBuffer<std::string, 1> g_sav_excPackBuf;
+	PackBuffer<std::array<float, 3>, 1> posPackBuf;
+	PackBuffer<std::array<uint32_t, 4>, 16> mtxPackBuf;
+	PackBuffer<std::string, 1, true> namPackBuf;
+	PackBuffer<std::string, 1> dblPackBuf;
+	PackBuffer<std::vector<float>, 4> verPackBuf;
+	PackBuffer<std::vector<uint16_t>, 2> facPackBuf;
+	PackBuffer<std::string, 1> datPackBuf;
+	PackBuffer<std::string, 1> ftxPackBuf;
+	PackBuffer<std::vector<float>, 4> uvcPackBuf;
+	PackBuffer<std::string, 1> excPackBuf;
 
 	void MakeObjChunk(Chunk* c, GameObject* o, bool isclp)
 	{
@@ -420,7 +420,7 @@ struct SceneSaver {
 
 		// Position
 		std::array<float, 3> cpos = { o->position.x, o->position.y, o->position.z };
-		uint32_t posoff = g_sav_posPackBuf.add(cpos);
+		uint32_t posoff = posPackBuf.add(cpos);
 
 		// Matrix
 		std::array<uint32_t, 4> cmtx;
@@ -430,14 +430,14 @@ struct SceneSaver {
 		cmtx[2] = (uint32_t)(o->matrix._21 * 1073741824.0f) & ~1;
 		cmtx[3] = o->matrix._22 * 1073741824.0f;
 		if (o->matrix._23 < 0) cmtx[2] |= 1;
-		uint32_t mtxoff = g_sav_mtxPackBuf.add(cmtx);
+		uint32_t mtxoff = mtxPackBuf.add(cmtx);
 
 		// DBL
 		std::string dblsav = o->dbl.save(*this);
-		uint32_t dbloff = g_sav_dblPackBuf.add(dblsav);
+		uint32_t dbloff = dblPackBuf.add(dblsav);
 
 		// Name
-		uint32_t namoff = g_sav_namPackBuf.add(o->name);
+		uint32_t namoff = namPackBuf.add(o->name);
 
 		// Vertices (Mesh+Line)
 		uint32_t veroff = 0, trifacoff = 0, quadfacoff = 0, linetermoff = 0, ftxoff = 0;
@@ -445,33 +445,33 @@ struct SceneSaver {
 		if (o->mesh || o->line) {
 			const auto& vertices = o->mesh ? o->mesh->vertices : o->line->vertices;
 			if (!vertices.empty()) {
-				veroff = g_sav_verPackBuf.add(vertices);
+				veroff = verPackBuf.add(vertices);
 			}
 		}
 
 		// Mesh
 		if (o->mesh) {
 			if (!o->mesh->triindices.empty()) {
-				trifacoff = g_sav_facPackBuf.add(o->mesh->triindices);
+				trifacoff = facPackBuf.add(o->mesh->triindices);
 			}
 			if (!o->mesh->quadindices.empty()) {
-				quadfacoff = g_sav_facPackBuf.add(o->mesh->quadindices);
+				quadfacoff = facPackBuf.add(o->mesh->quadindices);
 			}
 			uint32_t realftxoff = 0;
 			if (!o->mesh->ftxFaces.empty()) {
 				uint32_t tcOff = 0, lcOff = 0;
 				if (!o->mesh->textureCoords.empty()) {
-					tcOff = g_sav_uvcPackBuf.add(o->mesh->textureCoords);
+					tcOff = uvcPackBuf.add(o->mesh->textureCoords);
 				}
 				if (!o->mesh->lightCoords.empty()) {
-					lcOff = g_sav_uvcPackBuf.add(o->mesh->lightCoords);
+					lcOff = uvcPackBuf.add(o->mesh->lightCoords);
 				}
 				ByteWriter<std::string> sb;
 				uint32_t numFaces = (uint32_t)o->mesh->ftxFaces.size();
 				std::array<uint32_t, 3> header = { tcOff, lcOff, numFaces };
 				sb.addData(header.data(), 12);
 				sb.addData(o->mesh->ftxFaces.data(), numFaces * 12);
-				realftxoff = g_sav_ftxPackBuf.add(sb.take()) + 1;
+				realftxoff = ftxPackBuf.add(sb.take()) + 1;
 			}
 			if (o->mesh->extension) {
 				ByteWriter<std::string> sb;
@@ -482,9 +482,9 @@ struct SceneSaver {
 					sb.addU32(p2);
 				}
 				sb.addStringNT(o->mesh->extension->name);
-				uint32_t ext2off = g_sav_datPackBuf.add(sb.take());
+				uint32_t ext2off = datPackBuf.add(sb.take());
 				std::array<uint32_t, 3> ext1 = { realftxoff, o->mesh->extension->extUnk2, ext2off };
-				uint32_t ext1off = g_sav_datPackBuf.add(std::string{ (char*)ext1.data(), 12 });
+				uint32_t ext1off = datPackBuf.add(std::string{ (char*)ext1.data(), 12 });
 				ftxoff = ext1off | 0x80000000;
 			}
 			else {
@@ -496,14 +496,14 @@ struct SceneSaver {
 		if (o->line) {
 			if (!o->line->terms.empty()) {
 				const char* ptr = (const char*)o->line->terms.data();
-				linetermoff = g_sav_datPackBuf.add(std::string{ ptr, 4 * o->line->terms.size() });
+				linetermoff = datPackBuf.add(std::string{ ptr, 4 * o->line->terms.size() });
 			}
 		}
 
 		// EXC
 		uint32_t pexcoff = 0;
 		if (o->excChunk) {
-			pexcoff = g_sav_excPackBuf.add(o->excChunk->saveToString()) + 1;
+			pexcoff = excPackBuf.add(o->excChunk->saveToString()) + 1;
 		}
 
 		// Object Header
@@ -615,16 +615,16 @@ void Scene::ModifySPK()
 
 	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac, ndat, nftx, nuvc, nexc;
 	fillMaindata('AEHP', &nhea, saver.heabuf.take());
-	fillMaindata('MANP', &nnam, saver.g_sav_namPackBuf.buffer);
-	fillMaindata('SOPP', &npos, saver.g_sav_posPackBuf.buffer);
-	fillMaindata('XTMP', &nmtx, saver.g_sav_mtxPackBuf.buffer);
-	fillMaindata('LBDP', &ndbl, saver.g_sav_dblPackBuf.buffer);
-	fillMaindata('REVP', &nver, saver.g_sav_verPackBuf.buffer);
-	fillMaindata('CAFP', &nfac, saver.g_sav_facPackBuf.buffer);
-	fillMaindata('TADP', &ndat, saver.g_sav_datPackBuf.buffer);
-	fillMaindata('XTFP', &nftx, saver.g_sav_ftxPackBuf.buffer);
-	fillMaindata('CVUP', &nuvc, saver.g_sav_uvcPackBuf.buffer);
-	fillMaindata('CXEP', &nexc, saver.g_sav_excPackBuf.buffer);
+	fillMaindata('MANP', &nnam, saver.namPackBuf.buffer);
+	fillMaindata('SOPP', &npos, saver.posPackBuf.buffer);
+	fillMaindata('XTMP', &nmtx, saver.mtxPackBuf.buffer);
+	fillMaindata('LBDP', &ndbl, saver.dblPackBuf.buffer);
+	fillMaindata('REVP', &nver, saver.verPackBuf.buffer);
+	fillMaindata('CAFP', &nfac, saver.facPackBuf.buffer);
+	fillMaindata('TADP', &ndat, saver.datPackBuf.buffer);
+	fillMaindata('XTFP', &nftx, saver.ftxPackBuf.buffer);
+	fillMaindata('CVUP', &nuvc, saver.uvcPackBuf.buffer);
+	fillMaindata('CXEP', &nexc, saver.excPackBuf.buffer);
 
 	// Chunk comparison
 	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
@@ -710,12 +710,12 @@ void Scene::SaveSceneSPK(const char *fn)
 	};
 	ModifySPK();
 	saveChunk(spkchk, "Pack.SPK");
-	saveChunk(&g_palPack, "Pack.PAL");
-	saveChunk(&g_dxtPack, "Pack.DXT");
-	saveChunk(&g_lgtPack, "Pack.LGT");
-	saveChunk(&g_wavPack, "Pack.WAV");
-	if (g_hasAnmPack)
-		saveChunk(&g_anmPack, "Pack.ANM");
+	saveChunk(&palPack, "Pack.PAL");
+	saveChunk(&dxtPack, "Pack.DXT");
+	saveChunk(&lgtPack, "Pack.LGT");
+	saveChunk(&wavPack, "Pack.WAV");
+	if (hasAnmPack)
+		saveChunk(&anmPack, "Pack.ANM");
 
 	mz_zip_writer_finalize_archive(&outzip);
 	mz_zip_writer_end(&outzip);

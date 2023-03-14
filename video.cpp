@@ -110,8 +110,8 @@ struct ProMesh {
 			lgtCoords = (float*)mesh->lightCoords.data();
 		}
 
-		assert(g_scene.g_lgtPack.subchunks[0].tag == 'RGBA');
-		uint8_t* colorMapData = g_scene.g_lgtPack.subchunks[0].maindata.data();
+		assert(g_scene.lgtPack.subchunks[0].tag == 'RGBA');
+		uint8_t* colorMapData = g_scene.lgtPack.subchunks[0].maindata.data();
 		assert(*(uint16_t*)(colorMapData + 6) == 2); // the width of color map must be 2
 		colorMapData += 0x14; // skip texture header until name
 		while (*colorMapData++); // skip texture name

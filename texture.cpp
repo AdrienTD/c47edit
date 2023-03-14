@@ -72,9 +72,9 @@ void GlifyTexture(Chunk* c) {
 
 void GlifyAllTextures()
 {
-	for (Chunk& c : g_scene.g_palPack.subchunks)
+	for (Chunk& c : g_scene.palPack.subchunks)
 		GlifyTexture(&c);
-	for (Chunk& c : g_scene.g_lgtPack.subchunks)
+	for (Chunk& c : g_scene.lgtPack.subchunks)
 		GlifyTexture(&c);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -94,8 +94,8 @@ void AddTexture(Scene& scene, const std::filesystem::path& filepath)
 	uint32_t& numTextureIds = *(uint32_t*)ptxi->maindata.data();
 	numTextureIds += 1;
 
-	Chunk& chk = scene.g_palPack.subchunks.emplace_back();
-	Chunk& dxtchk = scene.g_dxtPack.subchunks.emplace_back();
+	Chunk& chk = scene.palPack.subchunks.emplace_back();
+	Chunk& dxtchk = scene.dxtPack.subchunks.emplace_back();
 	ImportTexture(filepath, chk, dxtchk, numTextureIds);
 }
 
@@ -186,15 +186,15 @@ void ExportTexture(Chunk* texChunk, const std::filesystem::path& filepath)
 
 std::pair<Chunk*, Chunk*> FindTextureChunk(Scene& scene, uint32_t id)
 {
-	for (Chunk& chk : scene.g_palPack.subchunks) {
+	for (Chunk& chk : scene.palPack.subchunks) {
 		uint32_t chkid = *(uint32_t*)chk.maindata.data();
 		if (chkid == id) {
-			int nth = &chk - scene.g_palPack.subchunks.data();
-			assert(*(uint32_t*)scene.g_dxtPack.subchunks[nth].maindata.data() == id);
-			return { &chk, &scene.g_dxtPack.subchunks[nth] };
+			int nth = &chk - scene.palPack.subchunks.data();
+			assert(*(uint32_t*)scene.dxtPack.subchunks[nth].maindata.data() == id);
+			return { &chk, &scene.dxtPack.subchunks[nth] };
 		}
 	}
-	for (Chunk& chk : scene.g_lgtPack.subchunks) {
+	for (Chunk& chk : scene.lgtPack.subchunks) {
 		uint32_t chkid = *(uint32_t*)chk.maindata.data();
 		if (chkid == id) {
 			return { &chk, nullptr };

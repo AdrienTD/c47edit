@@ -626,7 +626,7 @@ void IGObjectInfo()
 						auto mit = objmodel.materials.find(objmodel.groups[groupIndex].name);
 						if (mit != objmodel.materials.end()) {
 							const std::string& texname = mit->second.map_Kd;
-							for (auto& texchk : g_scene.g_palPack.subchunks) {
+							for (auto& texchk : g_scene.palPack.subchunks) {
 								const TexInfo* ti = (const TexInfo*)texchk.maindata.data();
 								if (ti->name == texname) {
 									texId = (uint16_t)ti->id;
@@ -900,7 +900,7 @@ void IGTextures()
 		auto filepaths = GuiUtils::MultiOpenDialogBox("Image\0*.png;*.bmp;*.jpg;*.jpeg;*.gif\0\0\0\0", "png");
 		for (const auto& filepath : filepaths) {
 			AddTexture(g_scene, filepath);
-			GlifyTexture(&g_scene.g_palPack.subchunks.back());
+			GlifyTexture(&g_scene.palPack.subchunks.back());
 		}
 	}
 	ImGui::SameLine();
@@ -930,7 +930,7 @@ void IGTextures()
 	if (ImGui::Button("Export all")) {
 		auto dirpath = GuiUtils::SelectFolderDialogBox("Export all the textures in PNG to:");
 		if (!dirpath.empty()) {
-			for (Chunk& chk : g_scene.g_palPack.subchunks) {
+			for (Chunk& chk : g_scene.palPack.subchunks) {
 				TexInfo* ti = (TexInfo*)chk.maindata.data();
 				std::string name = ti->name;
 				if (name.empty()) {
@@ -948,7 +948,7 @@ void IGTextures()
 	ImGui::RadioButton("Tex", &packShown, 0);
 	ImGui::SameLine();
 	ImGui::RadioButton("Lgt", &packShown, 1);
-	auto& pack = (packShown == 0) ? g_scene.g_palPack : g_scene.g_lgtPack;
+	auto& pack = (packShown == 0) ? g_scene.palPack : g_scene.lgtPack;
 
 	if (ImGui::BeginTable("TextureColumnsa", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoHostExtendY | ImGuiTableFlags_NoHostExtendX, ImGui::GetContentRegionAvail())) {
 		ImGui::TableSetupColumn("TexListCol", ImGuiTableColumnFlags_WidthFixed, 256.0f);
@@ -992,7 +992,7 @@ void IGSounds()
 	if (!wavc) return;
 	int32_t numSounds = *(uint32_t*)wavc->multidata[1].data();
 	assert(wavc->multidata.size() == 2 + 2 * numSounds);
-	assert((size_t)numSounds == g_scene.g_wavPack.subchunks.size());
+	assert((size_t)numSounds == g_scene.wavPack.subchunks.size());
 
 	ImGui::SetNextWindowSize(ImVec2(512.0f, 350.0f), ImGuiCond_FirstUseEver);
 	ImGui::Begin("Sounds", &wndShowSounds);
@@ -1000,7 +1000,7 @@ void IGSounds()
 	if (ImGui::Button("Replace")) {
 		auto fpath = GuiUtils::OpenDialogBox("Sound Wave file (*.wav)\0*.WAV\0\0\0", "wav");
 		if (!fpath.empty()) {
-			Chunk& chk = g_scene.g_wavPack.subchunks[selectedSound];
+			Chunk& chk = g_scene.wavPack.subchunks[selectedSound];
 			FILE* file;
 			_wfopen_s(&file, fpath.c_str(), L"rb");
 			if (file) {
@@ -1018,7 +1018,7 @@ void IGSounds()
 		const char* sndName = (const char*)wavc->multidata[2 + 2 * selectedSound + 1].data();
 		auto fpath = GuiUtils::SaveDialogBox("Sound Wave file (*.wav)\0*.WAV\0\0\0", "wav", std::filesystem::path(sndName).filename());
 		if (!fpath.empty()) {
-			Chunk& chk = g_scene.g_wavPack.subchunks[selectedSound];
+			Chunk& chk = g_scene.wavPack.subchunks[selectedSound];
 			FILE* file;
 			_wfopen_s(&file, fpath.c_str(), L"wb");
 			if (file) {
@@ -1033,7 +1033,7 @@ void IGSounds()
 		auto dirpath = GuiUtils::SelectFolderDialogBox("Export all WAV sounds to:\n(this will also create subfolders)");
 		if (!dirpath.empty()) {
 			for (int i = 0; i < numSounds; ++i) {
-				Chunk& chk = g_scene.g_wavPack.subchunks[i];
+				Chunk& chk = g_scene.wavPack.subchunks[i];
 				const char* sndName = (const char*)wavc->multidata[2 + 2 * i + 1].data();
 				auto fpath = dirpath / std::filesystem::path(sndName).relative_path();
 				std::filesystem::create_directories(fpath.parent_path());
@@ -1048,7 +1048,7 @@ void IGSounds()
 	}
 	ImGui::BeginChild("SoundList");
 	for (int i = 0; i < numSounds; ++i) {
-		Chunk& chk = g_scene.g_wavPack.subchunks[i];
+		Chunk& chk = g_scene.wavPack.subchunks[i];
 		uint32_t sndId = *(uint32_t*)wavc->multidata[2 + 2 * i].data();
 		const char* sndName = (const char*)wavc->multidata[2 + 2 * i + 1].data();
 		ImGui::PushID(i);
