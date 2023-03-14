@@ -424,11 +424,11 @@ struct SceneSaver {
 
 		// Matrix
 		std::array<uint32_t, 4> cmtx;
-		cmtx[0] = (uint32_t)(o->matrix._31 * 1073741824.0f) & ~1; // multiply by 2^30
-		cmtx[1] = o->matrix._32 * 1073741824.0f;
+		cmtx[0] = (uint32_t)(o->matrix._31 * 1073741824.0f) & ~1u; // multiply by 2^30
+		cmtx[1] = (uint32_t)(o->matrix._32 * 1073741824.0f);
 		if (o->matrix._33 < 0) cmtx[0] |= 1;
-		cmtx[2] = (uint32_t)(o->matrix._21 * 1073741824.0f) & ~1;
-		cmtx[3] = o->matrix._22 * 1073741824.0f;
+		cmtx[2] = (uint32_t)(o->matrix._21 * 1073741824.0f) & ~1u;
+		cmtx[3] = (uint32_t)(o->matrix._22 * 1073741824.0f);
 		if (o->matrix._23 < 0) cmtx[2] |= 1;
 		uint32_t mtxoff = mtxPackBuf.add(cmtx);
 
@@ -768,7 +768,7 @@ const char * DBLEntry::getTypeName(int type)
 	static const char* names[] = { "0", "double", "float", "int", "char*", "5", "EndCpnt", "7", "ZGEOMREF", "ZGEOMREFTAB", "MSG", "SNDREF", "Script" };
 	if (type == 0x3F)
 		return "EndDBL";
-	if (type < std::size(names))
+	if ((size_t)type < std::size(names))
 		return names[type];
 	return "?";
 }

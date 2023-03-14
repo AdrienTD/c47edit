@@ -64,7 +64,6 @@ void ObjModel::load(const std::filesystem::path& filename)
 			texCoords.push_back(vec);
 		}
 		else if (verb == "f") {
-			std::array<int, 3> indices;
 			static std::vector<std::array<int, 3>> posIndices;
 			posIndices.clear();
 			while (!wordSplitter.finished()) {

@@ -469,7 +469,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 					GLuint tex = GetDblImageTexture(selobj, data.data(), format, width, height, opacity, refresh);
 					int dispHeight = std::min(128u, height);
 					int dispWidth = width * dispHeight / height;
-					ImGui::Image((void*)(uintptr_t)tex, ImVec2(dispWidth, dispHeight));
+					ImGui::Image((void*)(uintptr_t)tex, ImVec2((float)dispWidth, (float)dispHeight));
 				}
 			}
 			break;
@@ -853,16 +853,12 @@ void IGMain()
 	ImGui::Text("c47edit - Version " APP_VERSION);
 	if (ImGui::Button("Save Scene"))
 	{
-		char newfn[300]; newfn[299] = 0;
-		_splitpath(g_scene.lastspkfn.c_str(), 0, 0, newfn, 0);
-		strcat(newfn, ".zip");
-		char *s = strrchr(newfn, '@');
-		if (s)
-			s += 1;
-		else
-			s = newfn;
+		auto newfn = std::filesystem::path(g_scene.lastspkfn).filename().string();
+		size_t atpos = newfn.rfind('@');
+		if (atpos != newfn.npos)
+			newfn = newfn.substr(atpos + 1);
 
-		auto zipPath = GuiUtils::SaveDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", s, "Save Scene ZIP archive as...");
+		auto zipPath = GuiUtils::SaveDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", newfn, "Save Scene ZIP archive as...");
 		if (!zipPath.empty())
 			g_scene.SaveSceneSPK(zipPath.string().c_str());
 	}
@@ -1158,7 +1154,7 @@ GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObje
 	if (o->mesh)
 	{
 		Mesh *m = o->mesh.get();
-		for (int i = 0; i < m->getNumQuads(); i++)
+		for (size_t i = 0; i < m->getNumQuads(); i++)
 			if (IsRayIntersectingFace(raystart, raydir, m->vertices.data(), m->quadindices.data() + i * 4, 4, &objmtx))
 				if ((d = (finalintersectpnt - campos).sqlen2xz()) < bestpickdist)
 				{
@@ -1166,7 +1162,7 @@ GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObje
 					bestpickobj = o;
 					bestpickintersectionpnt = finalintersectpnt;
 				}
-		for(int i = 0; i < m->getNumTris(); i++)
+		for(size_t i = 0; i < m->getNumTris(); i++)
 			if (IsRayIntersectingFace(raystart, raydir, m->vertices.data(), m->triindices.data() + i * 3, 3, &objmtx))
 				if ((d = (finalintersectpnt - campos).sqlen2xz()) < bestpickdist)
 				{
@@ -1248,7 +1244,7 @@ int main(int argc, char* argv[])
 				if (ImGui::IsKeyPressed('T'))
 					rendertextures = !rendertextures;
 			}
-			campos += cammove * camspeed * (io.KeyShift ? 2 : 1);
+			campos += cammove * camspeed * (io.KeyShift ? 2.0f : 1.0f);
 			if (io.MouseDown[0] && !io.WantCaptureMouse && !(io.KeyAlt || io.KeyCtrl))
 			{
 				camori.y += io.MouseDelta.x * 0.01f;
@@ -1258,7 +1254,7 @@ int main(int argc, char* argv[])
 			if (io.MouseClicked[1] || (io.MouseClicked[0] && (io.KeyAlt || io.KeyCtrl)))
 			{
 				Vector3 raystart, raydir;
-				float ys = 1 / tan(60.0f * (float)M_PI / 180.0f / 2.0f);
+				float ys = 1.0f / tan(60.0f * (float)M_PI / 180.0f / 2.0f);
 				float xs = ys / ((float)screen_width / (float)screen_height);
 				ImVec2 mspos = ImGui::GetMousePos();
 				float msx = mspos.x * 2.0f / (float)screen_width - 1.0f;
@@ -1315,7 +1311,7 @@ int main(int argc, char* argv[])
 			glMultMatrixf(lookat.v);
 			glMatrixMode(GL_MODELVIEW);
 			glLoadIdentity();
-			float ovs = pow(2, objviewscale);
+			float ovs = pow(2.0f, objviewscale);
 			glScalef(ovs, ovs, ovs);
 
 			glEnable(GL_CULL_FACE);

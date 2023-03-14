@@ -172,7 +172,7 @@ Chunk Chunk::reconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void
 		}
 
 		if (has_multidata) {
-			for (int md = 0; md < num_multidata; ++md) {
+			for (int md = 0; md < (int)num_multidata; ++md) {
 				rpmap[currp + datoff] = { c, md };
 				datoff += c->multidata[md].size();
 			}
@@ -183,8 +183,8 @@ Chunk Chunk::reconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void
 
 		if (has_subchunks) {
 			currp += 16 + (has_multidata ? 4 + num_multidata*4 : 0);
-			for (int i = 0; i < num_subchunks; i++)
-				rec(&c->subchunks[i], rec);
+			for (auto& subchunk : c->subchunks)
+				rec(&subchunk, rec);
 		}
 
 		currp = beg + csize;
