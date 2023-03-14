@@ -142,6 +142,7 @@
     <ClCompile Include="window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ByteWriter.h" />
     <ClInclude Include="chunk.h" />
     <ClInclude Include="classInfo.h" />
     <ClInclude Include="debug.h" />

@@ -4,11 +4,11 @@
 #include <filesystem>
 #include <functional>
 #include <map>
-#include <sstream>
 
 #include "global.h"
 #include "chunk.h"
 #include "gameobj.h"
+#include "ByteWriter.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -109,37 +109,35 @@ void ImportTexture(const std::filesystem::path& filepath, Chunk& chk, Chunk& dxt
 	int flags = 0x14;
 	int random = 0x12345678;
 
-	std::stringbuf chkdata, dxtdata;
-	chkdata.sputn((char*)&texid, 4);
-	chkdata.sputn((char*)&height, 2);
-	chkdata.sputn((char*)&width, 2);
-	chkdata.sputn((char*)&numMipmaps, 4);
-	chkdata.sputn((char*)&flags, 4);
-	chkdata.sputn((char*)&random, 4);
-	chkdata.sputn(name.c_str(), name.size() + 1);
-	std::string str = chkdata.str();
-	dxtdata.sputn(str.data(), str.size());
+	ByteWriter<std::vector<uint8_t>> chkdata, dxtdata;
+	chkdata.addU32(texid);
+	chkdata.addU16(height);
+	chkdata.addU16(width);
+	chkdata.addU32(numMipmaps);
+	chkdata.addU32(flags);
+	chkdata.addU32(random);
+	chkdata.addStringNT(name);
+	dxtdata = chkdata;
 
 	int size = width * height * 4;
-	chkdata.sputn((char*)&size, 4);
-	chkdata.sputn((char*)pixels, size);
+	chkdata.addS32(size);
+	chkdata.addData(pixels, size);
 
-	// 2 COPIES >_<
+	// 1 COPY >_<
 	chk.tag = 'RGBA';
-	str = chkdata.str();
+	auto str = chkdata.take();
 	chk.maindata.resize(str.size());
 	memcpy(chk.maindata.data(), str.data(), str.size());
 
 	// DXT
 	size = squish::GetStorageRequirements(width, height, squish::kDxt1);
-	auto comp = std::make_unique<uint8_t[]>(size);
-	squish::CompressImage(pixels, width, height, comp.get(), squish::kDxt1);
-	dxtdata.sputn((char*)&size, 4);
-	dxtdata.sputn((char*)comp.get(), size);
+	dxtdata.addS32(size);
+	uint8_t* comp = dxtdata.addEmpty(size);
+	squish::CompressImage(pixels, width, height, comp, squish::kDxt1);
 
-	// 2 COPIES >_<
+	// 1 COPY >_<
 	dxtchk.tag = 'DXT1';
-	str = dxtdata.str();
+	str = dxtdata.take();
 	dxtchk.maindata.resize(str.size());
 	memcpy(dxtchk.maindata.data(), str.data(), str.size());
 

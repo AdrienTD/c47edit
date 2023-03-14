@@ -4,9 +4,9 @@
 // See LICENSE file for more details.
 
 #include "chunk.h"
-#include <sstream>
 #include <map>
 #include <cassert>
+#include "ByteWriter.h"
 
 Chunk::~Chunk() = default;
 
@@ -80,34 +80,27 @@ void Chunk::load(void *bytes)
 	}
 }
 
-uint32_t sbtell(std::stringbuf *sb)
-{
-	return sb->pubseekoff(0, std::ios_base::cur, std::ios_base::out);
-}
-
-void WriteChunkToStringBuf(std::stringbuf *sb, Chunk *chk)
+void WriteChunkToStringBuf(ByteWriter<std::string>& sb, Chunk *chk)
 {
 	// Header
-	uint32_t begoff = sbtell(sb);
-	sb->sputn((char*)&(chk->tag), 4);
+	uint32_t begoff = (uint32_t)sb.size();
+	sb.addU32(chk->tag);
 	bool hasmultidata = !chk->multidata.empty();
 	bool hassubchunks = !chk->subchunks.empty();
-	//int size = 8 + chk->maindata_size;
-	int iv = 0;
-	sb->sputn((char*)&iv, 4);
+	sb.addS32(0); // reserved for size
 	if (hasmultidata || hassubchunks)
-		sb->sputn((char*)&iv, 4);
+		sb.addS32(0); // reserved for data offset
 	if (hassubchunks) {
 		uint32_t num_subchunks = (uint32_t)chk->subchunks.size();
-		sb->sputn((char*)&num_subchunks, 4);
+		sb.addU32(num_subchunks);
 	}
 	if (hasmultidata)
 	{
 		uint32_t num_datas = (uint32_t)chk->multidata.size();
-		sb->sputn((char*)&num_datas, 4);
+		sb.addU32(num_datas);
 		for (auto& dat : chk->multidata) {
 			uint32_t len = (uint32_t)dat.size();
-			sb->sputn((char*)&len, 4);
+			sb.addU32(len);
 		}
 	}
 
@@ -117,27 +110,27 @@ void WriteChunkToStringBuf(std::stringbuf *sb, Chunk *chk)
 			WriteChunkToStringBuf(sb, &subchunk);
 
 	// Data / Multidata
-	uint32_t odat = sbtell(sb) - begoff;
+	uint32_t odat = (uint32_t)sb.size() - begoff;
 	if (hasmultidata)
 		for (auto& dat : chk->multidata)
-			sb->sputn((char*)dat.data(), dat.size());
+			sb.addData(dat.data(), dat.size());
 	else
-		sb->sputn((char*)chk->maindata.data(), chk->maindata.size());
-	uint32_t endoff = sbtell(sb);
+		sb.addData(chk->maindata.data(), chk->maindata.size());
+	uint32_t endoff = (uint32_t)sb.size();
 
-	sb->pubseekpos(begoff + 4, std::ios_base::out);
+	// Write to the reserved values
+	uint8_t* headerPtr = (uint8_t*)sb.getPointer(begoff);
 	uint32_t lenflags = (endoff - begoff) | (hasmultidata ? 0x40000000 : 0) | (hassubchunks ? 0x80000000 : 0);
-	sb->sputn((char*)&lenflags, 4);
+	*(uint32_t*)(headerPtr + 4) = lenflags;
 	if (hasmultidata || hassubchunks)
-		sb->sputn((char*)&odat, 4);
-	sb->pubseekpos(endoff);
+		*(uint32_t*)(headerPtr + 8) = odat;
 }
 
 std::string Chunk::saveToString()
 {
-	std::stringbuf sb;
-	WriteChunkToStringBuf(&sb, this);
-	return sb.str();
+	ByteWriter<std::string> sb;
+	WriteChunkToStringBuf(sb, this);
+	return sb.take();
 }
 
 void Chunk::saveToMem(void** pnt, size_t* size)

@@ -4,7 +4,6 @@
 // See LICENSE file for more details.
 
 #include <functional>
-#include <sstream>
 #include <array>
 #include <map>
 #include <unordered_map>
@@ -13,6 +12,7 @@
 #include "gameobj.h"
 #include "chunk.h"
 #include "vecmat.h"
+#include "ByteWriter.h"
 
 #include <miniz/miniz.h>
 
@@ -402,7 +402,7 @@ struct PackBuffer {
 uint32_t moc_objcount;
 std::map<GameObject*, uint32_t> objidmap;
 
-std::stringbuf heabuf;
+ByteWriter<std::vector<uint8_t>> heabuf;
 PackBuffer<std::array<float, 3>, 1> g_sav_posPackBuf;
 PackBuffer<std::array<uint32_t, 4>, 16> g_sav_mtxPackBuf;
 PackBuffer<std::string, 1, true> g_sav_namPackBuf;
@@ -413,8 +413,6 @@ PackBuffer<std::string, 1> g_sav_datPackBuf;
 PackBuffer<std::string, 1> g_sav_ftxPackBuf;
 PackBuffer<std::vector<float>, 4> g_sav_uvcPackBuf;
 PackBuffer<std::string, 1> g_sav_excPackBuf;
-
-uint32_t sbtell(std::stringbuf* sb);
 
 void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 {
@@ -436,7 +434,7 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 	std::string dblsav = o->dbl.save();
 	uint32_t dbloff = g_sav_dblPackBuf.add(dblsav);
 
-	uint32_t heaoff = sbtell(&heabuf);
+	uint32_t heaoff = (uint32_t)heabuf.size();
 
 	uint32_t namoff = g_sav_namPackBuf.add(o->name);
 
@@ -464,23 +462,23 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 			if (!o->mesh->lightCoords.empty()) {
 				lcOff = g_sav_uvcPackBuf.add(o->mesh->lightCoords);
 			}
-			std::stringbuf sb;
+			ByteWriter<std::string> sb;
 			uint32_t numFaces = (uint32_t)o->mesh->ftxFaces.size();
 			std::array<uint32_t, 3> header = { tcOff, lcOff, numFaces };
-			sb.sputn((char*)header.data(), 12);
-			sb.sputn((char*)o->mesh->ftxFaces.data(), numFaces * 12);
-			realftxoff = g_sav_ftxPackBuf.add(sb.str()) + 1;
+			sb.addData(header.data(), 12);
+			sb.addData(o->mesh->ftxFaces.data(), numFaces * 12);
+			realftxoff = g_sav_ftxPackBuf.add(sb.take()) + 1;
 		}
 		if (o->mesh->extension) {
-			std::stringbuf sb;
+			ByteWriter<std::string> sb;
 			uint32_t numFrames = o->mesh->extension->frames.size();
-			sb.sputn((char*)&numFrames, 4);
+			sb.addU32(numFrames);
 			for (auto& [p1,p2] : o->mesh->extension->frames) {
-				sb.sputn((char*)&p1, 4);
-				sb.sputn((char*)&p2, 4);
+				sb.addU32(p1);
+				sb.addU32(p2);
 			}
-			sb.sputn(o->mesh->extension->name.c_str(), o->mesh->extension->name.size() + 1);
-			uint32_t ext2off = g_sav_datPackBuf.add(sb.str());
+			sb.addStringNT(o->mesh->extension->name);
+			uint32_t ext2off = g_sav_datPackBuf.add(sb.take());
 			std::array<uint32_t, 3> ext1 = { realftxoff, o->mesh->extension->extUnk2, ext2off };
 			uint32_t ext1off = g_sav_datPackBuf.add(std::string{ (char*)ext1.data(), 12 });
 			ftxoff = ext1off | 0x80000000;
@@ -503,50 +501,50 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 
 	if(true)
 	{
-		heabuf.sputn((char*)&dbloff, 4);
-		heabuf.sputn((char*)&pexcoff, 4);
-		heabuf.sputn((char*)&namoff, 4);
-		heabuf.sputn((char*)&mtxoff, 4);
-		heabuf.sputn((char*)&posoff, 4);
-		heabuf.sputn((char*)&o->type, 2);
-		heabuf.sputn((char*)&o->flags, 2);
+		heabuf.addU32(dbloff);
+		heabuf.addU32(pexcoff);
+		heabuf.addU32(namoff);
+		heabuf.addU32(mtxoff);
+		heabuf.addU32(posoff);
+		heabuf.addU16(o->type);
+		heabuf.addU16(o->flags);
 		if (o->flags & 0x0020)
 		{
 			assert(o->mesh);
-			heabuf.sputn((char*)&veroff, 4);
-			heabuf.sputn((char*)&quadfacoff, 4);
-			heabuf.sputn((char*)&trifacoff, 4);
-			heabuf.sputn((char*)&ftxoff, 4);
+			heabuf.addU32(veroff);
+			heabuf.addU32(quadfacoff);
+			heabuf.addU32(trifacoff);
+			heabuf.addU32(ftxoff);
 			uint32_t versize = o->mesh->getNumVertices();
 			uint32_t quadsize = o->mesh->getNumQuads();
 			uint32_t trisize = o->mesh->getNumTris();
-			heabuf.sputn((char*)&versize, 4);
-			heabuf.sputn((char*)&quadsize, 4);
-			heabuf.sputn((char*)&trisize, 4);
-			heabuf.sputn((char*)&o->color, 4);
-			heabuf.sputn((char*)&o->mesh->weird, 4);
+			heabuf.addU32(versize);
+			heabuf.addU32(quadsize);
+			heabuf.addU32(trisize);
+			heabuf.addU32(o->color);
+			heabuf.addU32(o->mesh->weird);
 		}
 		if (o->flags & 0x0400)
 		{
 			assert(o->line);
 			uint32_t zero = 0;
-			heabuf.sputn((char*)&veroff, 4);
-			heabuf.sputn((char*)&zero, 4);
-			heabuf.sputn((char*)&linetermoff, 4);
-			heabuf.sputn((char*)&o->line->ftxo, 4);
+			heabuf.addU32(veroff);
+			heabuf.addU32(zero);
+			heabuf.addU32(linetermoff);
+			heabuf.addU32(o->line->ftxo);
 			uint32_t versize = o->line->getNumVertices();
 			uint32_t termsize = o->line->terms.size();
-			heabuf.sputn((char*)&versize, 4);
-			heabuf.sputn((char*)&zero, 4);
-			heabuf.sputn((char*)&termsize, 4);
-			heabuf.sputn((char*)&o->color, 4);
-			heabuf.sputn((char*)&o->line->weird, 4);
+			heabuf.addU32(versize);
+			heabuf.addU32(zero);
+			heabuf.addU32(termsize);
+			heabuf.addU32(o->color);
+			heabuf.addU32(o->line->weird);
 		}
 		if (o->flags & 0x0080)
 		{
 			assert(o->light);
 			for (int i = 0; i < 7; i++)
-				heabuf.sputn((char*)&o->light->param[i], 4);
+				heabuf.addU32(o->light->param[i]);
 		}
 	}
 	uint32_t tagstate = o->state | (isclp ? 1 : 0);
@@ -605,7 +603,7 @@ void Scene::ModifySPK()
 	};
 
 	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac, ndat, nftx, nuvc, nexc;
-	fillMaindata('AEHP', &nhea, heabuf.str());
+	fillMaindata('AEHP', &nhea, heabuf.take());
 	fillMaindata('MANP', &nnam, g_sav_namPackBuf.buffer);
 	fillMaindata('SOPP', &npos, g_sav_posPackBuf.buffer);
 	fillMaindata('XTMP', &nmtx, g_sav_mtxPackBuf.buffer);
@@ -617,7 +615,7 @@ void Scene::ModifySPK()
 	fillMaindata('CVUP', &nuvc, g_sav_uvcPackBuf.buffer);
 	fillMaindata('CXEP', &nexc, g_sav_excPackBuf.buffer);
 
-	heabuf = std::stringbuf();
+	heabuf = {};
 	g_sav_namPackBuf = {};
 	g_sav_posPackBuf = {}; g_sav_mtxPackBuf = {}; g_sav_dblPackBuf = {};
 	g_sav_verPackBuf = {}; g_sav_facPackBuf = {}; g_sav_datPackBuf = {};
@@ -852,55 +850,51 @@ void DBLList::load(uint8_t* dpbeg, const std::map<uint32_t, GameObject*>& idobjm
 
 std::string DBLList::save()
 {
-	std::stringbuf dblsav;
-	uint32_t zero = 0;
-	dblsav.sputn((char*)&zero, 4);
+	ByteWriter<std::string> dblsav;
+	dblsav.addU32(0);
 	for (auto e = entries.begin(); e != entries.end(); e++)
 	{
 		uint8_t typ = e->type | e->flags;
-		dblsav.sputc(typ);
+		dblsav.addU8(typ);
 		switch (e->type)
 		{
 		case 0:
 			break;
 		case 1:
-			dblsav.sputn((char*)&std::get<double>(e->value), 8); break;
+			dblsav.addDouble(std::get<double>(e->value)); break;
 		case 2:
-			dblsav.sputn((char*)&std::get<float>(e->value), 4); break;
+			dblsav.addFloat(std::get<float>(e->value)); break;
 		case 3:
 		case 0xA:
 		case 0xB:
-			dblsav.sputn((char*)&std::get<uint32_t>(e->value), 4); break;
+			dblsav.addU32(std::get<uint32_t>(e->value)); break;
 		case 4:
-		case 5: {
-			auto& str = std::get<std::string>(e->value);
-			dblsav.sputn(str.data(), str.size() + 1); break;
-		}
+		case 5:
+			dblsav.addStringNT(std::get<std::string>(e->value)); break;
 		case 6:
 		case 0x3f:
 			break;
 		case 7:
 		{
 			auto& vec = std::get<std::vector<uint8_t>>(e->value);
-			uint32_t siz = (uint32_t)vec.size() + 4;
-			dblsav.sputn((char*)&siz, 4);
-			dblsav.sputn((char*)vec.data(), vec.size());
+			dblsav.addU32((uint32_t)vec.size() + 4);
+			dblsav.addData(vec.data(), vec.size());
 			break;
 		}
 		case 8:
 		{
 			auto& obj = std::get<GORef>(e->value);
 			uint32_t x = objidmap[obj.get()];
-			dblsav.sputn((char*)&x, 4); break;
+			dblsav.addU32(x); break;
 		}
 		case 9:
 		{
 			auto& vec = std::get<std::vector<GORef>>(e->value);
 			uint32_t siz = (uint32_t)vec.size() * 4 + 4;
-			dblsav.sputn((char*)&siz, 4);
+			dblsav.addU32(siz);
 			for (auto& obj : vec) {
 				uint32_t x = objidmap[obj.get()];
-				dblsav.sputn((char*)&x, 4);
+				dblsav.addU32(x);
 			}
 			break;
 		}
@@ -908,12 +902,12 @@ std::string DBLList::save()
 		{
 			auto& sublist = std::get<DBLList>(e->value);
 			auto subdblsav = sublist.save();
-			dblsav.sputn((const char*)subdblsav.data(), subdblsav.size());
+			dblsav.addData(subdblsav.data(), subdblsav.size());
 			break;
 		}
 		}
 	}
-	std::string str = dblsav.str();
+	std::string str = dblsav.take();
 	*(uint32_t*)str.data() = (uint32_t)str.size() | (flags << 24);
 	return str;
 }
