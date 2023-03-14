@@ -80,7 +80,7 @@ void Chunk::load(void *bytes)
 	}
 }
 
-void WriteChunkToStringBuf(ByteWriter<std::string>& sb, Chunk *chk)
+static void WriteChunkToStringBuf(ByteWriter<std::string>& sb, Chunk *chk)
 {
 	// Header
 	uint32_t begoff = (uint32_t)sb.size();
@@ -131,15 +131,6 @@ std::string Chunk::saveToString()
 	ByteWriter<std::string> sb;
 	WriteChunkToStringBuf(sb, this);
 	return sb.take();
-}
-
-void Chunk::saveToMem(void** pnt, size_t* size)
-{
-	auto m = saveToString();
-	size_t l = m.length();
-	*pnt = malloc(l);
-	*size = l;
-	memcpy(*pnt, m.data(), l);
 }
 
 Chunk Chunk::reconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void *repeat)

@@ -25,6 +25,5 @@ struct Chunk
 
 	void load(void *bytes);
 	std::string saveToString();
-	void saveToMem(void **pnt, size_t *size);
 	static Chunk reconstructPackFromRepeat(void *packrep, uint32_t packrepsize, void *repeat);
 };

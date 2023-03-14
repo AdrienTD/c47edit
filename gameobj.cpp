@@ -383,7 +383,7 @@ struct PackBuffer {
 	std::map<Unit, uint32_t> offmap;
 
 	[[nodiscard]] uint32_t addByteOffset(const Unit& elem) {
-		auto [it, inserted] = offmap.try_emplace(elem, buffer.size());
+		auto [it, inserted] = offmap.try_emplace(elem, (uint32_t)buffer.size());
 		if (inserted) {
 			uint8_t* ptr = (uint8_t*)std::data(elem);
 			size_t len = sizeof(Elem) * (std::size(elem) + (IncludeStringNullTerminator ? 1 : 0));
@@ -396,111 +396,118 @@ struct PackBuffer {
 	}
 };
 
-// All global variables below are used during saving.
-// Should be fine as long as a scene is saved one at a time.
+// Struct with all variables used when saving a Scene.
+struct SceneSaver {
+	uint32_t moc_objcount;
+	std::map<GameObject*, uint32_t> objidmap;
 
-uint32_t moc_objcount;
-std::map<GameObject*, uint32_t> objidmap;
+	ByteWriter<std::vector<uint8_t>> heabuf;
+	PackBuffer<std::array<float, 3>, 1> g_sav_posPackBuf;
+	PackBuffer<std::array<uint32_t, 4>, 16> g_sav_mtxPackBuf;
+	PackBuffer<std::string, 1, true> g_sav_namPackBuf;
+	PackBuffer<std::string, 1> g_sav_dblPackBuf;
+	PackBuffer<std::vector<float>, 4> g_sav_verPackBuf;
+	PackBuffer<std::vector<uint16_t>, 2> g_sav_facPackBuf;
+	PackBuffer<std::string, 1> g_sav_datPackBuf;
+	PackBuffer<std::string, 1> g_sav_ftxPackBuf;
+	PackBuffer<std::vector<float>, 4> g_sav_uvcPackBuf;
+	PackBuffer<std::string, 1> g_sav_excPackBuf;
 
-ByteWriter<std::vector<uint8_t>> heabuf;
-PackBuffer<std::array<float, 3>, 1> g_sav_posPackBuf;
-PackBuffer<std::array<uint32_t, 4>, 16> g_sav_mtxPackBuf;
-PackBuffer<std::string, 1, true> g_sav_namPackBuf;
-PackBuffer<std::string, 1> g_sav_dblPackBuf;
-PackBuffer<std::vector<float>, 4> g_sav_verPackBuf;
-PackBuffer<std::vector<uint16_t>, 2> g_sav_facPackBuf;
-PackBuffer<std::string, 1> g_sav_datPackBuf;
-PackBuffer<std::string, 1> g_sav_ftxPackBuf;
-PackBuffer<std::vector<float>, 4> g_sav_uvcPackBuf;
-PackBuffer<std::string, 1> g_sav_excPackBuf;
-
-void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
-{
-	moc_objcount++;
-	*c = {};
-
-	std::array<float, 3> cpos = { o->position.x, o->position.y, o->position.z };
-	uint32_t posoff = g_sav_posPackBuf.add(cpos);
-
-	std::array<uint32_t, 4> cmtx;
-	cmtx[0] = (uint32_t)(o->matrix._31 * 1073741824.0f) & ~1; // multiply by 2^30
-	cmtx[1] = o->matrix._32 * 1073741824.0f;
-	if (o->matrix._33 < 0) cmtx[0] |= 1;
-	cmtx[2] = (uint32_t)(o->matrix._21 * 1073741824.0f) & ~1;
-	cmtx[3] = o->matrix._22 * 1073741824.0f;
-	if (o->matrix._23 < 0) cmtx[2] |= 1;
-	uint32_t mtxoff = g_sav_mtxPackBuf.add(cmtx);
-
-	std::string dblsav = o->dbl.save();
-	uint32_t dbloff = g_sav_dblPackBuf.add(dblsav);
-
-	uint32_t heaoff = (uint32_t)heabuf.size();
-
-	uint32_t namoff = g_sav_namPackBuf.add(o->name);
-
-	uint32_t veroff = 0, trifacoff = 0, quadfacoff = 0, linetermoff = 0, ftxoff = 0;
-	assert(!(o->mesh && o->line));
-	if (o->mesh || o->line) {
-		const auto& vertices = o->mesh ? o->mesh->vertices : o->line->vertices;
-		if (!vertices.empty()) {
-			veroff = g_sav_verPackBuf.add(vertices);
-		}
-	}
-	if (o->mesh) {
-		if (!o->mesh->triindices.empty()) {
-			trifacoff = g_sav_facPackBuf.add(o->mesh->triindices);
-		}
-		if (!o->mesh->quadindices.empty()) {
-			quadfacoff = g_sav_facPackBuf.add(o->mesh->quadindices);
-		}
-		uint32_t realftxoff = 0;
-		if (!o->mesh->ftxFaces.empty()) {
-			uint32_t tcOff = 0, lcOff = 0;
-			if (!o->mesh->textureCoords.empty()) {
-				tcOff = g_sav_uvcPackBuf.add(o->mesh->textureCoords);
-			}
-			if (!o->mesh->lightCoords.empty()) {
-				lcOff = g_sav_uvcPackBuf.add(o->mesh->lightCoords);
-			}
-			ByteWriter<std::string> sb;
-			uint32_t numFaces = (uint32_t)o->mesh->ftxFaces.size();
-			std::array<uint32_t, 3> header = { tcOff, lcOff, numFaces };
-			sb.addData(header.data(), 12);
-			sb.addData(o->mesh->ftxFaces.data(), numFaces * 12);
-			realftxoff = g_sav_ftxPackBuf.add(sb.take()) + 1;
-		}
-		if (o->mesh->extension) {
-			ByteWriter<std::string> sb;
-			uint32_t numFrames = o->mesh->extension->frames.size();
-			sb.addU32(numFrames);
-			for (auto& [p1,p2] : o->mesh->extension->frames) {
-				sb.addU32(p1);
-				sb.addU32(p2);
-			}
-			sb.addStringNT(o->mesh->extension->name);
-			uint32_t ext2off = g_sav_datPackBuf.add(sb.take());
-			std::array<uint32_t, 3> ext1 = { realftxoff, o->mesh->extension->extUnk2, ext2off };
-			uint32_t ext1off = g_sav_datPackBuf.add(std::string{ (char*)ext1.data(), 12 });
-			ftxoff = ext1off | 0x80000000;
-		}
-		else {
-			ftxoff = realftxoff;
-		}
-	}
-	if (o->line) {
-		if (!o->line->terms.empty()) {
-			const char* ptr = (const char*)o->line->terms.data();
-			linetermoff = g_sav_datPackBuf.add(std::string{ ptr, 4 * o->line->terms.size() });
-		}
-	}
-
-	uint32_t pexcoff = 0;
-	if (o->excChunk) {
-		pexcoff = g_sav_excPackBuf.add(o->excChunk->saveToString()) + 1;
-	}
-
-	if(true)
+	void MakeObjChunk(Chunk* c, GameObject* o, bool isclp)
 	{
+		moc_objcount++;
+		*c = {};
+
+		// Position
+		std::array<float, 3> cpos = { o->position.x, o->position.y, o->position.z };
+		uint32_t posoff = g_sav_posPackBuf.add(cpos);
+
+		// Matrix
+		std::array<uint32_t, 4> cmtx;
+		cmtx[0] = (uint32_t)(o->matrix._31 * 1073741824.0f) & ~1; // multiply by 2^30
+		cmtx[1] = o->matrix._32 * 1073741824.0f;
+		if (o->matrix._33 < 0) cmtx[0] |= 1;
+		cmtx[2] = (uint32_t)(o->matrix._21 * 1073741824.0f) & ~1;
+		cmtx[3] = o->matrix._22 * 1073741824.0f;
+		if (o->matrix._23 < 0) cmtx[2] |= 1;
+		uint32_t mtxoff = g_sav_mtxPackBuf.add(cmtx);
+
+		// DBL
+		std::string dblsav = o->dbl.save(*this);
+		uint32_t dbloff = g_sav_dblPackBuf.add(dblsav);
+
+		// Name
+		uint32_t namoff = g_sav_namPackBuf.add(o->name);
+
+		// Vertices (Mesh+Line)
+		uint32_t veroff = 0, trifacoff = 0, quadfacoff = 0, linetermoff = 0, ftxoff = 0;
+		assert(!(o->mesh && o->line));
+		if (o->mesh || o->line) {
+			const auto& vertices = o->mesh ? o->mesh->vertices : o->line->vertices;
+			if (!vertices.empty()) {
+				veroff = g_sav_verPackBuf.add(vertices);
+			}
+		}
+
+		// Mesh
+		if (o->mesh) {
+			if (!o->mesh->triindices.empty()) {
+				trifacoff = g_sav_facPackBuf.add(o->mesh->triindices);
+			}
+			if (!o->mesh->quadindices.empty()) {
+				quadfacoff = g_sav_facPackBuf.add(o->mesh->quadindices);
+			}
+			uint32_t realftxoff = 0;
+			if (!o->mesh->ftxFaces.empty()) {
+				uint32_t tcOff = 0, lcOff = 0;
+				if (!o->mesh->textureCoords.empty()) {
+					tcOff = g_sav_uvcPackBuf.add(o->mesh->textureCoords);
+				}
+				if (!o->mesh->lightCoords.empty()) {
+					lcOff = g_sav_uvcPackBuf.add(o->mesh->lightCoords);
+				}
+				ByteWriter<std::string> sb;
+				uint32_t numFaces = (uint32_t)o->mesh->ftxFaces.size();
+				std::array<uint32_t, 3> header = { tcOff, lcOff, numFaces };
+				sb.addData(header.data(), 12);
+				sb.addData(o->mesh->ftxFaces.data(), numFaces * 12);
+				realftxoff = g_sav_ftxPackBuf.add(sb.take()) + 1;
+			}
+			if (o->mesh->extension) {
+				ByteWriter<std::string> sb;
+				uint32_t numFrames = o->mesh->extension->frames.size();
+				sb.addU32(numFrames);
+				for (auto& [p1, p2] : o->mesh->extension->frames) {
+					sb.addU32(p1);
+					sb.addU32(p2);
+				}
+				sb.addStringNT(o->mesh->extension->name);
+				uint32_t ext2off = g_sav_datPackBuf.add(sb.take());
+				std::array<uint32_t, 3> ext1 = { realftxoff, o->mesh->extension->extUnk2, ext2off };
+				uint32_t ext1off = g_sav_datPackBuf.add(std::string{ (char*)ext1.data(), 12 });
+				ftxoff = ext1off | 0x80000000;
+			}
+			else {
+				ftxoff = realftxoff;
+			}
+		}
+
+		// Line
+		if (o->line) {
+			if (!o->line->terms.empty()) {
+				const char* ptr = (const char*)o->line->terms.data();
+				linetermoff = g_sav_datPackBuf.add(std::string{ ptr, 4 * o->line->terms.size() });
+			}
+		}
+
+		// EXC
+		uint32_t pexcoff = 0;
+		if (o->excChunk) {
+			pexcoff = g_sav_excPackBuf.add(o->excChunk->saveToString()) + 1;
+		}
+
+		// Object Header
+		uint32_t heaoff = (uint32_t)heabuf.size();
 		heabuf.addU32(dbloff);
 		heabuf.addU32(pexcoff);
 		heabuf.addU32(namoff);
@@ -546,48 +553,52 @@ void MakeObjChunk(Chunk *c, GameObject *o, bool isclp)
 			for (int i = 0; i < 7; i++)
 				heabuf.addU32(o->light->param[i]);
 		}
+
+		// Object Chunk
+		uint32_t tagstate = o->state | (isclp ? 1 : 0);
+		c->tag = heaoff | (tagstate << 24);
+		c->subchunks.resize(o->subobj.size());
+		int i = 0;
+		for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
+		{
+			Chunk* s = &c->subchunks[i];
+			s->tag = 0;
+			MakeObjChunk(s, *e, isclp);
+			i++;
+		}
 	}
-	uint32_t tagstate = o->state | (isclp ? 1 : 0);
-	c->tag = heaoff | (tagstate << 24);
-	c->subchunks.resize(o->subobj.size());
-	int i = 0;
-	for(auto e = o->subobj.begin(); e != o->subobj.end(); e++)
-	{
-		Chunk *s = &c->subchunks[i];
-		s->tag = 0;
-		MakeObjChunk(s, *e, isclp);
-		i++;
-	}
-}
+};
 
 void Scene::ModifySPK()
 {
+	SceneSaver saver;
+
 	Chunk nrot, nclp;
 	nrot.tag = 'TORP';
 	nclp.tag = 'PLCP';
 
 	uint32_t objid = 1;
-	auto z = [&objid](GameObject *o, auto& rec) -> void {
+	auto z = [&objid,&saver](GameObject *o, auto& rec) -> void {
 		for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
 		{
-			objidmap[*e] = objid++;
+			saver.objidmap[*e] = objid++;
 			rec(*e, rec);
 		}
 	};
 	z(cliprootobj, z);
 	z(rootobj, z);
 
-	auto f = [this](Chunk *c, GameObject *o) {
+	auto f = [this,&saver](Chunk *c, GameObject *o) {
 		c->subchunks.resize(o->subobj.size());
-		moc_objcount = 0;
+		saver.moc_objcount = 0;
 		int i = 0;
 		for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
 		{
 			Chunk *s = &c->subchunks[i++];
-			MakeObjChunk(s, *e, o==cliprootobj);
+			saver.MakeObjChunk(s, *e, o==cliprootobj);
 		}
 		c->maindata.resize(4);
-		*(uint32_t*)c->maindata.data() = moc_objcount;
+		*(uint32_t*)c->maindata.data() = saver.moc_objcount;
 	};
 	f(&nrot, rootobj);
 	f(&nclp, cliprootobj);
@@ -603,23 +614,17 @@ void Scene::ModifySPK()
 	};
 
 	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac, ndat, nftx, nuvc, nexc;
-	fillMaindata('AEHP', &nhea, heabuf.take());
-	fillMaindata('MANP', &nnam, g_sav_namPackBuf.buffer);
-	fillMaindata('SOPP', &npos, g_sav_posPackBuf.buffer);
-	fillMaindata('XTMP', &nmtx, g_sav_mtxPackBuf.buffer);
-	fillMaindata('LBDP', &ndbl, g_sav_dblPackBuf.buffer);
-	fillMaindata('REVP', &nver, g_sav_verPackBuf.buffer);
-	fillMaindata('CAFP', &nfac, g_sav_facPackBuf.buffer);
-	fillMaindata('TADP', &ndat, g_sav_datPackBuf.buffer);
-	fillMaindata('XTFP', &nftx, g_sav_ftxPackBuf.buffer);
-	fillMaindata('CVUP', &nuvc, g_sav_uvcPackBuf.buffer);
-	fillMaindata('CXEP', &nexc, g_sav_excPackBuf.buffer);
-
-	heabuf = {};
-	g_sav_namPackBuf = {};
-	g_sav_posPackBuf = {}; g_sav_mtxPackBuf = {}; g_sav_dblPackBuf = {};
-	g_sav_verPackBuf = {}; g_sav_facPackBuf = {}; g_sav_datPackBuf = {};
-	g_sav_ftxPackBuf = {}; g_sav_uvcPackBuf = {}; g_sav_excPackBuf = {};
+	fillMaindata('AEHP', &nhea, saver.heabuf.take());
+	fillMaindata('MANP', &nnam, saver.g_sav_namPackBuf.buffer);
+	fillMaindata('SOPP', &npos, saver.g_sav_posPackBuf.buffer);
+	fillMaindata('XTMP', &nmtx, saver.g_sav_mtxPackBuf.buffer);
+	fillMaindata('LBDP', &ndbl, saver.g_sav_dblPackBuf.buffer);
+	fillMaindata('REVP', &nver, saver.g_sav_verPackBuf.buffer);
+	fillMaindata('CAFP', &nfac, saver.g_sav_facPackBuf.buffer);
+	fillMaindata('TADP', &ndat, saver.g_sav_datPackBuf.buffer);
+	fillMaindata('XTFP', &nftx, saver.g_sav_ftxPackBuf.buffer);
+	fillMaindata('CVUP', &nuvc, saver.g_sav_uvcPackBuf.buffer);
+	fillMaindata('CXEP', &nexc, saver.g_sav_excPackBuf.buffer);
 
 	// Chunk comparison
 	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
@@ -670,8 +675,6 @@ void Scene::ModifySPK()
 	*pexc = std::move(nexc);
 
 	((uint32_t*)spkchk->maindata.data())[1] = 0x40000;
-
-	objidmap.clear();
 }
 
 void Scene::SaveSceneSPK(const char *fn)
@@ -702,10 +705,8 @@ void Scene::SaveSceneSPK(const char *fn)
 			mz_zip_writer_add_from_zip_reader(&outzip, &inzip, i);
 
 	auto saveChunk = [&outzip](Chunk* chk, const char* filename) {
-		void* cmem; size_t csize;
-		chk->saveToMem(&cmem, &csize);
-		mz_zip_writer_add_mem(&outzip, filename, cmem, csize, MZ_DEFAULT_COMPRESSION);
-		free(cmem);
+		auto str = chk->saveToString();
+		mz_zip_writer_add_mem(&outzip, filename, str.data(), str.size(), MZ_DEFAULT_COMPRESSION);
 	};
 	ModifySPK();
 	saveChunk(spkchk, "Pack.SPK");
@@ -848,7 +849,7 @@ void DBLList::load(uint8_t* dpbeg, const std::map<uint32_t, GameObject*>& idobjm
 	}
 }
 
-std::string DBLList::save()
+std::string DBLList::save(SceneSaver& sceneSaver)
 {
 	ByteWriter<std::string> dblsav;
 	dblsav.addU32(0);
@@ -884,7 +885,7 @@ std::string DBLList::save()
 		case 8:
 		{
 			auto& obj = std::get<GORef>(e->value);
-			uint32_t x = objidmap[obj.get()];
+			uint32_t x = sceneSaver.objidmap[obj.get()];
 			dblsav.addU32(x); break;
 		}
 		case 9:
@@ -893,7 +894,7 @@ std::string DBLList::save()
 			uint32_t siz = (uint32_t)vec.size() * 4 + 4;
 			dblsav.addU32(siz);
 			for (auto& obj : vec) {
-				uint32_t x = objidmap[obj.get()];
+				uint32_t x = sceneSaver.objidmap[obj.get()];
 				dblsav.addU32(x);
 			}
 			break;
@@ -901,7 +902,7 @@ std::string DBLList::save()
 		case 0xC:
 		{
 			auto& sublist = std::get<DBLList>(e->value);
-			auto subdblsav = sublist.save();
+			auto subdblsav = sublist.save(sceneSaver);
 			dblsav.addData(subdblsav.data(), subdblsav.size());
 			break;
 		}

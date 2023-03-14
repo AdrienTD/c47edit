@@ -82,13 +82,14 @@ struct Light
 };
 
 struct DBLEntry;
+struct SceneSaver;
 
 struct DBLList {
 	int flags = 0;
 	std::vector<DBLEntry> entries;
 
 	void load(uint8_t* ptr, const std::map<uint32_t, GameObject*>& idobjmap);
-	std::string save();
+	std::string save(SceneSaver& sceneSaver);
 };
 
 struct DBLEntry
