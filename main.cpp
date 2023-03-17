@@ -36,6 +36,15 @@
 #include <stb_image.h>
 #include <stb_image_write.h>
 
+#pragma pack(push, 1)
+struct BonePre {
+	uint16_t parentIndex, flags;
+	double stuff[7];
+	char name[16];
+};
+static_assert(sizeof(BonePre) == 0x4C);
+#pragma pack(pop)
+
 GameObject *selobj = 0, *viewobj = 0;
 float objviewscale = 0.0f;
 Vector3 campos(0, 0, -50), camori(0,0,0);
@@ -821,6 +830,16 @@ void IGObjectInfo()
 			}
 		}
 		if (selobj->excChunk && ImGui::CollapsingHeader("EXC")) {
+			if (ImGui::Button("Export")) {
+				auto fpath = GuiUtils::SaveDialogBox("Data\0*.bin\0\0\0", "bin");
+				if (!fpath.empty()) {
+					FILE* file;
+					_wfopen_s(&file, fpath.c_str(), L"wb");
+					auto chkbin = selobj->excChunk->saveToString();
+					fwrite(chkbin.data(), chkbin.size(), 1, file);
+					fclose(file);
+				}
+			}
 			auto walkChunk = [](Chunk* chk, auto& rec) -> void {
 				std::string tag{ (char*)&chk->tag, 4};
 				if (ImGui::TreeNode(chk, "%s", tag.c_str())) {
@@ -830,6 +849,53 @@ void IGObjectInfo()
 				}
 			};
 			walkChunk(selobj->excChunk.get(), walkChunk);
+		}
+		if (selobj->excChunk && ImGui::CollapsingHeader("EXC Skeleton")) {
+			Chunk& exchk = *selobj->excChunk;
+			if (Chunk* lche = exchk.findSubchunk('LCHE')) {
+				Chunk* hmtx = exchk.findSubchunk('HMTX');
+				Chunk* hpre = exchk.findSubchunk('HPRE');
+				Chunk* hpts = exchk.findSubchunk('HPTS');
+				assert(hmtx && hpre && hpts);
+				uint32_t numBones = *(uint32_t*)lche->maindata.data();
+				assert(hmtx->multidata.size() == numBones);
+				uint16_t* ranges = (uint16_t*)hpts->maindata.data();
+				if (ImGui::Button("Corrupt")) {
+					//Chunk* vrmp = exchk.findSubchunk('VRMP');
+					//assert(vrmp);
+					//memset(vrmp->maindata.data(), 0, vrmp->maindata.size());
+					//*(uint32_t*)vrmp->maindata.data() /= 2;
+					Chunk* hpvd = exchk.findSubchunk('HPVD');
+					assert(hpvd);
+					//memset(hpvd->maindata.data(), 0, hpvd->maindata.size());
+					using PvdElem = std::pair<uint32_t, float>;
+					static_assert(sizeof(PvdElem) == 8);
+					PvdElem* elems = (PvdElem*)hpvd->maindata.data();
+					int numElems = hpvd->maindata.size() / 8;
+					for (int i = 0; i < numElems; ++i) {
+						elems[i].second = 0.0f;
+					}
+					//Chunk* hpts = exchk.findSubchunk('HPTS');
+					//assert(hpts);
+					//memset(hpts->maindata.data(), 0, hpts->maindata.size());
+				}
+				for (uint32_t i = 0; i < numBones; ++i) {
+					BonePre* bone;
+					if (hpre->maindata.size() > 0)
+						bone = ((BonePre*)hpre->maindata.data()) + i;
+					else
+						bone = (BonePre*)hpre->multidata[0].data() + i;
+					if (ImGui::TreeNode((void*)i, "%2i: %s (%i %i %i)", i, bone->name, bone->parentIndex, bone->flags, ranges[i])) {
+						ImGui::Text("%i %i\n%f %f %f\n%f %f %f %f\n%s", bone->parentIndex, bone->flags, bone->stuff[0], bone->stuff[1], bone->stuff[2], bone->stuff[3], bone->stuff[4], bone->stuff[5], bone->stuff[6], bone->name);
+						double* mat = (double*)hmtx->multidata[i].data();
+						for (int row = 3; row >= 0; --row) {
+							ImGui::Text("%.3f %.3f %.3f", mat[3 * row], mat[3 * row + 1], mat[3 * row + 2]);
+						}
+						ImGui::TreePop();
+					}
+				}
+
+			}
 		}
 		if (wannadel)
 		{
@@ -1338,6 +1404,45 @@ int main(int argc, char* argv[])
 								for (uint32_t i = 1; i <= cnt; ++i) {
 									float* kpos = (float*)((char*)(keys->multidata[i].data()) + 4);
 									Vector3 vpos = Vector3(kpos[0], kpos[1], kpos[2]).transform(mat);
+									glVertex3fv(&vpos.x);
+								}
+							}
+							else if (Chunk* lche = exchk.findSubchunk('LCHE')) {
+								Chunk* hmtx = exchk.findSubchunk('HMTX');
+								Chunk* hpre = exchk.findSubchunk('HPRE');
+								uint32_t numBones = *(uint32_t*)lche->maindata.data();
+								assert(hmtx->multidata.size() == numBones);
+								//std::stack<Matrix> matrixStack;
+								//matrixStack.push(Matrix::getIdentity());
+								for (uint32_t i = 0; i < numBones; ++i) {
+									int xxx = i;
+									Matrix globalMtx = Matrix::getIdentity();
+									while (xxx != 65535) {
+										BonePre* bone;
+										if (hpre->maindata.size() > 0)
+											bone = ((BonePre*)hpre->maindata.data()) + xxx;
+										else
+											bone = (BonePre*)hpre->multidata[0].data() + xxx;
+										double* dmtx = (double*)hmtx->multidata[xxx].data();
+										Matrix boneMtx = Matrix::getIdentity();
+										for (int row = 3; row >= 0; --row) {
+											boneMtx.m[row][0] = (float)*(dmtx++);
+											boneMtx.m[row][1] = (float)*(dmtx++);
+											boneMtx.m[row][2] = (float)*(dmtx++);
+										}
+										globalMtx = globalMtx * boneMtx;
+										xxx = bone->parentIndex;
+									}
+
+									//BonePre* bone = ((BonePre*)hpre->maindata.data()) + i;
+									//Matrix& topMtx = matrixStack.top();
+									//topMtx = boneMtx * topMtx;
+									//Vector3 vpos = Vector3(0, 0, 0).transform(topMtx);
+									//if (bone->flags == 2)
+									//	matrixStack.push(topMtx);
+									//else if (bone->flags == 1)
+									//	matrixStack.pop();
+									Vector3 vpos = Vector3(0, 0, 0).transform(globalMtx * mat);
 									glVertex3fv(&vpos.x);
 								}
 							}
