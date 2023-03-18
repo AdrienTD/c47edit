@@ -50,8 +50,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 void InitWindow()
 {
 	HINSTANCE hInstance = GetModuleHandle(NULL);
-	WNDCLASS wndclass = { CS_OWNDC | CS_VREDRAW | CS_HREDRAW, WndProc, 0, 0, hInstance,
-		NULL, LoadCursor(NULL, IDC_ARROW), (HBRUSH)(COLOR_WINDOW + 1), NULL, appclassname };
+	WNDCLASS wndclass = { CS_OWNDC, WndProc, 0, 0, hInstance,
+		LoadIconA(hInstance, "IDI_APPICON"), LoadCursor(NULL, IDC_ARROW), NULL, NULL, appclassname};
 	if (!RegisterClass(&wndclass)) ferr("Class registration failed.");
 	RECT rect = { 0,0,screen_width,screen_height };
 	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
