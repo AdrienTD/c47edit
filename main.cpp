@@ -29,6 +29,7 @@
 #include <gl/GLU.h>
 #include <commdlg.h>
 #include <mmsystem.h>
+#include <shellapi.h>
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_opengl2.h"
 #include "imgui/imgui_impl_win32.h"
@@ -135,8 +136,8 @@ void IGOTNode(GameObject *o)
 
 void IGObjectTree()
 {
-	ImGui::SetNextWindowPos(ImVec2(3, 3), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(316, 652), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(3, 23), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(316, 632), ImGuiCond_FirstUseEver);
 	ImGui::Begin("Object tree", 0, ImGuiWindowFlags_HorizontalScrollbar);
 	IGOTNode(g_scene.superroot);
 	findsel = false;
@@ -536,8 +537,8 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 void IGObjectInfo()
 {
 	nextobjtosel = 0;
-	ImGui::SetNextWindowPos(ImVec2(1005, 3), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(270, 445), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(965, 23), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(310, 425), ImGuiCond_FirstUseEver);
 	ImGui::Begin("Object information");
 	if (!selobj)
 		ImGui::Text("No object selected.");
@@ -844,28 +845,28 @@ void IGObjectInfo()
 	if (nextobjtosel) selobj = nextobjtosel;
 }
 
+void CmdSaveScene()
+{
+	auto newfn = std::filesystem::path(g_scene.lastspkfn).filename().string();
+	size_t atpos = newfn.rfind('@');
+	if (atpos != newfn.npos)
+		newfn = newfn.substr(atpos + 1);
+
+	auto zipPath = GuiUtils::SaveDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", newfn, "Save Scene ZIP archive as...");
+	if (!zipPath.empty())
+		g_scene.SaveSceneSPK(zipPath.string().c_str());
+}
+
 void IGMain()
 {
-	ImGui::SetNextWindowPos(ImVec2(1005, 453), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(270, 203), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(965, 453), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(310, 203), ImGuiCond_FirstUseEver);
 	ImGui::Begin("c47edit");
-	ImGui::Text("c47edit - Version " APP_VERSION);
-	if (ImGui::Button("Save Scene"))
-	{
-		auto newfn = std::filesystem::path(g_scene.lastspkfn).filename().string();
-		size_t atpos = newfn.rfind('@');
-		if (atpos != newfn.npos)
-			newfn = newfn.substr(atpos + 1);
-
-		auto zipPath = GuiUtils::SaveDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", newfn, "Save Scene ZIP archive as...");
-		if (!zipPath.empty())
-			g_scene.SaveSceneSPK(zipPath.string().c_str());
+	if (ImGui::Button("Save Scene")) {
+		CmdSaveScene();
 	}
 	ImGui::SameLine();
-	if(ImGui::Button("About..."))
-		MessageBox(hWindow, "c47edit\nUnofficial scene editor for \"Hitman: Codename 47\"\n\n"
-			"(C) 2018 AdrienTD\nLicensed under the GPL 3.\nSee LICENSE file for details.\n\n"
-			"3rd party libraries used:\n- Dear ImGui (MIT license)\n- Miniz (MIT license)\nSee LICENSE_* files for copyright and licensing of these libraries.", "c47edit", 0);
+	ImGui::Text("%4u FPS", framespersec);
 	//ImGui::DragFloat("Scale", &objviewscale, 0.1f);
 	ImGui::DragFloat("Cam speed", &camspeed, 0.1f);
 	ImGui::DragFloat3("Cam pos", &campos.x, 1.0f);
@@ -882,7 +883,6 @@ void IGMain()
 	ImGui::Checkbox("Lightmaps", &renderLightmaps);
 	ImGui::SameLine();
 	ImGui::Checkbox("Alpha Test", &enableAlphaTest);
-	ImGui::Text("FPS: %u", framespersec);
 	ImGui::End();
 }
 
@@ -1286,6 +1286,13 @@ int main(int argc, char* argv[])
 			if(wndShowTextures) IGTextures();
 			if(wndShowSounds) IGSounds();
 			if (ImGui::BeginMainMenuBar()) {
+				if (ImGui::BeginMenu("Scene")) {
+					if (ImGui::MenuItem("Save as..."))
+						CmdSaveScene();
+					if (ImGui::MenuItem("Exit"))
+						DestroyWindow(hWindow);
+					ImGui::EndMenu();
+				}
 				if (ImGui::BeginMenu("Create")) {
 					static const std::pair<uint16_t, const char*> categories[] = {
 						{0x0010, "Group"},
@@ -1314,7 +1321,21 @@ int main(int argc, char* argv[])
 					ImGui::MenuItem("Sounds", nullptr, &wndShowSounds);
 					ImGui::EndMenu();
 				}
+				if (ImGui::BeginMenu("Help")) {
+					if (ImGui::MenuItem("Help document on GitHub")) {
+						ShellExecuteA(hWindow, nullptr, "https://github.com/AdrienTD/c47edit/blob/master/docs/help.md", nullptr, nullptr, SW_SHOWNORMAL);
+					}
+					if (ImGui::MenuItem("About...")) {
+						MessageBox(hWindow, "c47edit\nUnofficial scene editor for \"Hitman: Codename 47\"\n\n"
+							"(C) 2018 AdrienTD\nLicensed under the GPL 3.\nSee LICENSE file for details.\n\n"
+							"3rd party libraries used:\n- Dear ImGui (MIT license)\n- Miniz (MIT license)\nSee LICENSE_* files for copyright and licensing of these libraries.", "c47edit", 0);
+					}
+					ImGui::EndMenu();
+				}
 				IGDebugMenus();
+				float barwidth = ImGui::GetWindowWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f;
+				ImGui::SameLine(barwidth - ImGui::CalcTextSize(APP_VERSION).x);
+				ImGui::TextUnformatted(APP_VERSION);
 				ImGui::EndMainMenuBar();
 			}
 			ImGui::EndFrame();

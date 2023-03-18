@@ -53,6 +53,7 @@ void InitWindow()
 	WNDCLASS wndclass = { CS_OWNDC, WndProc, 0, 0, hInstance,
 		LoadIconA(hInstance, "IDI_APPICON"), LoadCursor(NULL, IDC_ARROW), NULL, NULL, appclassname};
 	if (!RegisterClass(&wndclass)) ferr("Class registration failed.");
+	if (GetSystemMetrics(SM_CYFULLSCREEN) >= 900) { screen_width = 1422; screen_height = 800; }
 	RECT rect = { 0,0,screen_width,screen_height };
 	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
 	hWindow = CreateWindow(appclassname, apptitle, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
