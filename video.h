@@ -6,6 +6,7 @@
 #pragma once
 
 struct Mesh;
+struct Chunk;
 
 extern int drawframes;
 extern bool rendertextures;
@@ -15,7 +16,8 @@ extern bool enableAlphaTest;
 void InitVideo();
 void BeginDrawing();
 void EndDrawing();
+float* ApplySkinToMesh(Mesh* mesh, Chunk* excChunk);
 void BeginMeshDraw();
 void EndMeshDraw();
-void DrawMesh(Mesh* mesh);
+void DrawMesh(Mesh* mesh, Chunk* excChunk = nullptr);
 void InvalidateMesh(Mesh* mesh);

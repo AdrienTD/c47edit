@@ -13,6 +13,7 @@
 #include "chunk.h"
 
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <Windows.h>
 #include <GL/glew.h>
 #include <GL/wglew.h>
@@ -68,6 +69,112 @@ void EndDrawing()
 	SwapBuffers(whdc); drawframes++;
 }
 
+std::map<Mesh*, std::vector<Vector3>> g_skinnedMeshMap;
+
+float* ApplySkinToMesh(Mesh* mesh, Chunk* excChunk)
+{
+	auto [it,inserted] = g_skinnedMeshMap.try_emplace(mesh);
+	if (!inserted)
+		return (float*)it->second.data();
+
+#pragma pack(push, 1)
+	struct BonePre {
+		uint16_t parentIndex, flags;
+		double stuff[7];
+		char name[16];
+	};
+	static_assert(sizeof(BonePre) == 0x4C);
+#pragma pack(pop)
+
+	if (Chunk* lche = excChunk->findSubchunk('LCHE')) {
+		Chunk* hmtx = excChunk->findSubchunk('HMTX');
+		Chunk* hpre = excChunk->findSubchunk('HPRE');
+		Chunk* hpts = excChunk->findSubchunk('HPTS');
+		Chunk* hpvd = excChunk->findSubchunk('HPVD');
+		Chunk* vrmp = excChunk->findSubchunk('VRMP');
+		assert(hmtx && hpre && hpts && vrmp && hpvd);
+		uint32_t numBones = *(uint32_t*)lche->maindata.data();
+		uint32_t numUsedVertices = *(uint32_t*)(lche->maindata.data() + 12);
+		assert(hmtx->multidata.size() == numBones);
+
+		// compute global matrix for each bone
+		std::vector<std::pair<Matrix, std::string>> boneGlobal;
+		boneGlobal.reserve(numBones);
+		for (uint32_t i = 0; i < numBones; ++i) {
+			int xxx = i;
+			Matrix globalMtx = Matrix::getIdentity();
+			std::string bonePath;
+			while (xxx != 65535) {
+				const BonePre* bone;
+				if (hpre->maindata.size() > 0)
+					bone = ((BonePre*)hpre->maindata.data()) + xxx;
+				else
+					bone = (BonePre*)hpre->multidata[0].data() + xxx;
+				const double* dmtx = (double*)hmtx->multidata[xxx].data();
+				Matrix boneMtx = Matrix::getIdentity();
+				for (int row = 3; row >= 0; --row) {
+					boneMtx.m[row][0] = (float)*(dmtx++);
+					boneMtx.m[row][1] = (float)*(dmtx++);
+					boneMtx.m[row][2] = (float)*(dmtx++);
+				}
+				globalMtx = globalMtx * boneMtx;
+				bonePath += bone->name;
+				bonePath += '/';
+				xxx = bone->parentIndex;
+			}
+			boneGlobal.push_back({ globalMtx, std::move(bonePath) });
+		}
+
+		// working vector buffer
+		std::vector<Vector3>& workBuffer = it->second;
+		workBuffer.resize(mesh->getNumVertices());
+		memcpy(workBuffer.data(), mesh->vertices.data(), 12 * mesh->getNumVertices());
+
+		// transform each vertex with the global matrix of the corresponding bone
+		const uint16_t* ptsRanges = (uint16_t*)hpts->maindata.data();
+		for (uint32_t i = 0; i < numBones; ++i) {
+			uint16_t startRange = (i == 0) ? 0 : ptsRanges[i - 1];
+			uint16_t endRange = ptsRanges[i];
+			for (uint16_t vtx = startRange; vtx < endRange; ++vtx)
+				workBuffer[vtx] = workBuffer[vtx].transform(boneGlobal[i].first);
+		}
+
+		// apply HPVD
+		const uint32_t* pvd = (uint32_t*)hpvd->maindata.data();
+		bool the_end = false;
+		while (!the_end) {
+			uint32_t segStartInt = *pvd;
+			float segStartFloat = *(float*)(pvd + 1);
+			pvd += 2;
+			Vector3& usedVec = workBuffer[segStartInt];
+			usedVec *= segStartFloat;
+			while (true) {
+				uint32_t pntInt = *pvd;
+				uint32_t pntIndex = pntInt & 0x3FFFFFFF;
+				float pntFloat = *(float*)(pvd + 1);
+				pvd += 2;
+				usedVec += workBuffer[pntIndex] * pntFloat;
+				if (pntInt & 0x80000000) {
+					if (pntInt & 0x40000000)
+						the_end = true;
+					break;
+				}
+			}
+		}
+
+		// apply VRMP
+		const uint32_t* remap = (uint32_t*)vrmp->maindata.data();
+		uint32_t numSwaps = *(remap++);
+		for (uint32_t i = 0; i < numSwaps; ++i) {
+			uint32_t index1 = *(remap++);
+			uint32_t index2 = *(remap++);
+			assert((index1 % 3) == 0 && (index2 % 3) == 0);
+			workBuffer[index1 / 3] = workBuffer[index2 / 3];
+		}
+	}
+	return (float*)it->second.data();
+}
+
 // Prepared+Optimized Mesh for rendering
 struct ProMesh {
 	using IndexType = uint16_t;
@@ -83,7 +190,7 @@ struct ProMesh {
 	inline static std::map<Mesh*, ProMesh> g_proMeshes;
 
 	// Get a prepared mesh from the cache, make one if not already done
-	static ProMesh* getProMesh(Mesh* mesh) {
+	static ProMesh* getProMesh(Mesh* mesh, Chunk* excChunk) {
 		// If ProMesh found in the cache, return it
 		auto it = g_proMeshes.find(mesh);
 		if (it != g_proMeshes.end())
@@ -102,6 +209,9 @@ struct ProMesh {
 		size_t numTris = mesh->getNumTris();
 		const uint16_t *ftxFace = (uint16_t*)mesh->ftxFaces.data();
 		bool hasFtx = !mesh->ftxFaces.empty();
+
+		if (excChunk && excChunk->findSubchunk('LCHE'))
+			verts = ApplySkinToMesh(mesh, excChunk);
 
 		float *uvCoords = (float*)defUvs;
 		float *lgtCoords = (float*)defUvs;
@@ -161,17 +271,20 @@ struct ProMesh {
 	}
 };
 
-void DrawMesh(Mesh* mesh)
+void DrawMesh(Mesh* mesh, Chunk* excChunk)
 {
 	if (!rendertextures)
 	{
-		glVertexPointer(3, GL_FLOAT, 6, mesh->vertices.data());
+		const float* vertices = mesh->vertices.data();
+		if (excChunk && excChunk->findSubchunk('LCHE'))
+			vertices = ApplySkinToMesh(mesh, excChunk);
+		glVertexPointer(3, GL_FLOAT, 6, vertices);
 		glDrawElements(GL_QUADS, mesh->quadindices.size(), GL_UNSIGNED_SHORT, mesh->quadindices.data());
 		glDrawElements(GL_TRIANGLES, mesh->triindices.size(), GL_UNSIGNED_SHORT, mesh->triindices.data());
 	}
 	else
 	{
-		ProMesh* pro = ProMesh::getProMesh(mesh);
+		ProMesh* pro = ProMesh::getProMesh(mesh, excChunk);
 		for (auto& [mat,part] : pro->parts) {
 			auto& [flags, texid, lgtid] = mat;
 			if (texid == 0xFFFF)
@@ -216,6 +329,7 @@ void DrawMesh(Mesh* mesh)
 void InvalidateMesh(Mesh* mesh)
 {
 	ProMesh::g_proMeshes.erase(mesh);
+	g_skinnedMeshMap.erase(mesh);
 }
 
 void BeginMeshDraw()

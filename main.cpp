@@ -1086,7 +1086,7 @@ void RenderObject(GameObject *o)
 			uint32_t clr = swap_rb(o->color);
 			glColor4ubv((uint8_t*)&clr);
 		}
-		DrawMesh(o->mesh.get());
+		DrawMesh(o->mesh.get(), o->excChunk.get());
 	}
 	for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
 		RenderObject(*e);
@@ -1154,8 +1154,9 @@ GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObje
 	if (o->mesh)
 	{
 		Mesh *m = o->mesh.get();
+		float* vertices = (o->excChunk && o->excChunk->findSubchunk('LCHE')) ? ApplySkinToMesh(m, o->excChunk.get()) : m->vertices.data();
 		for (size_t i = 0; i < m->getNumQuads(); i++)
-			if (IsRayIntersectingFace(raystart, raydir, m->vertices.data(), m->quadindices.data() + i * 4, 4, &objmtx))
+			if (IsRayIntersectingFace(raystart, raydir, vertices, m->quadindices.data() + i * 4, 4, &objmtx))
 				if ((d = (finalintersectpnt - campos).sqlen2xz()) < bestpickdist)
 				{
 					bestpickdist = d;
@@ -1163,7 +1164,7 @@ GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObje
 					bestpickintersectionpnt = finalintersectpnt;
 				}
 		for(size_t i = 0; i < m->getNumTris(); i++)
-			if (IsRayIntersectingFace(raystart, raydir, m->vertices.data(), m->triindices.data() + i * 3, 3, &objmtx))
+			if (IsRayIntersectingFace(raystart, raydir, vertices, m->triindices.data() + i * 3, 3, &objmtx))
 				if ((d = (finalintersectpnt - campos).sqlen2xz()) < bestpickdist)
 				{
 					bestpickdist = d;
