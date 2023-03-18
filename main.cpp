@@ -103,7 +103,7 @@ void IGOTNode(GameObject *o)
 		colorpushed = 1;
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 1, 0, 1));
 	}
-	op = ImGui::TreeNodeEx(o, (o->subobj.empty() ? ImGuiTreeNodeFlags_Leaf : 0) | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ((o == selobj) ? ImGuiTreeNodeFlags_Selected : 0), "%s(0x%X)::%s", ClassInfo::GetObjTypeString(o->type), o->type, o->name.c_str());
+	op = ImGui::TreeNodeEx(o, (o->subobj.empty() ? ImGuiTreeNodeFlags_Leaf : 0) | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ((o == selobj) ? ImGuiTreeNodeFlags_Selected : 0), "%s::%s", ClassInfo::GetObjTypeString(o->type), o->name.c_str());
 	if (colorpushed)
 		ImGui::PopStyleColor();
 	if (findsel)
@@ -711,10 +711,9 @@ void IGObjectInfo()
 		}
 		ImGui::Separator();
 
+		ImGui::Text("%s (%i, %04X)", ClassInfo::GetObjTypeString(selobj->type), selobj->type, selobj->flags);
 		IGStdStringInput("Name", selobj->name);
 		ImGui::InputScalar("State", ImGuiDataType_U32, &selobj->state);
-		ImGui::InputScalar("Type", ImGuiDataType_U32, &selobj->type);
-		ImGui::InputScalar("Flags", ImGuiDataType_U32, &selobj->flags, nullptr, nullptr, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
 		ImGui::Separator();
 		ImGui::DragFloat3("Position", &selobj->position.x);
 		/*for (int i = 0; i < 3; i++) {
@@ -1287,6 +1286,29 @@ int main(int argc, char* argv[])
 			if(wndShowTextures) IGTextures();
 			if(wndShowSounds) IGSounds();
 			if (ImGui::BeginMainMenuBar()) {
+				if (ImGui::BeginMenu("Create")) {
+					static const std::pair<uint16_t, const char*> categories[] = {
+						{0x0010, "Group"},
+						{0x0020, "Mesh"},
+						{0x0040, "Camera"},
+						{0x0080, "Light"},
+						{0x0400, "Shape"},
+						{0x0800, "List"},
+					};
+					for (auto& [flags, cat] : categories) {
+						if (ImGui::BeginMenu(cat)) {
+							for (auto& [name, id] : g_classInfo_stringIdMap) {
+								if (ClassInfo::GetObjTypeCategory(id) & flags) {
+									if (ImGui::MenuItem(name.c_str())) {
+										g_scene.CreateObject(id, g_scene.rootobj);
+									}
+								}
+							}
+							ImGui::EndMenu();
+						}
+					}
+					ImGui::EndMenu();
+				}
 				if (ImGui::BeginMenu("Tools")) {
 					ImGui::MenuItem("Textures", nullptr, &wndShowTextures);
 					ImGui::MenuItem("Sounds", nullptr, &wndShowSounds);

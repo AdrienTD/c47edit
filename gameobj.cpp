@@ -13,6 +13,7 @@
 #include "chunk.h"
 #include "vecmat.h"
 #include "ByteWriter.h"
+#include "classInfo.h"
 
 #include <miniz/miniz.h>
 
@@ -760,6 +761,96 @@ void Scene::GiveObject(GameObject *o, GameObject *t)
 			st.erase(it);
 	}
 	t->subobj.push_back(o);
+	o->parent = t;
+}
+
+GameObject* Scene::CreateObject(int type, GameObject* parent)
+{
+	GameObject* obj = new GameObject();
+	obj->type = type;
+	obj->flags = ClassInfo::GetObjTypeCategory(type);
+	
+	//obj->parent = parent;
+	GiveObject(obj, parent);
+	obj->root = parent->root;
+
+	if (obj->flags & 0x0020)
+		obj->mesh = std::make_shared<Mesh>();
+	if (obj->flags & 0x0080)
+		obj->light = std::make_shared<Light>();
+	if (obj->flags & 0x0400)
+		obj->line = std::make_shared<ObjLine>();
+
+	auto members = ClassInfo::GetMemberNames(obj);
+	for (auto& mem : members) {
+		auto& cm = mem.info;
+		auto& defValue = cm->defaultValue;
+		DBLEntry& de = obj->dbl.entries.emplace_back();
+		if (cm->type == "DOUBLE") {
+			de.type = 1;
+			de.value.emplace<double>(defValue.empty() ? 0.0f : std::stod(defValue));
+		}
+		else if (cm->type == "FLOAT") {
+			de.type = 2;
+			de.value.emplace<float>(defValue.empty() ? 0.0f : std::stof(defValue));
+		}
+		else if (cm->type == "INT" || cm->type == "LONG" || cm->type == "BOOL" || cm->type == "COLOR") {
+			uint32_t value;
+			if (defValue.empty() || defValue == "false" || defValue == "FALSE")
+				value = 0;
+			else if (defValue == "true" || defValue == "TRUE")
+				value = 1;
+			else
+				value = std::stoi(defValue);
+			de.type = 3;
+			de.value.emplace<uint32_t>(value);
+		}
+		else if (cm->type == "ENUM") {
+			de.type = 3;
+			de.value.emplace<uint32_t>(0);
+		}
+		else if (cm->type == "WINOBJTYPE") {
+			de.type = 3;
+			de.value.emplace<uint32_t>(0);
+		}
+		else if (cm->type == "CHAR*" || cm->type == "SUBPIC") {
+			de.type = 4;
+			de.value.emplace<std::string>(defValue);
+		}
+		else if (cm->type == "DATA" || cm->type == "TABLE") {
+			de.type = 7;
+			de.value.emplace<std::vector<uint8_t>>();
+		}
+		else if (cm->type == "ZGEOMREF") {
+			de.type = 8;
+			de.value.emplace<GORef>();
+		}
+		else if (cm->type == "ZGEOMREFTAB") {
+			de.type = 9;
+			de.value.emplace<std::vector<GORef>>();
+		}
+		else if (cm->type == "MSG") {
+			de.type = 10;
+			de.value.emplace<uint32_t>(0);
+		}
+		else if (cm->type == "SNDREF") {
+			de.type = 11;
+			de.value.emplace<uint32_t>(0);
+		}
+		else if (cm->type == "SCRIPT") {
+			de.type = 12;
+			de.value.emplace<DBLList>();
+		}
+		else if (cm->type == "") {
+			de.type = 6;
+		}
+		else {
+			printf("What is %s?\n", cm->type.c_str());
+		}
+	}
+	auto& last = obj->dbl.entries.emplace_back();
+	last.type = 0x3F;
+	last.flags = 0xC0;
 }
 
 const char * DBLEntry::getTypeName(int type)

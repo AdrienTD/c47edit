@@ -47,7 +47,7 @@ struct Mesh
 {
 	std::vector<float> vertices;
 	std::vector<uint16_t> quadindices, triindices;
-	uint32_t weird;
+	uint32_t weird = 0;
 
 	// FTX
 	using FTXFace = std::array<uint16_t, 6>;
@@ -148,6 +148,8 @@ struct Scene {
 	void LoadSceneSPK(const char *fn);
 	void ModifySPK();
 	void SaveSceneSPK(const char *fn);
+	
+	GameObject* CreateObject(int type, GameObject* parent);
 	void RemoveObject(GameObject *o);
 	GameObject* DuplicateObject(GameObject *o, GameObject *parent = nullptr);
 	void GiveObject(GameObject *o, GameObject *t);

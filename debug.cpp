@@ -12,6 +12,7 @@
 
 #include "gameobj.h"
 #include "imgui/imgui.h"
+#include "classInfo.h"
 
 // Keeps track of what bytes of a chunk (or any kind of data) has been covered.
 // E.g. did we read the entire chunk, didn't we forget to look at some bytes?
@@ -102,6 +103,15 @@ void IGDebugMenus()
 					break;
 				}
 			}
+		}
+		if (ImGui::MenuItem("Object flags stats")) {
+			auto walkObj = [](GameObject* obj, auto& rec) -> void {
+				printf("%s;%u\n", ClassInfo::GetObjTypeString(obj->type), obj->flags);
+				for (auto* child : obj->subobj) {
+					rec(child, rec);
+				}
+			};
+			walkObj(g_scene.superroot, walkObj);
 		}
 		ImGui::EndMenu();
 	}

@@ -138,6 +138,11 @@ const char* ClassInfo::GetObjTypeString(int typeId)
 	return g_classInfo_idJsonMap.at(typeId)->at("name").get_ref<const std::string&>().c_str();
 }
 
+uint16_t ClassInfo::GetObjTypeCategory(int typeId)
+{
+	return g_classInfo_idJsonMap.at(typeId)->at("num2").get<uint32_t>() >> 16;
+}
+
 // Return a list of names of all DBL members of the object
 std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj)
 {

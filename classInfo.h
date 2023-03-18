@@ -5,11 +5,14 @@
 
 #pragma once
 
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
 
 struct GameObject;
+
+extern std::map<std::string, int> g_classInfo_stringIdMap;         // Class name -> ID map
 
 namespace ClassInfo {
 	// Initialize the class info from the file
@@ -17,6 +20,9 @@ namespace ClassInfo {
 
 	// Get name of class from ID
 	const char *GetObjTypeString(int typeId);
+
+	// Get class category flags
+	uint16_t GetObjTypeCategory(int typeId);
 
 	struct ClassMember {
 		std::string type;
