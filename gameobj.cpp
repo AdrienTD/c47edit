@@ -242,8 +242,8 @@ void Scene::LoadSceneSPK(const char *fn)
 		for (int i = 0; i < 4; i++)
 			mc[i] = (float)((double)mtxoff[i] / 1073741824.0); // divide by 2^30
 		Vector3 rv[3];
-		rv[2] = Vector3(mc[0], mc[1], std::sqrt(1.0f - mc[0]*mc[0] - mc[1]*mc[1]));
-		rv[1] = Vector3(mc[2], mc[3], std::sqrt(1.0f - mc[2]*mc[2] - mc[3]*mc[3]));
+		rv[2] = Vector3(mc[0], mc[1], std::sqrt(std::max(0.0f, 1.0f - mc[0]*mc[0] - mc[1]*mc[1])));
+		rv[1] = Vector3(mc[2], mc[3], std::sqrt(std::max(0.0f, 1.0f - mc[2]*mc[2] - mc[3]*mc[3])));
 		if (mtxoff[0] & 1) rv[2].z = -rv[2].z;
 		if (mtxoff[2] & 1) rv[1].z = -rv[1].z;
 		rv[0] = rv[1].cross(rv[2]);
