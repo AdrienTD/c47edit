@@ -21,3 +21,4 @@ void BeginMeshDraw();
 void EndMeshDraw();
 void DrawMesh(Mesh* mesh, Chunk* excChunk = nullptr);
 void InvalidateMesh(Mesh* mesh);
+void UncacheAllMeshes();

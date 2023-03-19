@@ -732,7 +732,7 @@ void IGObjectInfo()
 			Matrix mz = Matrix::getRotationZMatrix(rota.z);
 			selobj->matrix = mz * mx * my;
 		}
-		ImGui::Text("Num. references: %u", selobj->refcount);
+		ImGui::Text("Num. references: %zu", selobj->getRefCount());
 		if (ImGui::CollapsingHeader("DBL"))
 		{
 			auto members = ClassInfo::GetMemberNames(selobj);
@@ -833,7 +833,7 @@ void IGObjectInfo()
 		}
 		if (wannadel)
 		{
-			if (selobj->refcount > 0)
+			if (selobj->getRefCount() > 0u)
 				warn("It's not possible to remove an object that is referenced by other objects!");
 			else {
 				g_scene.RemoveObject(selobj);
@@ -981,7 +981,7 @@ void IGTextures()
 void IGSounds()
 {
 	static int selectedSound = -1;
-	Chunk* ands = g_scene.spkchk->findSubchunk('SDNA');
+	Chunk* ands = g_scene.spkchk.findSubchunk('SDNA');
 	if (!ands) return;
 	Chunk* wavc = ands->findSubchunk('CVAW');
 	if (!wavc) return;
@@ -1176,6 +1176,23 @@ GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObje
 	return 0;
 }
 
+bool CmdOpenScene()
+{
+	auto zipPath = GuiUtils::OpenDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", "Select a Scene ZIP archive (containing Pack.SPK)");
+	if (zipPath.empty())
+		return false;
+	UncacheAllTextures();
+	UncacheAllMeshes();
+	g_scene.LoadSceneSPK(zipPath.string().c_str());
+	GlifyAllTextures();
+	selobj = nullptr;
+	viewobj = nullptr;
+	bestpickobj = nullptr;
+	objtogive = nullptr;
+	nextobjtosel = nullptr;
+	return true;
+}
+
 int main(int argc, char* argv[])
 //int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode)
 {
@@ -1191,11 +1208,6 @@ int main(int argc, char* argv[])
 		exit(-2);
 	}
 
-	auto zipPath = GuiUtils::OpenDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", "Select a Scene ZIP archive (containing Pack.SPK)");
-	if (zipPath.empty())
-		exit(-1);
-	g_scene.LoadSceneSPK(zipPath.string().c_str());
-
 	bool appnoquit = true;
 	InitWindow();
 
@@ -1205,7 +1217,8 @@ int main(int argc, char* argv[])
 	ImGui_ImplOpenGL2_Init();
 	lastfpscheck = GetTickCount();
 
-	GlifyAllTextures();
+	if (!CmdOpenScene())
+		exit(-1);
 
 	while (appnoquit = HandleWindow())
 	{
@@ -1287,6 +1300,8 @@ int main(int argc, char* argv[])
 			if(wndShowSounds) IGSounds();
 			if (ImGui::BeginMainMenuBar()) {
 				if (ImGui::BeginMenu("Scene")) {
+					if (ImGui::MenuItem("Open..."))
+						CmdOpenScene();
 					if (ImGui::MenuItem("Save as..."))
 						CmdSaveScene();
 					if (ImGui::MenuItem("Exit"))
@@ -1369,7 +1384,7 @@ int main(int argc, char* argv[])
 			EndMeshDraw();
 
 			if (renderExc && viewobj) {
-				if (Chunk* pexc = g_scene.spkchk->findSubchunk('CXEP')) {
+				if (Chunk* pexc = g_scene.spkchk.findSubchunk('CXEP')) {
 					glPointSize(5.0f);
 					glBegin(GL_POINTS);
 					auto renderAnim = [pexc](auto rec, GameObject* obj, const Matrix& prevmat) -> void {

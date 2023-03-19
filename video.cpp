@@ -332,6 +332,12 @@ void InvalidateMesh(Mesh* mesh)
 	g_skinnedMeshMap.erase(mesh);
 }
 
+void UncacheAllMeshes()
+{
+	ProMesh::g_proMeshes.clear();
+	g_skinnedMeshMap.clear();
+}
+
 void BeginMeshDraw()
 {
 	if (!rendertextures) {

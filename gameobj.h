@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -19,6 +20,8 @@
 struct GameObject;
 struct Chunk;
 struct Scene;
+
+extern std::unordered_map<GameObject*, size_t> g_objRefCounts;
 
 class GORef
 {
@@ -124,7 +127,8 @@ struct GameObject
 	DBLList dbl;
 	std::shared_ptr<Chunk> excChunk;
 
-	uint32_t refcount = 0;
+	//uint32_t refcount = 0;
+	size_t getRefCount() { return g_objRefCounts[this]; }
 
 	GameObject(const char *nName = "Unnamed", int nType = 0) : name(nName), type(nType) {}
 	GameObject(const GameObject& other) = default;
@@ -133,21 +137,24 @@ struct GameObject
 	std::string getPath() const;
 };
 
-inline void GORef::deref() noexcept { if (m_obj) { m_obj->refcount--; m_obj = nullptr; } }
-inline void GORef::set(GameObject * obj) noexcept { deref(); m_obj = obj; if (m_obj) m_obj->refcount++; }
+inline void GORef::deref() noexcept { if (m_obj) { g_objRefCounts[m_obj]--; m_obj = nullptr; } }
+inline void GORef::set(GameObject * obj) noexcept { deref(); m_obj = obj; if (m_obj) g_objRefCounts[m_obj]++; }
 
 struct Scene {
-	Chunk* spkchk, * prot, * pclp, * phea, * pnam, * ppos, * pmtx, * pver, * pfac, * pftx, * puvc, *pdbl, *pdat, *pexc;
-	GameObject* rootobj, * cliprootobj, * superroot;
+	Chunk spkchk;
+	Chunk* prot, * pclp, * phea, * pnam, * ppos, * pmtx, * pver, * pfac, * pftx, * puvc, * pdbl, * pdat, * pexc;
+	GameObject* rootobj = nullptr, * cliprootobj = nullptr, * superroot = nullptr;
 	std::string lastspkfn;
-	void* zipmem = nullptr;
-	uint32_t zipsize = 0;
+	std::vector<uint8_t> zipmem;
 	Chunk palPack, dxtPack, lgtPack, anmPack, wavPack;
 	bool hasAnmPack = false;
+	bool ready = false;
 
 	void LoadSceneSPK(const char *fn);
 	void ModifySPK();
 	void SaveSceneSPK(const char *fn);
+	void Close();
+	~Scene() { Close(); }
 	
 	GameObject* CreateObject(int type, GameObject* parent);
 	void RemoveObject(GameObject *o);

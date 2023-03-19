@@ -87,9 +87,18 @@ void InvalidateTexture(uint32_t texid)
 	GlifyTexture(FindTextureChunk(g_scene, texid).first);
 }
 
+void UncacheAllTextures()
+{
+	for (auto& [id, vtex] : texmap) {
+		GLuint gltex = (GLuint)(uintptr_t)vtex;
+		glDeleteTextures(1, &gltex);
+	}
+	texmap.clear();
+}
+
 void AddTexture(Scene& scene, const std::filesystem::path& filepath)
 {
-	Chunk* ptxi = scene.spkchk->findSubchunk('IXTP');
+	Chunk* ptxi = scene.spkchk.findSubchunk('IXTP');
 	assert(ptxi);
 	uint32_t& numTextureIds = *(uint32_t*)ptxi->maindata.data();
 	numTextureIds += 1;

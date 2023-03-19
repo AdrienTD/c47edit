@@ -24,6 +24,7 @@ extern std::map<uint32_t, void*> texmap;
 void GlifyTexture(Chunk* c);
 void GlifyAllTextures();
 void InvalidateTexture(uint32_t texid);
+void UncacheAllTextures();
 void AddTexture(Scene& scene, const std::filesystem::path& filepath);
 void ImportTexture(const std::filesystem::path& filepath, Chunk& chk, Chunk& dxtchk, int texid);
 void ExportTexture(Chunk* texChunk, const std::filesystem::path& filepath);
