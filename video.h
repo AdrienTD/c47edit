@@ -7,6 +7,7 @@
 
 struct Mesh;
 struct Chunk;
+struct Matrix;
 
 extern int drawframes;
 extern bool rendertextures;
@@ -19,6 +20,7 @@ void EndDrawing();
 float* ApplySkinToMesh(Mesh* mesh, Chunk* excChunk);
 void BeginMeshDraw();
 void EndMeshDraw();
-void DrawMesh(Mesh* mesh, Chunk* excChunk = nullptr);
+void DrawMesh(Mesh* mesh, const Matrix& matrix, Chunk* excChunk = nullptr);
+void RenderMeshLists();
 void InvalidateMesh(Mesh* mesh);
 void UncacheAllMeshes();

@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <stack>
 
 #include "chunk.h"
 #include "classInfo.h"
@@ -1075,21 +1076,21 @@ GameObject* FindObjectNamed(const char *name, GameObject *sup = g_scene.rootobj)
 	return 0;
 }
 
+std::stack<Matrix> g_renderMatrixStack{ std::deque{ Matrix::getIdentity() } };
+
 void RenderObject(GameObject *o)
 {
-	glPushMatrix();
-	glTranslatef(o->position.x, o->position.y, o->position.z);
-	glMultMatrixf(o->matrix.v);
+	g_renderMatrixStack.push(o->matrix * Matrix::getTranslationMatrix(o->position) * g_renderMatrixStack.top());
 	if (o->mesh && (o->flags & 0x20)) {
 		if (!rendertextures) {
 			uint32_t clr = swap_rb(o->color);
 			glColor4ubv((uint8_t*)&clr);
 		}
-		DrawMesh(o->mesh.get(), o->excChunk.get());
+		DrawMesh(o->mesh.get(), g_renderMatrixStack.top(), o->excChunk.get());
 	}
 	for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
 		RenderObject(*e);
-	glPopMatrix();
+	g_renderMatrixStack.pop();
 }
 
 Vector3 finalintersectpnt = Vector3(0, 0, 0);
@@ -1380,6 +1381,8 @@ int main(int argc, char* argv[])
 			if (viewobj) {
 				//glTranslatef(-viewobj->position.x, -viewobj->position.y, -viewobj->position.z);
 				RenderObject(viewobj);
+				RenderMeshLists();
+				assert(g_renderMatrixStack.size() == 1u);
 			}
 			EndMeshDraw();
 

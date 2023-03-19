@@ -185,7 +185,8 @@ struct ProMesh {
 		std::vector<uint32_t> colors;
 		std::vector<IndexType> indices;
 	};
-	std::map<std::tuple<uint16_t, uint16_t, uint16_t>, Part> parts;
+	using PartKey = std::tuple<uint16_t, uint16_t, uint16_t>;
+	std::map<PartKey, Part> parts;
 
 	inline static std::map<Mesh*, ProMesh> g_proMeshes;
 
@@ -233,7 +234,7 @@ struct ProMesh {
 			bool isLit = hasFtx && (ftxFace[0] & 0x80);
 			uint16_t texid = isTextured ? ftxFace[2] : 0xFFFF;
 			uint16_t lgtid = isLit ? ftxFace[3] : 0xFFFF;
-			auto& part = pro.parts[std::make_tuple(ftxFace[0] & 0x0202, texid, lgtid)];
+			auto& part = pro.parts[std::make_tuple(texid, lgtid, ftxFace[0] & 0x0202)];
 			IndexType prostart = (IndexType)part.vertices.size();
 			for (int j = 0; j < shape; j++) {
 				const float* uu = (isTextured ? uvCoords : defUvs) + uvit[j] * 2;
@@ -271,13 +272,16 @@ struct ProMesh {
 	}
 };
 
-void DrawMesh(Mesh* mesh, Chunk* excChunk)
+std::map<ProMesh::PartKey, std::vector<std::pair<Matrix, const ProMesh::Part*>>> g_meshLists;
+
+void DrawMesh(Mesh* mesh, const Matrix& matrix, Chunk* excChunk)
 {
 	if (!rendertextures)
 	{
 		const float* vertices = mesh->vertices.data();
 		if (excChunk && excChunk->findSubchunk('LCHE'))
 			vertices = ApplySkinToMesh(mesh, excChunk);
+		glLoadMatrixf(matrix.v);
 		glVertexPointer(3, GL_FLOAT, 6, vertices);
 		glDrawElements(GL_QUADS, mesh->quadindices.size(), GL_UNSIGNED_SHORT, mesh->quadindices.data());
 		glDrawElements(GL_TRIANGLES, mesh->triindices.size(), GL_UNSIGNED_SHORT, mesh->triindices.data());
@@ -286,34 +290,47 @@ void DrawMesh(Mesh* mesh, Chunk* excChunk)
 	{
 		ProMesh* pro = ProMesh::getProMesh(mesh, excChunk);
 		for (auto& [mat,part] : pro->parts) {
-			auto& [flags, texid, lgtid] = mat;
+			auto& [texid, lgtid, flags] = mat;
 			if (texid == 0xFFFF)
 				continue;
-			GLuint gltex = 0, gllgt = 0;
-			if (renderColorTextures)
-				if (auto t = texmap.find(texid); t != texmap.end())
-					gltex = (GLuint)(uintptr_t)t->second;
-			if (renderLightmaps)
-				if (auto t = texmap.find(lgtid); t != texmap.end())
-					gllgt = (GLuint)(uintptr_t)t->second;
-			glActiveTextureARB(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, gltex);
-			glActiveTextureARB(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_2D, gllgt);
-			if (enableAlphaTest && (flags & 0x0200)) {
-				glEnable(GL_ALPHA_TEST);
-				glAlphaFunc(GL_GEQUAL, 0.1f);
-			}
-			else {
-				glDisable(GL_ALPHA_TEST);
-			}
-			//if (flags & 0x0002) {
-			//	glEnable(GL_BLEND);
-			//	glBlendFunc(GL_ONE, GL_ONE);
-			//}
-			//else {
-			//	glDisable(GL_BLEND);
-			//}
+			g_meshLists[mat].push_back({ matrix, &part });
+		}
+	}
+}
+
+void RenderMeshLists()
+{
+	if (!rendertextures)
+		return;
+	for (auto& [mat, partList] : g_meshLists) {
+		auto& [texid, lgtid, flags] = mat;
+		GLuint gltex = 0, gllgt = 0;
+		if (renderColorTextures)
+			if (auto t = texmap.find(texid); t != texmap.end())
+				gltex = (GLuint)(uintptr_t)t->second;
+		if (renderLightmaps)
+			if (auto t = texmap.find(lgtid); t != texmap.end())
+				gllgt = (GLuint)(uintptr_t)t->second;
+		glActiveTextureARB(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, gltex);
+		glActiveTextureARB(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, gllgt);
+		if (enableAlphaTest && (flags & 0x0200)) {
+			glEnable(GL_ALPHA_TEST);
+			glAlphaFunc(GL_GEQUAL, 0.1f);
+		}
+		else {
+			glDisable(GL_ALPHA_TEST);
+		}
+		//if (flags & 0x0002) {
+		//	glEnable(GL_BLEND);
+		//	glBlendFunc(GL_ONE, GL_ONE);
+		//}
+		//else {
+		//	glDisable(GL_BLEND);
+		//}
+		for (auto& [matrix, partPtr] : partList) {
+			auto& part = *partPtr;
 			glVertexPointer(3, GL_FLOAT, 12, part.vertices.data());
 			if (renderLightmaps)
 				glColorPointer(4, GL_UNSIGNED_BYTE, 4, part.colors.data());
@@ -321,6 +338,7 @@ void DrawMesh(Mesh* mesh, Chunk* excChunk)
 			glTexCoordPointer(2, GL_FLOAT, 8, part.texcoords.data());
 			glClientActiveTextureARB(GL_TEXTURE1);
 			glTexCoordPointer(2, GL_FLOAT, 8, part.lightmapCoords.data());
+			glLoadMatrixf(matrix.v);
 			glDrawElements(GL_TRIANGLES, part.indices.size(), GL_UNSIGNED_SHORT, part.indices.data());
 		}
 	}
@@ -362,6 +380,9 @@ void BeginMeshDraw()
 		glClientActiveTextureARB(GL_TEXTURE1);
 		glEnable(GL_TEXTURE_2D);
 		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+		for (auto& [mat, list] : g_meshLists)
+			list.clear();
 	}
 	glColor4f(1, 1, 1, 1);
 }
