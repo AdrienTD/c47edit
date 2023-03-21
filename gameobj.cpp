@@ -84,7 +84,7 @@ static void ReadAssetPacks(Scene* scene, mz_zip_archive* zip)
 	static const auto readFile = [](const char* filename) {
 		void* repmem; size_t repsize;
 		FILE* repfile = fopen(filename, "rb");
-		if (!repfile) ferr("Could not open Repeat.* file.");
+		if (!repfile) ferr("Could not open Repeat.* file.\nBe sure you copied all the 4 files named \"Repeat\" (with .ANM, .DXT, .PAL, .WAV extensions) from the Hitman C47 game's folder into the editor's folder (where c47edit.exe is).");
 		fseek(repfile, 0, SEEK_END);
 		repsize = ftell(repfile);
 		fseek(repfile, 0, SEEK_SET);

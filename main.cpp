@@ -1194,8 +1194,11 @@ bool CmdOpenScene()
 	return true;
 }
 
+#ifndef APPVEYOR
 int main(int argc, char* argv[])
-//int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode)
+#else
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode)
+#endif
 {
 	//SetProcessDPIAware();
 
@@ -1296,7 +1299,9 @@ int main(int argc, char* argv[])
 			IGMain();
 			IGObjectTree();
 			IGObjectInfo();
+#ifndef APPVEYOR
 			IGDebugWindows();
+#endif
 			if(wndShowTextures) IGTextures();
 			if(wndShowSounds) IGSounds();
 			if (ImGui::BeginMainMenuBar()) {
@@ -1338,17 +1343,19 @@ int main(int argc, char* argv[])
 					ImGui::EndMenu();
 				}
 				if (ImGui::BeginMenu("Help")) {
-					if (ImGui::MenuItem("Help document on GitHub")) {
-						ShellExecuteA(hWindow, nullptr, "https://github.com/AdrienTD/c47edit/blob/master/docs/help.md", nullptr, nullptr, SW_SHOWNORMAL);
+					if (ImGui::MenuItem("c47edit Wiki")) {
+						ShellExecuteA(hWindow, nullptr, "https://github.com/AdrienTD/c47edit/wiki", nullptr, nullptr, SW_SHOWNORMAL);
 					}
 					if (ImGui::MenuItem("About...")) {
 						MessageBox(hWindow, "c47edit\nUnofficial scene editor for \"Hitman: Codename 47\"\n\n"
-							"(C) 2018 AdrienTD\nLicensed under the GPL 3.\nSee LICENSE file for details.\n\n"
-							"3rd party libraries used:\n- Dear ImGui (MIT license)\n- Miniz (MIT license)\nSee LICENSE_* files for copyright and licensing of these libraries.", "c47edit", 0);
+							"(C) 2018-2023 AdrienTD\nLicensed under the GPL 3.\nSee LICENSE file for details.\n"
+							"See 3RDPARTY file for copyright and licensing of 3rd-party libraries.", "c47edit", 0);
 					}
 					ImGui::EndMenu();
 				}
+#ifndef APPVEYOR
 				IGDebugMenus();
+#endif
 				float barwidth = ImGui::GetWindowWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f;
 				ImGui::SameLine(barwidth - ImGui::CalcTextSize(APP_VERSION).x);
 				ImGui::TextUnformatted(APP_VERSION);
