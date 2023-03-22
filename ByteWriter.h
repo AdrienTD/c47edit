@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 // Adapter for container that adds methods to append arbitrary binary data
@@ -37,6 +38,7 @@ public:
 	void addFloat(float val) { addData(&val, 4); }
 	void addDouble(double val) { addData(&val, 8); }
 	void addStringNT(const std::string& val) { addData(val.data(), val.size() + 1); }
+	void addStringNT(std::string_view val) { addData(val.data(), val.size()); addU8(0); }
 
 	Container take() { return std::move(buffer); }
 	Byte* getPointer(size_t addr = 0) { return buffer.data() + addr; }

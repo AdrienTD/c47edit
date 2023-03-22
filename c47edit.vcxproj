@@ -134,6 +134,7 @@
     <ClCompile Include="imgui\imgui_tables.cpp" />
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ModelImporter.cpp" />
     <ClCompile Include="ObjModel.cpp" />
     <ClCompile Include="stb_implementations.cpp" />
     <ClCompile Include="texture.cpp" />
@@ -153,6 +154,7 @@
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_impl_opengl2.h" />
     <ClInclude Include="imgui\imgui_impl_win32.h" />
+    <ClInclude Include="ModelImporter.h" />
     <ClInclude Include="ObjModel.h" />
     <ClInclude Include="texture.h" />
     <ClInclude Include="vecmat.h" />

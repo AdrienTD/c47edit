@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <map>
+#include <string_view>
 
 struct Chunk;
 struct Scene;
@@ -25,7 +26,12 @@ void GlifyTexture(Chunk* c);
 void GlifyAllTextures();
 void InvalidateTexture(uint32_t texid);
 void UncacheAllTextures();
-void AddTexture(Scene& scene, const std::filesystem::path& filepath);
+uint32_t AddTexture(Scene& scene, uint8_t* pixels, int width, int height, std::string_view name);
+uint32_t AddTexture(Scene& scene, const std::filesystem::path& filepath);
+uint32_t AddTexture(Scene& scene, const void* mem, size_t memSize, std::string_view name);
+void ImportTexture(uint8_t* pixels, int width, int height, std::string_view name, Chunk& chk, Chunk& dxtchk, int texid);
 void ImportTexture(const std::filesystem::path& filepath, Chunk& chk, Chunk& dxtchk, int texid);
+void ImportTexture(const void* mem, size_t memSize, std::string_view name, Chunk& chk, Chunk& dxtchk, int texid);
 void ExportTexture(Chunk* texChunk, const std::filesystem::path& filepath);
 std::pair<Chunk*, Chunk*> FindTextureChunk(Scene& scene, uint32_t id);
+std::pair<Chunk*, Chunk*> FindTextureChunkByName(Scene& scene, std::string_view name);

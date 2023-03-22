@@ -22,6 +22,7 @@
 #include "ObjModel.h"
 #include "GuiUtils.h"
 #include "debug.h"
+#include "ModelImporter.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -567,94 +568,15 @@ void IGObjectInfo()
 			if (ImGui::Button("Select parent"))
 				selobj = selobj->parent;
 		}
-		if (ImGui::Button("Import OBJ")) {
-			auto filepath = GuiUtils::OpenDialogBox("Wavefront OBJ model\0*.OBJ\0\0\0", "obj");
+		if (ImGui::Button("Import with Assimp")) {
+			auto filepath = GuiUtils::OpenDialogBox("3D Model\0*.dae;*.blend;*.gltf;*.glb;*.obj;*.ogex\0Any format\0*.*\0\0\0\0", "");
 			if (!filepath.empty()) {
-				std::vector<Vector3> objVertices;
-				std::vector<Vector3> objTexCoords;
-				std::vector<std::array<std::array<int, 3>, 3>> triangles;
-				std::vector<std::array<std::array<int, 3>, 4>> quads;
-				//std::vector<std::array<float, 8>> triUvs;
-				//std::vector<std::array<float, 8>> quadUvs;
-
-				ObjModel objmodel;
-				objmodel.load(filepath);
-				objVertices = std::move(objmodel.vertices);
-				objTexCoords = std::move(objmodel.texCoords);
-				for (auto& vec : objVertices)
-					vec *= Vector3(-1.0f, 1.0f, 1.0f);
-				//for (auto& tri : objmodel.triangles) {
-				//	triIndices.insert(triIndices.end(), {tri[0], tri[1], tri[2]});
-				//}
-				triangles = std::move(objmodel.triangles);
-
-				selobj->flags |= 0x20;
 				if (!selobj->mesh)
 					selobj->mesh = std::make_shared<Mesh>();
-				else
-					*selobj->mesh = {};
-
-				Mesh* mesh = selobj->mesh.get();
-				mesh->vertices.resize(3 * std::size(objVertices));
-				mesh->quadindices.resize(4 * std::size(quads));
-				mesh->triindices.resize(3 * std::size(triangles));
-				size_t numFaces = std::size(quads) + std::size(triangles);
-				mesh->ftxFaces.resize(numFaces);
-				mesh->textureCoords.resize(numFaces * 8);
-				mesh->lightCoords.resize(numFaces * 8);
-
-				float* verts = mesh->vertices.data();
-				uint16_t* qfaces = mesh->quadindices.data();
-				uint16_t* tfaces = mesh->triindices.data();
-				uint16_t* ftx = (uint16_t*)mesh->ftxFaces.data();
-				float* uv1 = (float*)mesh->textureCoords.data();
-				float* uv2 = (float*)mesh->lightCoords.data();
-
-				memcpy(verts, objVertices.data(), objVertices.size() * 12);
-				for (auto& tri : triangles)
-					for (auto& [indPos, indTxc, indNrm] : tri)
-						*tfaces++ = 2 * indPos;
-				for (auto& quad : quads)
-					for (auto& [indPos, indTxc, indNrm] : quad)
-						*qfaces++ = 2 * indPos;
-				size_t groupIndex = -1, triId = 0;
-				static constexpr uint16_t defaultTexId = 0x0135;
-				uint16_t texId = defaultTexId;
-				for (auto& tri : triangles) {
-					// find texture
-					while (groupIndex == -1 || triId >= objmodel.groups[groupIndex].end) {
-						groupIndex += 1;
-						texId = defaultTexId;
-						auto mit = objmodel.materials.find(objmodel.groups[groupIndex].name);
-						if (mit != objmodel.materials.end()) {
-							const std::string& texname = mit->second.map_Kd;
-							for (auto& texchk : g_scene.palPack.subchunks) {
-								const TexInfo* ti = (const TexInfo*)texchk.maindata.data();
-								if (ti->name == texname) {
-									texId = (uint16_t)ti->id;
-								}
-							}
-						}
-					}
-
-					*ftx++ = 0x00A0; // 0: no texture, 0x20 textured, 0x80 lighting/shading
-					*ftx++ = 0;
-					*ftx++ = texId; // 0x0135;
-					*ftx++ = 0xFFFF;
-					*ftx++ = 0;
-					*ftx++ = 0x0CF8;
-					const Vector3& txc0 = objTexCoords[tri[0][1]];
-					const Vector3& txc1 = objTexCoords[tri[1][1]];
-					const Vector3& txc2 = objTexCoords[tri[2][1]];
-					Vector3 txc3 = Vector3{ 0,0,0 };
-					for (const Vector3& txc : { txc0, txc1, txc2, txc3 }) {
-						*uv1++ = txc.x; *uv1++ = 1.0f - txc.y;
-						*uv2++ = txc.x; *uv2++ = 1.0f - txc.y;
-					}
-					triId += 1;
-				}
-
-				InvalidateMesh(mesh);
+				*selobj->mesh = ImportWithAssimp(filepath);
+				InvalidateMesh(selobj->mesh.get());
+				UncacheAllTextures();
+				GlifyAllTextures();
 			}
 		}
 		ImGui::SameLine();

@@ -96,7 +96,7 @@ void UncacheAllTextures()
 	texmap.clear();
 }
 
-void AddTexture(Scene& scene, const std::filesystem::path& filepath)
+std::tuple<uint32_t, Chunk*, Chunk*> AddUninitializedTexture(Scene& scene)
 {
 	Chunk* ptxi = scene.spkchk.findSubchunk('IXTP');
 	assert(ptxi);
@@ -105,15 +105,32 @@ void AddTexture(Scene& scene, const std::filesystem::path& filepath)
 
 	Chunk& chk = scene.palPack.subchunks.emplace_back();
 	Chunk& dxtchk = scene.dxtPack.subchunks.emplace_back();
-	ImportTexture(filepath, chk, dxtchk, numTextureIds);
+	return { numTextureIds, &chk, &dxtchk };
 }
 
-void ImportTexture(const std::filesystem::path& filepath, Chunk& chk, Chunk& dxtchk, int texid)
+uint32_t AddTexture(Scene& scene, uint8_t* pixels, int width, int height, std::string_view name)
 {
-	int width, height, channels;
-	uint8_t* pixels = stbi_load(filepath.string().c_str(), &width, &height, &channels, 4);
+	auto& [id, chk, dxtchk] = AddUninitializedTexture(scene);
+	ImportTexture(pixels, width, height, name, *chk, *dxtchk, id);
+	return id;
+}
 
-	std::string name = filepath.stem().string();
+uint32_t AddTexture(Scene& scene, const std::filesystem::path& filepath)
+{
+	auto& [id, chk, dxtchk] = AddUninitializedTexture(scene);
+	ImportTexture(filepath, *chk, *dxtchk, id);
+	return id;
+}
+
+uint32_t AddTexture(Scene& scene, const void* mem, size_t memSize, std::string_view name)
+{
+	auto& [id, chk, dxtchk] = AddUninitializedTexture(scene);
+	ImportTexture(mem, memSize, name, *chk, *dxtchk, id);
+	return id;
+}
+
+void ImportTexture(uint8_t* pixels, int width, int height, std::string_view name, Chunk& chk, Chunk& dxtchk, int texid)
+{
 	int numMipmaps = 1;
 	int flags = 0x14;
 	int random = 0x12345678;
@@ -149,7 +166,22 @@ void ImportTexture(const std::filesystem::path& filepath, Chunk& chk, Chunk& dxt
 	str = dxtdata.take();
 	dxtchk.maindata.resize(str.size());
 	memcpy(dxtchk.maindata.data(), str.data(), str.size());
+}
 
+void ImportTexture(const std::filesystem::path& filepath, Chunk& chk, Chunk& dxtchk, int texid)
+{
+	int width, height, channels;
+	uint8_t* pixels = stbi_load(filepath.string().c_str(), &width, &height, &channels, 4);
+	std::string name = filepath.stem().string();
+	ImportTexture(pixels, width, height, name, chk, dxtchk, texid);
+	stbi_image_free(pixels);
+}
+
+void ImportTexture(const void* mem, size_t memSize, std::string_view name, Chunk& chk, Chunk& dxtchk, int texid)
+{
+	int width, height, channels;
+	uint8_t* pixels = stbi_load_from_memory((const uint8_t*)mem, memSize, &width, &height, &channels, 4);
+	ImportTexture(pixels, width, height, name, chk, dxtchk, texid);
 	stbi_image_free(pixels);
 }
 
@@ -207,6 +239,18 @@ std::pair<Chunk*, Chunk*> FindTextureChunk(Scene& scene, uint32_t id)
 		uint32_t chkid = *(uint32_t*)chk.maindata.data();
 		if (chkid == id) {
 			return { &chk, nullptr };
+		}
+	}
+	return { nullptr, nullptr };
+}
+
+std::pair<Chunk*, Chunk*> FindTextureChunkByName(Scene& scene, std::string_view name)
+{
+	for (Chunk& chk : scene.palPack.subchunks) {
+		const TexInfo* ti = (const TexInfo*)chk.maindata.data();
+		if (name == ti->name) {
+			int nth = &chk - scene.palPack.subchunks.data();
+			return { &chk, &scene.dxtPack.subchunks[nth] };
 		}
 	}
 	return { nullptr, nullptr };
