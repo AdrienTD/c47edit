@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <map>
 #include <string_view>
+#include <vector>
 
 struct Chunk;
 struct Scene;
@@ -18,6 +19,7 @@ struct TexInfo {
 	uint32_t random;
 	const char name[1];
 	TexInfo() = delete;
+	const char* getName() const { return name; }
 };
 
 extern std::map<uint32_t, void*> texmap;
@@ -33,5 +35,6 @@ void ImportTexture(uint8_t* pixels, int width, int height, std::string_view name
 void ImportTexture(const std::filesystem::path& filepath, Chunk& chk, Chunk& dxtchk, int texid);
 void ImportTexture(const void* mem, size_t memSize, std::string_view name, Chunk& chk, Chunk& dxtchk, int texid);
 void ExportTexture(Chunk* texChunk, const std::filesystem::path& filepath);
+std::vector<uint8_t> ExportTextureToPNGInMemory(Chunk* texChunk);
 std::pair<Chunk*, Chunk*> FindTextureChunk(Scene& scene, uint32_t id);
 std::pair<Chunk*, Chunk*> FindTextureChunkByName(Scene& scene, std::string_view name);

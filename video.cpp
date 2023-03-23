@@ -69,9 +69,9 @@ void EndDrawing()
 	SwapBuffers(whdc); drawframes++;
 }
 
-std::map<Mesh*, std::vector<Vector3>> g_skinnedMeshMap;
+std::map<const Mesh*, std::vector<Vector3>> g_skinnedMeshMap;
 
-float* ApplySkinToMesh(Mesh* mesh, Chunk* excChunk)
+float* ApplySkinToMesh(const Mesh* mesh, Chunk* excChunk)
 {
 	auto [it,inserted] = g_skinnedMeshMap.try_emplace(mesh);
 	if (!inserted)

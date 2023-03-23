@@ -5,10 +5,19 @@
 
 #include "gameobj.h"
 #include "texture.h"
+#include "video.h"
 
-#include "assimp/Importer.hpp"
-#include "assimp/scene.h"
+#include <assimp/Importer.hpp>
+#include <assimp/Exporter.hpp>
+#include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/Logger.hpp>
+#include <assimp/DefaultLogger.hpp>
+
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+extern HWND hWindow;
 
 static std::string ShortenTextureName(std::string_view fullName)
 {
@@ -31,11 +40,17 @@ static uint32_t GetTextureFromAssimp(const aiTexture* atex, std::string_view nam
 	}
 }
 
-Mesh ImportWithAssimp(const std::filesystem::path& filename)
+std::optional<Mesh> ImportWithAssimp(const std::filesystem::path& filename)
 {
 	Mesh gmesh;
 	Assimp::Importer importer;
-	const aiScene* ais = importer.ReadFile(filename.string(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_MakeLeftHanded);
+	const aiScene* ais = importer.ReadFile(filename.u8string(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_MakeLeftHanded);
+	if (!ais) {
+		std::string msg = "Assimp Import Error:\n";
+		msg += importer.GetErrorString();
+		MessageBoxA(hWindow, msg.c_str(), "Import Error", 16);
+		return {};
+	}
 
 	// Meshes
 	for (unsigned int m = 0; m < ais->mNumMeshes; ++m) {
@@ -113,5 +128,146 @@ Mesh ImportWithAssimp(const std::filesystem::path& filename)
 			}
 		}
 	}
-	return gmesh;
+	return std::move(gmesh);
+}
+
+void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, Chunk* excChunk)
+{
+	aiScene ascene;
+
+	struct Part {
+		std::vector<aiVector3D> vertices;
+		std::vector<aiVector3D> texCoords;
+		std::vector<aiFace> faces;
+		unsigned int primitiveTypes = 0;
+	};
+	using PartKey = uint16_t;
+	std::map<PartKey, Part> parts;
+
+	const float* vertices = gmesh.vertices.data();
+	if (excChunk && excChunk->findSubchunk('LCHE')) {
+		vertices = ApplySkinToMesh(&gmesh, excChunk);
+	}
+
+	const Mesh::FTXFace* ftxptr = gmesh.ftxFaces.data();
+	const float* uvptr = gmesh.textureCoords.data();
+	for (auto [indvec, shape] : { std::make_pair(&gmesh.triindices, 3u), std::make_pair(&gmesh.quadindices, 4u) }) {
+		const uint16_t* indptr = indvec->data();
+		size_t numFaces = indvec->size() / shape;
+		for (size_t f = 0; f < numFaces; ++f) {
+			auto& ftx = *ftxptr;
+			uint16_t texid = (ftx[0] & 0x20) ? ftx[2] : 0xFFFF;
+			auto& part = parts[texid];
+
+			unsigned int facesFirstVertexIndex = (unsigned int)part.vertices.size();
+			for (unsigned int i = 0; i < shape; ++i) {
+				const float* gvec = vertices + 3 * (indptr[i] >> 1);
+				part.vertices.emplace_back(gvec[0], gvec[1], gvec[2]);
+			}
+
+			aiFace& face = part.faces.emplace_back();
+			face.mNumIndices = shape;
+			face.mIndices = new unsigned int[shape];
+			for (unsigned int i = 0; i < shape; ++i)
+				face.mIndices[i] = facesFirstVertexIndex + i;
+
+			if (ftx[0] & 0x20) {
+				for (unsigned int i = 0; i < shape; ++i) {
+					part.texCoords.emplace_back(uvptr[2 * i], uvptr[2 * i + 1], 0.0f);
+				}
+				uvptr += 8;
+			}
+
+			part.primitiveTypes |= (shape == 3) ? aiPrimitiveType_TRIANGLE : aiPrimitiveType_POLYGON;
+
+			indptr += shape;
+			ftxptr += 1;
+		}
+	}
+
+	ascene.mNumMeshes = parts.size();
+	ascene.mMeshes = new aiMesh * [ascene.mNumMeshes];
+	ascene.mNumMaterials = parts.size();
+	ascene.mMaterials = new aiMaterial * [ascene.mNumMaterials];
+	size_t m = 0;
+	std::vector<Chunk*> texturesToExport;
+	for (auto& [texid, part] : parts) {
+		aiMesh* amesh = new aiMesh;
+		ascene.mMeshes[m] = amesh;
+		amesh->mMaterialIndex = m;
+
+		amesh->mPrimitiveTypes = part.primitiveTypes;
+
+		amesh->mNumVertices = part.vertices.size();
+		amesh->mVertices = new aiVector3D[amesh->mNumVertices];
+		memcpy(amesh->mVertices, part.vertices.data(), amesh->mNumVertices * sizeof(aiVector3D));
+
+		if (texid != 0xFFFF) {
+			amesh->mNumUVComponents[0] = 2;
+			amesh->mTextureCoords[0] = new aiVector3D[amesh->mNumVertices];
+			memcpy(amesh->mTextureCoords[0], part.texCoords.data(), part.texCoords.size() * sizeof(aiVector3D));
+		}
+
+		amesh->mNumFaces = part.faces.size();
+		amesh->mFaces = new aiFace[amesh->mNumFaces];
+		memcpy(amesh->mFaces, part.faces.data(), part.faces.size() * sizeof(aiFace));
+		memset(part.faces.data(), 0, part.faces.size() * sizeof(aiFace)); // need to nullify the index pointers on old vector to keep them unique
+
+		aiMaterial* amat = new aiMaterial;
+		ascene.mMaterials[m] = amat;
+		aiString matName;
+		aiString texPath;
+		if (Chunk* texChunk = FindTextureChunk(g_scene, texid).first) {
+			matName.Set(((TexInfo*)texChunk->maindata.data())->name);
+			texPath.Set(std::string("*") + std::to_string(texturesToExport.size()));
+			texturesToExport.push_back(texChunk);
+			amat->AddProperty(&texPath, AI_MATKEY_TEXTURE_DIFFUSE(0));
+		}
+		else {
+			matName.Set("Unnamed");
+		}
+		amat->AddProperty(&matName, AI_MATKEY_NAME);
+
+		m += 1;
+	}
+
+	ascene.mNumTextures = texturesToExport.size();
+	ascene.mTextures = new aiTexture * [ascene.mNumTextures];
+	for (unsigned int t = 0; t < ascene.mNumTextures; ++t) {
+		aiTexture* atex = new aiTexture;
+		ascene.mTextures[t] = atex;
+		
+		Chunk* texChunk = texturesToExport[t];
+		const TexInfo* ti = (const TexInfo*)texChunk->maindata.data();
+		auto png = ExportTextureToPNGInMemory(texChunk);
+
+		atex->mWidth = png.size();
+		atex->mHeight = 0;
+		atex->mFilename = ti->getName();
+		static constexpr char hint[4] = "png";
+		std::copy(std::begin(hint), std::end(hint), atex->achFormatHint);
+		atex->pcData = new aiTexel[(png.size() + 3) / 4];
+		memcpy(atex->pcData, png.data(), png.size());
+	}
+
+	ascene.mRootNode = new aiNode;
+	ascene.mRootNode->mNumMeshes = parts.size();
+	ascene.mRootNode->mMeshes = new unsigned int[parts.size()];
+	for (size_t i = 0; i < parts.size(); ++i)
+		ascene.mRootNode->mMeshes[i] = i;
+
+	auto fileext = filename.extension().string().substr(1);
+	std::transform(fileext.begin(), fileext.end(), fileext.begin(), [](char c) {return (char)std::tolower(c); });
+	if (fileext == "gltf" || fileext == "glb")
+		fileext += '2';
+	if (fileext == "dae")
+		fileext = "collada";
+
+	Assimp::Exporter exporter;
+	aiReturn res = exporter.Export(&ascene, fileext, filename.u8string(), aiProcess_FlipUVs | aiProcess_MakeLeftHanded);
+	if (res != aiReturn_SUCCESS) {
+		std::string msg = "Assimp Export Error:\n";
+		msg += exporter.GetErrorString();
+		MessageBoxA(hWindow, msg.c_str(), "Export Error", 16);
+	}
 }

@@ -225,6 +225,20 @@ void ExportTexture(Chunk* texChunk, const std::filesystem::path& filepath)
 	stbi_write_png(filepath.string().c_str(), ti->width, ti->height, 4, rgba.data(), 0);
 }
 
+std::vector<uint8_t> ExportTextureToPNGInMemory(Chunk* texChunk)
+{
+	const TexInfo* ti = (const TexInfo*)texChunk->maindata.data();
+	auto rgba = ConvertTextureToRGBA8(texChunk);
+	assert(rgba.size() > 0);
+	ByteWriter<std::vector<uint8_t>> byteWriter;
+	auto writeFunc = [](void* context, void* data, int size) -> void {
+		auto* bytes = (decltype(byteWriter)*)context;
+		bytes->addData(data, size);
+	};
+	stbi_write_png_to_func(writeFunc, &byteWriter, ti->width, ti->height, 4, rgba.data(), 0);
+	return byteWriter.take();
+}
+
 std::pair<Chunk*, Chunk*> FindTextureChunk(Scene& scene, uint32_t id)
 {
 	for (Chunk& chk : scene.palPack.subchunks) {

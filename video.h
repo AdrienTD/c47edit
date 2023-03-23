@@ -17,7 +17,7 @@ extern bool enableAlphaTest;
 void InitVideo();
 void BeginDrawing();
 void EndDrawing();
-float* ApplySkinToMesh(Mesh* mesh, Chunk* excChunk);
+float* ApplySkinToMesh(const Mesh* mesh, Chunk* excChunk);
 void BeginMeshDraw();
 void EndMeshDraw();
 void DrawMesh(Mesh* mesh, const Matrix& matrix, Chunk* excChunk = nullptr);

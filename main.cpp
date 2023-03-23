@@ -568,18 +568,35 @@ void IGObjectInfo()
 			if (ImGui::Button("Select parent"))
 				selobj = selobj->parent;
 		}
+		static const char* modelFileFilter = "3D Model\0*.glb;*.gltf;*.dae;*.blend;*.obj;*.ogex;*.fbx\0"
+			"glTF 2.0 Binary (*.glb)\0*.glb\0"
+			"glTF 2.0 Text (*.gltf)\0*.gltf\0"
+			"Collada (*.dae)\0*.dae\0"
+			"OpenGEX (*.ogex)\0*.ogex\0"
+			"Wavefront OBJ (*.obj)\0*.obj\0"
+			"Blender (*.blend)\0*.blend\0"
+			"FBX (*.fbx)\0*.fbx\0"
+			"Any format\0*.*\0\0\0\0";
 		if (ImGui::Button("Import with Assimp")) {
-			auto filepath = GuiUtils::OpenDialogBox("3D Model\0*.dae;*.blend;*.gltf;*.glb;*.obj;*.ogex\0Any format\0*.*\0\0\0\0", "");
+			auto filepath = GuiUtils::OpenDialogBox(modelFileFilter, "glb");
 			if (!filepath.empty()) {
-				if (!selobj->mesh)
-					selobj->mesh = std::make_shared<Mesh>();
-				*selobj->mesh = ImportWithAssimp(filepath);
-				InvalidateMesh(selobj->mesh.get());
-				UncacheAllTextures();
-				GlifyAllTextures();
+				if (auto optMesh = ImportWithAssimp(filepath)) {
+					if (!selobj->mesh)
+						selobj->mesh = std::make_shared<Mesh>();
+					*selobj->mesh = std::move(*optMesh);
+					InvalidateMesh(selobj->mesh.get());
+					UncacheAllTextures();
+					GlifyAllTextures();
+				}
 			}
 		}
 		ImGui::SameLine();
+		if (ImGui::Button("Export")) {
+			auto filepath = GuiUtils::SaveDialogBox(modelFileFilter, "glb");
+			if (!filepath.empty()) {
+				ExportWithAssimp(*selobj->mesh, filepath, selobj->excChunk.get());
+			}
+		}
 		if (ImGui::Button("Mesh tools")) {
 			ImGui::OpenPopup("MeshTools");
 		}
@@ -838,7 +855,7 @@ void IGTextures()
 		Chunk* palchk = FindTextureChunk(g_scene, curtexid).first;
 		if (palchk) {
 			TexInfo* ti = (TexInfo*)palchk->maindata.data();
-			auto fpath = GuiUtils::SaveDialogBox("PNG Image\0*.png\0\0\0\0", "png", ti->name);
+			auto fpath = GuiUtils::SaveDialogBox("PNG Image\0*.png\0\0\0\0", "png", ti->getName());
 			if (!fpath.empty()) {
 				ExportTexture(palchk, fpath);
 			}
