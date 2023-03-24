@@ -140,13 +140,89 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 		std::vector<aiVector3D> texCoords;
 		std::vector<aiFace> faces;
 		unsigned int primitiveTypes = 0;
+		std::map<int, std::vector<aiVertexWeight>> weights;
 	};
 	using PartKey = uint16_t;
 	std::map<PartKey, Part> parts;
 
+	bool hasBones = excChunk && excChunk->findSubchunk('LCHE');
+	
 	const float* vertices = gmesh.vertices.data();
-	if (excChunk && excChunk->findSubchunk('LCHE')) {
+	if (hasBones) {
 		vertices = ApplySkinToMesh(&gmesh, excChunk);
+	}
+
+#pragma pack(push, 1)
+	struct BonePre {
+		uint16_t parentIndex, flags;
+		double stuff[7];
+		char name[16];
+	};
+	static_assert(sizeof(BonePre) == 0x4C);
+#pragma pack(pop)
+	std::vector<std::vector<std::pair<uint32_t, float>>> mapVertToWeights;
+	std::map<uint16_t, uint16_t> mapFinalVertToWorkVert;
+	const BonePre* gbones = nullptr;
+	uint32_t numBones = 0;
+	if (hasBones) {
+
+		Chunk* lche = excChunk->findSubchunk('LCHE');
+		Chunk* hmtx = excChunk->findSubchunk('HMTX');
+		Chunk* hpre = excChunk->findSubchunk('HPRE');
+		Chunk* hpts = excChunk->findSubchunk('HPTS');
+		Chunk* hpvd = excChunk->findSubchunk('HPVD');
+		Chunk* vrmp = excChunk->findSubchunk('VRMP');
+		assert(hmtx&& hpre&& hpts&& vrmp&& hpvd);
+		numBones = *(uint32_t*)lche->maindata.data();
+		uint32_t numUsedVertices = *(uint32_t*)(lche->maindata.data() + 12);
+		assert(hmtx->multidata.size() == numBones);
+
+		if (hpre->maindata.size() > 0)
+			gbones = (const BonePre*)hpre->maindata.data();
+		else
+			gbones = (const BonePre*)hpre->multidata[0].data();
+
+		const uint16_t* ptsRanges = (uint16_t*)hpts->maindata.data();
+		const uint16_t* ptsRangesEnd = ptsRanges + numBones;
+		auto getWorkVertexBone = [&](uint16_t index) {
+			return std::upper_bound(ptsRanges, ptsRangesEnd, index) - ptsRanges;
+		};
+
+		uint32_t* remapPtr = (uint32_t*)vrmp->maindata.data();
+		uint32_t numRemaps = *remapPtr++;
+		for (uint32_t i = 0; i < numRemaps; ++i) {
+			mapFinalVertToWorkVert[remapPtr[0] / 3] = remapPtr[1] / 3;
+			remapPtr += 2;
+		}
+
+		mapVertToWeights.resize(gmesh.getNumVertices());
+		const uint32_t* pvd = (uint32_t*)hpvd->maindata.data();
+		bool the_end = false;
+		while (!the_end) {
+			uint32_t segStartInt = *pvd;
+			float segStartFloat = *(float*)(pvd + 1);
+			auto& vec = mapVertToWeights[segStartInt];
+			assert(vec.empty());
+			vec.emplace_back(getWorkVertexBone(segStartInt), segStartFloat);
+			pvd += 2;
+			while (true) {
+				uint32_t pntInt = *pvd;
+				uint32_t pntIndex = pntInt & 0x3FFFFFFF;
+				float pntFloat = *(float*)(pvd + 1);
+				vec.emplace_back(getWorkVertexBone(pntIndex), pntFloat);
+				pvd += 2;
+				if (pntInt & 0x80000000) {
+					if (pntInt & 0x40000000)
+						the_end = true;
+					break;
+				}
+			}
+		}
+		for (size_t v = 0; v < gmesh.getNumVertices(); ++v) {
+			auto& vec = mapVertToWeights[v];
+			if (vec.empty())
+				vec.emplace_back(getWorkVertexBone(v), 1.0f);
+		}
 	}
 
 	const Mesh::FTXFace* ftxptr = gmesh.ftxFaces.data();
@@ -180,6 +256,17 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 
 			part.primitiveTypes |= (shape == 3) ? aiPrimitiveType_TRIANGLE : aiPrimitiveType_POLYGON;
 
+			if (hasBones) {
+				for (unsigned int i = 0; i < shape; ++i) {
+					uint16_t finalIndex = indptr[i] >> 1;
+					uint16_t workIndex = finalIndex;
+					if (auto it = mapFinalVertToWorkVert.find(finalIndex); it != mapFinalVertToWorkVert.end())
+						workIndex = it->second;
+					for (auto& [boneId, weight] : mapVertToWeights.at(workIndex))
+						part.weights[boneId].emplace_back(facesFirstVertexIndex + i, weight);
+				}
+			}
+
 			indptr += shape;
 			ftxptr += 1;
 		}
@@ -212,6 +299,40 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 		amesh->mFaces = new aiFace[amesh->mNumFaces];
 		memcpy(amesh->mFaces, part.faces.data(), part.faces.size() * sizeof(aiFace));
 		memset(part.faces.data(), 0, part.faces.size() * sizeof(aiFace)); // need to nullify the index pointers on old vector to keep them unique
+
+		if (hasBones) {
+			amesh->mNumBones = part.weights.size();
+			amesh->mBones = new aiBone * [amesh->mNumBones];
+			size_t b = 0;
+			for (auto& [boneId,weights] : part.weights) {
+				aiBone* abone = new aiBone;
+				amesh->mBones[b++] = abone;
+				abone->mName = gbones[boneId].name;
+				abone->mNumWeights = weights.size();
+				abone->mWeights = new aiVertexWeight[abone->mNumWeights];
+				memcpy(abone->mWeights, weights.data(), weights.size() * sizeof(aiVertexWeight));
+
+				int xxx = boneId;
+				Matrix globalMtx = Matrix::getIdentity();
+				Chunk* hmtx = excChunk->findSubchunk('HMTX');
+				while (xxx != 65535) {
+					const BonePre* bone = gbones + xxx;
+					const double* dmtx = (double*)hmtx->multidata[xxx].data();
+					Matrix boneMtx = Matrix::getIdentity();
+					for (int row = 3; row >= 0; --row) {
+						boneMtx.m[row][0] = (float)*(dmtx++);
+						boneMtx.m[row][1] = (float)*(dmtx++);
+						boneMtx.m[row][2] = (float)*(dmtx++);
+					}
+					globalMtx = globalMtx * boneMtx;
+					xxx = bone->parentIndex;
+				}
+				Matrix invMtx = globalMtx.getInverse4x3().getTranspose();
+				static_assert(sizeof(abone->mOffsetMatrix) == 64);
+				memcpy(&abone->mOffsetMatrix, &invMtx, 64);
+
+			}
+		}
 
 		aiMaterial* amat = new aiMaterial;
 		ascene.mMaterials[m] = amat;
@@ -255,6 +376,36 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 	ascene.mRootNode->mMeshes = new unsigned int[parts.size()];
 	for (size_t i = 0; i < parts.size(); ++i)
 		ascene.mRootNode->mMeshes[i] = i;
+	if (hasBones) {
+		std::vector<aiNode*> boneNodes;
+		std::map<aiNode*, std::vector<aiNode*>> boneChildNodes;
+		boneNodes.resize(numBones);
+		Chunk* hmtx = excChunk->findSubchunk('HMTX');
+		for (size_t b = 0; b < numBones; ++b) {
+			aiNode* node = new aiNode;
+			boneNodes[b] = node;
+			node->mName = gbones[b].name;
+			if (gbones[b].parentIndex != 0xFFFF)
+				node->mParent = boneNodes[gbones[b].parentIndex];
+			else
+				node->mParent = ascene.mRootNode;
+			boneChildNodes[node->mParent].push_back(node);
+			const double* dmtx = (double*)hmtx->multidata[b].data();
+			Matrix boneMtx = Matrix::getIdentity();
+			for (int row = 3; row >= 0; --row) {
+				boneMtx.m[row][0] = (float)*(dmtx++);
+				boneMtx.m[row][1] = (float)*(dmtx++);
+				boneMtx.m[row][2] = (float)*(dmtx++);
+			}
+			boneMtx = boneMtx.getTranspose();
+			memcpy(&node->mTransformation, &boneMtx, 64);
+		}
+		for (auto& [node, children] : boneChildNodes) {
+			node->mNumChildren = children.size();
+			node->mChildren = new aiNode * [children.size()];
+			memcpy(node->mChildren, children.data(), children.size() * sizeof(aiNode*));
+		}
+	}
 
 	auto fileext = filename.extension().string().substr(1);
 	std::transform(fileext.begin(), fileext.end(), fileext.begin(), [](char c) {return (char)std::tolower(c); });
