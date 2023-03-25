@@ -568,90 +568,6 @@ void IGObjectInfo()
 			if (ImGui::Button("Select parent"))
 				selobj = selobj->parent;
 		}
-		static const char* modelFileFilter = "3D Model\0*.glb;*.gltf;*.dae;*.blend;*.obj;*.ogex;*.fbx\0"
-			"glTF 2.0 Binary (*.glb)\0*.glb\0"
-			"glTF 2.0 Text (*.gltf)\0*.gltf\0"
-			"Collada (*.dae)\0*.dae\0"
-			"OpenGEX (*.ogex)\0*.ogex\0"
-			"Wavefront OBJ (*.obj)\0*.obj\0"
-			"Blender (*.blend)\0*.blend\0"
-			"FBX (*.fbx)\0*.fbx\0"
-			"Any format\0*.*\0\0\0\0";
-		if (ImGui::Button("Import with Assimp")) {
-			auto filepath = GuiUtils::OpenDialogBox(modelFileFilter, "glb");
-			if (!filepath.empty()) {
-				if (auto optMesh = ImportWithAssimp(filepath)) {
-					if (!selobj->mesh)
-						selobj->mesh = std::make_shared<Mesh>();
-					*selobj->mesh = std::move(optMesh->first);
-					if (optMesh->second)
-						*selobj->excChunk = std::move(*optMesh->second);
-					InvalidateMesh(selobj->mesh.get());
-					UncacheAllTextures();
-					GlifyAllTextures();
-				}
-			}
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Export")) {
-			auto filepath = GuiUtils::SaveDialogBox(modelFileFilter, "glb");
-			if (!filepath.empty()) {
-				ExportWithAssimp(*selobj->mesh, filepath, selobj->excChunk.get());
-			}
-		}
-		if (ImGui::Button("Mesh tools")) {
-			ImGui::OpenPopup("MeshTools");
-		}
-		if (ImGui::BeginPopup("MeshTools")) {
-			static Vector3 scale{ 1.0f, 1.0f, 1.0f };
-			static bool doScale = false;
-			static bool invertFaces = false;
-			ImGui::Checkbox("Scale:", &doScale);
-			ImGui::BeginDisabled(!doScale);
-			ImGui::InputFloat3("Factor", &scale.x);
-			ImGui::EndDisabled();
-			ImGui::Checkbox("Invert faces", &invertFaces);
-			if (ImGui::Button("Apply")) {
-				Mesh* mesh = selobj->mesh.get();
-				if (doScale) {
-					float* verts = mesh->vertices.data();
-					for (size_t i = 0; i < mesh->vertices.size(); i += 3) {
-						verts[i] *= scale.x;
-						verts[i + 1] *= scale.y;
-						verts[i + 2] *= scale.z;
-					}
-				}
-				if (invertFaces) {
-					uint16_t* triIndices = mesh->triindices.data();
-					uint16_t* quadIndices = mesh->quadindices.data();
-					bool hasFtx = !selobj->mesh->ftxFaces.empty();
-					assert(hasFtx);
-					float* uvCoords = (float*)selobj->mesh->textureCoords.data();
-					using UVQuad = std::array<std::array<float, 2>, 4>;
-					static_assert(sizeof(UVQuad) == 4 * 8);
-					UVQuad* uvQuads = (UVQuad*)uvCoords;
-					uint16_t* ftxFace = (uint16_t*)selobj->mesh->ftxFaces.data();
-					for (uint32_t i = 0; i < mesh->getNumTris(); ++i) {
-						std::swap(triIndices[0], triIndices[2]);
-						UVQuad& q = *uvQuads;
-						std::swap(q[0], q[2]);
-						triIndices += 3;
-						uvQuads += 1;
-					}
-					for (uint32_t i = 0; i < mesh->getNumQuads(); ++i) {
-						std::swap(quadIndices[0], quadIndices[3]);
-						std::swap(quadIndices[1], quadIndices[2]);
-						UVQuad& q = *uvQuads;
-						std::swap(q[0], q[3]);
-						std::swap(q[1], q[2]);
-						quadIndices += 4;
-						uvQuads += 1;
-					}
-				}
-				InvalidateMesh(mesh);
-			}
-			ImGui::EndPopup();
-		}
 		ImGui::Separator();
 
 		ImGui::Text("%s (%i, %04X)", ClassInfo::GetObjTypeString(selobj->type), selobj->type, selobj->flags);
@@ -682,6 +598,97 @@ void IGObjectInfo()
 		}
 		if (selobj->mesh && ImGui::CollapsingHeader("Mesh"))
 		{
+			static const char* modelFileFilter = "3D Model\0*.glb;*.gltf;*.dae;*.blend;*.obj;*.ogex;*.fbx\0"
+				"glTF 2.0 Binary (*.glb)\0*.glb\0"
+				"glTF 2.0 Text (*.gltf)\0*.gltf\0"
+				"Collada (*.dae)\0*.dae\0"
+				"OpenGEX (*.ogex)\0*.ogex\0"
+				"Wavefront OBJ (*.obj)\0*.obj\0"
+				"Blender (*.blend)\0*.blend\0"
+				"FBX (*.fbx)\0*.fbx\0"
+				"Any format\0*.*\0\0\0\0";
+			if (ImGui::Button("Import")) {
+				auto filepath = GuiUtils::OpenDialogBox(modelFileFilter, "glb");
+				if (!filepath.empty()) {
+					if (auto optMesh = ImportWithAssimp(filepath)) {
+						if (!selobj->mesh)
+							selobj->mesh = std::make_shared<Mesh>();
+						*selobj->mesh = std::move(optMesh->first);
+						if (optMesh->second) {
+							if (!selobj->excChunk)
+								selobj->excChunk = std::make_shared<Chunk>();
+							*selobj->excChunk = std::move(*optMesh->second);
+						}
+						//else
+						//	selobj->excChunk = nullptr;
+						InvalidateMesh(selobj->mesh.get());
+						UncacheAllTextures();
+						GlifyAllTextures();
+					}
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Export")) {
+				auto filepath = GuiUtils::SaveDialogBox(modelFileFilter, "glb");
+				if (!filepath.empty()) {
+					ExportWithAssimp(*selobj->mesh, filepath, selobj->excChunk.get());
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Mesh tools")) {
+				ImGui::OpenPopup("MeshTools");
+			}
+			if (ImGui::BeginPopup("MeshTools")) {
+				static Vector3 scale{ 1.0f, 1.0f, 1.0f };
+				static bool doScale = false;
+				static bool invertFaces = false;
+				ImGui::Checkbox("Scale:", &doScale);
+				ImGui::BeginDisabled(!doScale);
+				ImGui::InputFloat3("Factor", &scale.x);
+				ImGui::EndDisabled();
+				ImGui::Checkbox("Invert faces", &invertFaces);
+				if (ImGui::Button("Apply")) {
+					Mesh* mesh = selobj->mesh.get();
+					if (doScale) {
+						float* verts = mesh->vertices.data();
+						for (size_t i = 0; i < mesh->vertices.size(); i += 3) {
+							verts[i] *= scale.x;
+							verts[i + 1] *= scale.y;
+							verts[i + 2] *= scale.z;
+						}
+					}
+					if (invertFaces) {
+						uint16_t* triIndices = mesh->triindices.data();
+						uint16_t* quadIndices = mesh->quadindices.data();
+						bool hasFtx = !selobj->mesh->ftxFaces.empty();
+						assert(hasFtx);
+						float* uvCoords = (float*)selobj->mesh->textureCoords.data();
+						using UVQuad = std::array<std::array<float, 2>, 4>;
+						static_assert(sizeof(UVQuad) == 4 * 8);
+						UVQuad* uvQuads = (UVQuad*)uvCoords;
+						uint16_t* ftxFace = (uint16_t*)selobj->mesh->ftxFaces.data();
+						for (uint32_t i = 0; i < mesh->getNumTris(); ++i) {
+							std::swap(triIndices[0], triIndices[2]);
+							UVQuad& q = *uvQuads;
+							std::swap(q[0], q[2]);
+							triIndices += 3;
+							uvQuads += 1;
+						}
+						for (uint32_t i = 0; i < mesh->getNumQuads(); ++i) {
+							std::swap(quadIndices[0], quadIndices[3]);
+							std::swap(quadIndices[1], quadIndices[2]);
+							UVQuad& q = *uvQuads;
+							std::swap(q[0], q[3]);
+							std::swap(q[1], q[2]);
+							quadIndices += 4;
+							uvQuads += 1;
+						}
+					}
+					InvalidateMesh(mesh);
+				}
+				ImGui::EndPopup();
+			}
+
 			ImGui::AlignTextToFramePadding();
 			ImGui::Text("Ref count: %li", selobj->mesh.use_count());
 			ImGui::SameLine();
