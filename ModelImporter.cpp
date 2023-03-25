@@ -68,12 +68,14 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 		Matrix transform;
 		Matrix invBind;
 		int numChildren;
-		std::vector<std::pair<unsigned int, float>> weights;
+		std::map<unsigned int, float> weights;
 		int parent;
 	};
 	std::map<std::string, BoneInfo> boneMap;
 
 	// Meshes
+	std::map<aiVector3D, int> dupVertMap;
+	int nextVertId = 0;
 	for (unsigned int m = 0; m < ais->mNumMeshes; ++m) {
 		auto& amesh = ais->mMeshes[m];
 
@@ -117,8 +119,16 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 		}
 
 		// Vertices
-		uint16_t firstVtx = (uint16_t)(gmesh.vertices.size() / 3);
-		gmesh.vertices.insert(gmesh.vertices.end(), (float*)amesh->mVertices, (float*)(amesh->mVertices + amesh->mNumVertices));
+		std::vector<uint32_t> remap(amesh->mNumVertices);
+		for (unsigned int v = 0; v < amesh->mNumVertices; ++v) {
+			auto& avert = amesh->mVertices[v];
+			auto [it, inserted] = dupVertMap.try_emplace(avert, nextVertId);
+			remap[v] = it->second;
+			if (inserted) {
+				gmesh.vertices.insert(gmesh.vertices.end(), (float*)&avert.x, (float*)&avert.x + 3);
+				nextVertId += 1;
+			}
+		}
 
 		// Faces (indices + UVs)
 		bool hasTextureCoords = amesh->HasTextureCoords(0) && texId != 0xFFFF;
@@ -129,9 +139,9 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 			assert(face.mNumIndices == 3);
 
 			std::array<uint16_t, 3> inds = {
-				(uint16_t)((firstVtx + face.mIndices[0]) << 1),
-				(uint16_t)((firstVtx + face.mIndices[1]) << 1),
-				(uint16_t)((firstVtx + face.mIndices[2]) << 1)
+				(uint16_t)(remap[face.mIndices[0]] << 1),
+				(uint16_t)(remap[face.mIndices[1]] << 1),
+				(uint16_t)(remap[face.mIndices[2]] << 1)
 			};
 			gmesh.triindices.insert(gmesh.triindices.end(), inds.begin(), inds.end());
 
@@ -163,7 +173,7 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 			}
 			for (unsigned int w = 0; w < abone->mNumWeights; ++w)
 				if (abone->mWeights[w].mWeight > 0.0f)
-					ws.weights.emplace_back(firstVtx + abone->mWeights[w].mVertexId, abone->mWeights[w].mWeight);
+					ws.weights[remap[abone->mWeights[w].mVertexId]] = abone->mWeights[w].mWeight;
 		}
 	}
 	if(boneMap.empty())
