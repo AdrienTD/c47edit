@@ -156,19 +156,19 @@ void Scene::LoadSceneSPK(const char *fn)
 	free(spkmem);
 	lastspkfn = fn;
 
-	prot = spkchk.findSubchunk('TORP');
-	pclp = spkchk.findSubchunk('PLCP');
-	phea = spkchk.findSubchunk('AEHP');
-	pnam = spkchk.findSubchunk('MANP');
-	ppos = spkchk.findSubchunk('SOPP');
-	pmtx = spkchk.findSubchunk('XTMP');
-	pver = spkchk.findSubchunk('REVP');
-	pfac = spkchk.findSubchunk('CAFP');
-	pftx = spkchk.findSubchunk('XTFP');
-	puvc = spkchk.findSubchunk('CVUP');
-	pdbl = spkchk.findSubchunk('LBDP');
-	pdat = spkchk.findSubchunk('TADP');
-	pexc = spkchk.findSubchunk('CXEP');
+	Chunk* prot = spkchk.findSubchunk('TORP');
+	Chunk* pclp = spkchk.findSubchunk('PLCP');
+	Chunk* phea = spkchk.findSubchunk('AEHP');
+	Chunk* pnam = spkchk.findSubchunk('MANP');
+	Chunk* ppos = spkchk.findSubchunk('SOPP');
+	Chunk* pmtx = spkchk.findSubchunk('XTMP');
+	Chunk* pver = spkchk.findSubchunk('REVP');
+	Chunk* pfac = spkchk.findSubchunk('CAFP');
+	Chunk* pftx = spkchk.findSubchunk('XTFP');
+	Chunk* puvc = spkchk.findSubchunk('CVUP');
+	Chunk* pdbl = spkchk.findSubchunk('LBDP');
+	Chunk* pdat = spkchk.findSubchunk('TADP');
+	Chunk* pexc = spkchk.findSubchunk('CXEP');
 	if (!(prot && pclp && phea && pnam && ppos && pmtx && pver && pfac && pftx && puvc && pdbl && pdat && pexc))
 		ferr("One or more important chunks were not found in Pack.SPK .");
 
@@ -186,7 +186,7 @@ void Scene::LoadSceneSPK(const char *fn)
 	std::map<Chunk*, GameObject*> chkobjmap;
 	std::function<void(Chunk*,GameObject*)> z;
 	uint32_t objid = 1;
-	z = [this, &z, &objid, &chkobjmap, &idobjmap](Chunk *c, GameObject *parentobj) {
+	z = [this, &z, &objid, &chkobjmap, &idobjmap, &phea, &pnam](Chunk *c, GameObject *parentobj) {
 		uint32_t pheaoff = c->tag & 0xFFFFFF;
 		uint32_t *p = (uint32_t*)((char*)phea->maindata.data() + pheaoff);
 		uint32_t ot = *(unsigned short*)(&p[5]);
@@ -224,7 +224,7 @@ void Scene::LoadSceneSPK(const char *fn)
 
 	// Then read/load the object properties.
 	std::function<void(Chunk*, GameObject*)> g;
-	g = [this, &g,&objid,&chkobjmap,&idobjmap,&toMeshKey,&meshMap,&lineMap](Chunk *c, GameObject *parentobj) {
+	g = [&](Chunk *c, GameObject *parentobj) {
 		uint32_t pheaoff = c->tag & 0xFFFFFF;
 		uint32_t *p = (uint32_t*)((char*)phea->maindata.data() + pheaoff);
 		uint32_t ot = *(unsigned short*)(&p[5]);
@@ -607,28 +607,19 @@ void Scene::ModifySPK()
 	f(&nrot, rootobj);
 	f(&nclp, cliprootobj);
 
+	Chunk* prot = spkchk.findSubchunk('TORP');
+	Chunk* pclp = spkchk.findSubchunk('PLCP');
+	assert(prot && pclp);
 	*prot = std::move(nrot);
 	*pclp = std::move(nclp);
 
+	// Fills a chunk
 	auto fillMaindata = [](uint32_t tag, Chunk *nthg, const auto& buf) {
 		using T = std::remove_reference_t<decltype(buf)>;
 		nthg->tag = tag;
 		nthg->maindata.resize(buf.size() * sizeof(T::value_type));
 		memcpy(nthg->maindata.data(), buf.data(), nthg->maindata.size());
 	};
-
-	Chunk nhea, nnam, npos, nmtx, ndbl, nver, nfac, ndat, nftx, nuvc, nexc;
-	fillMaindata('AEHP', &nhea, saver.heabuf.take());
-	fillMaindata('MANP', &nnam, saver.namPackBuf.buffer);
-	fillMaindata('SOPP', &npos, saver.posPackBuf.buffer);
-	fillMaindata('XTMP', &nmtx, saver.mtxPackBuf.buffer);
-	fillMaindata('LBDP', &ndbl, saver.dblPackBuf.buffer);
-	fillMaindata('REVP', &nver, saver.verPackBuf.buffer);
-	fillMaindata('CAFP', &nfac, saver.facPackBuf.buffer);
-	fillMaindata('TADP', &ndat, saver.datPackBuf.buffer);
-	fillMaindata('XTFP', &nftx, saver.ftxPackBuf.buffer);
-	fillMaindata('CVUP', &nuvc, saver.uvcPackBuf.buffer);
-	fillMaindata('CXEP', &nexc, saver.excPackBuf.buffer);
 
 	// Chunk comparison
 	auto chkcmp = [](Chunk* chka, Chunk* chkb, const char* name) {
@@ -654,29 +645,27 @@ void Scene::ModifySPK()
 				printf("Same bytesum\n");
 		}
 	};
-	chkcmp(phea, &nhea, "PHEA");
-	chkcmp(pnam, &nnam, "PNAM");
-	chkcmp(ppos, &npos, "PPOS");
-	chkcmp(pmtx, &nmtx, "PMTX");
-	chkcmp(pdbl, &ndbl, "PDBL");
-	chkcmp(pver, &nver, "PVER");
-	chkcmp(pfac, &nfac, "PFAC");
-	chkcmp(pdat, &ndat, "PDAT");
-	chkcmp(pftx, &nftx, "PFTX");
-	chkcmp(puvc, &nuvc, "PUVC");
-	chkcmp(pexc, &nexc, "PEXC");
 
-	*phea = std::move(nhea);
-	*pnam = std::move(nnam);
-	*ppos = std::move(npos);
-	*pmtx = std::move(nmtx);
-	*pdbl = std::move(ndbl);
-	*pver = std::move(nver);
-	*pfac = std::move(nfac);
-	*pdat = std::move(ndat);
-	*pftx = std::move(nftx);
-	*puvc = std::move(nuvc);
-	*pexc = std::move(nexc);
+	// Final move
+	auto serveChunk = [&](const char* name, const auto& buffer) {
+		Chunk* oldChunk = spkchk.findSubchunk(*(uint32_t*)name);
+		assert(oldChunk != nullptr); // might as well create it if it didn't exist
+		Chunk newChunk;
+		fillMaindata(*(uint32_t*)name, &newChunk, buffer);
+		chkcmp(oldChunk, &newChunk, name);
+		*oldChunk = std::move(newChunk);
+	};
+	serveChunk("PHEA", saver.heabuf.take());
+	serveChunk("PNAM", saver.namPackBuf.buffer);
+	serveChunk("PPOS", saver.posPackBuf.buffer);
+	serveChunk("PMTX", saver.mtxPackBuf.buffer);
+	serveChunk("PDBL", saver.dblPackBuf.buffer);
+	serveChunk("PVER", saver.verPackBuf.buffer);
+	serveChunk("PFAC", saver.facPackBuf.buffer);
+	serveChunk("PDAT", saver.datPackBuf.buffer);
+	serveChunk("PFTX", saver.ftxPackBuf.buffer);
+	serveChunk("PUVC", saver.uvcPackBuf.buffer);
+	serveChunk("PEXC", saver.excPackBuf.buffer);
 
 	((uint32_t*)spkchk.maindata.data())[1] = 0x40000;
 }

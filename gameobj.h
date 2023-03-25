@@ -142,7 +142,6 @@ inline void GORef::set(GameObject * obj) noexcept { deref(); m_obj = obj; if (m_
 
 struct Scene {
 	Chunk spkchk;
-	Chunk* prot, * pclp, * phea, * pnam, * ppos, * pmtx, * pver, * pfac, * pftx, * puvc, * pdbl, * pdat, * pexc;
 	GameObject* rootobj = nullptr, * cliprootobj = nullptr, * superroot = nullptr;
 	std::string lastspkfn;
 	std::vector<uint8_t> zipmem;
