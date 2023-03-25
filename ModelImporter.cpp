@@ -6,6 +6,8 @@
 #include "gameobj.h"
 #include "texture.h"
 #include "video.h"
+#include "ByteWriter.h"
+#include "chunk.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/Exporter.hpp>
@@ -18,6 +20,15 @@
 #define NOMINMAX
 #include <Windows.h>
 extern HWND hWindow;
+
+#pragma pack(push, 1)
+struct BonePre {
+	uint16_t parentIndex, flags;
+	double stuff[7];
+	char name[16];
+};
+static_assert(sizeof(BonePre) == 0x4C);
+#pragma pack(pop)
 
 static std::string ShortenTextureName(std::string_view fullName)
 {
@@ -40,17 +51,27 @@ static uint32_t GetTextureFromAssimp(const aiTexture* atex, std::string_view nam
 	}
 }
 
-std::optional<Mesh> ImportWithAssimp(const std::filesystem::path& filename)
+std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std::filesystem::path& filename)
 {
-	Mesh gmesh;
 	Assimp::Importer importer;
-	const aiScene* ais = importer.ReadFile(filename.u8string(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_MakeLeftHanded);
+	const aiScene* ais = importer.ReadFile(filename.u8string(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_MakeLeftHanded | aiProcess_PopulateArmatureData | aiProcess_JoinIdenticalVertices);
 	if (!ais) {
 		std::string msg = "Assimp Import Error:\n";
 		msg += importer.GetErrorString();
 		MessageBoxA(hWindow, msg.c_str(), "Import Error", 16);
 		return {};
 	}
+
+	Mesh gmesh;
+
+	struct BoneInfo {
+		Matrix transform;
+		Matrix invBind;
+		int numChildren;
+		std::vector<std::pair<unsigned int, float>> weights;
+		int parent;
+	};
+	std::map<std::string, BoneInfo> boneMap;
 
 	// Meshes
 	for (unsigned int m = 0; m < ais->mNumMeshes; ++m) {
@@ -127,8 +148,194 @@ std::optional<Mesh> ImportWithAssimp(const std::filesystem::path& filename)
 				gmesh.textureCoords.insert(gmesh.textureCoords.end(), uvs.begin(), uvs.end());
 			}
 		}
+
+		// Bones
+		for (unsigned int b = 0; b < amesh->mNumBones; ++b) {
+			aiBone* abone = amesh->mBones[b];
+			auto [it, inserted] = boneMap.try_emplace(abone->mName.C_Str());
+			auto& ws = it->second;
+			if (inserted) {
+				memcpy(&ws.transform, &abone->mNode->mTransformation, 64);
+				memcpy(&ws.invBind, &abone->mOffsetMatrix, 64);
+				ws.transform = ws.transform.getTranspose();
+				ws.invBind = ws.invBind.getTranspose();
+				ws.numChildren = abone->mNode->mNumChildren;
+			}
+			for (unsigned int w = 0; w < abone->mNumWeights; ++w)
+				if (abone->mWeights[w].mWeight > 0.0f)
+					ws.weights.emplace_back(firstVtx + abone->mWeights[w].mVertexId, abone->mWeights[w].mWeight);
+		}
 	}
-	return std::move(gmesh);
+	if(boneMap.empty())
+		return std::make_pair(std::move(gmesh), std::nullopt);
+	else {
+		// find the root bone node
+		auto findRootBoneNode = [&boneMap](aiNode* node, const auto& rec) -> aiNode* {
+			if (boneMap.count(node->mName.C_Str()))
+				return node;
+			for (size_t i = 0; i < node->mNumChildren; ++i)
+				if (aiNode* c = rec(node->mChildren[i], rec))
+					return c;
+			return nullptr;
+		};
+		aiNode* rootBone = findRootBoneNode(ais->mRootNode, findRootBoneNode);
+		printf("Root bone found: %s\n", rootBone->mName.C_Str());
+		
+		// construct vector of BoneInfo* in order of hierarchy
+		std::vector<std::pair<const std::string*, BoneInfo*>> boneInfos;
+		auto walkBoneNode = [&boneMap,&boneInfos](aiNode* node, int parent, const auto& rec) -> void {
+			auto it = boneMap.find(node->mName.C_Str());
+			assert(it != boneMap.end());
+			int id = boneInfos.size();
+			it->second.parent = parent;
+			boneInfos.emplace_back(&it->first, &it->second);
+			for (size_t i = 0; i < node->mNumChildren; ++i)
+				rec(node->mChildren[i], id, rec);
+		};
+		walkBoneNode(rootBone, -1, walkBoneNode);
+
+		Chunk excChunk;
+		excChunk.tag = 'HEAD';
+		excChunk.subchunks.resize(6);
+		Chunk& lche = excChunk.subchunks[0]; lche.tag = 'LCHE';	// OK
+		Chunk& hmtx = excChunk.subchunks[1]; hmtx.tag = 'HMTX';	// OK
+		Chunk& hpts = excChunk.subchunks[2]; hpts.tag = 'HPTS';	// OK
+		Chunk& hpvd = excChunk.subchunks[3]; hpvd.tag = 'HPVD';	// OK
+		Chunk& hpre = excChunk.subchunks[4]; hpre.tag = 'HPRE';	// OK
+		//Chunk& hpmo = excChunk.subchunks[1]; hpmo.tag = 'HPMO';
+		Chunk& vrmp = excChunk.subchunks[5]; vrmp.tag = 'VRMP';	// OK
+
+		int boneMap;
+
+		uint32_t numBones = boneInfos.size();
+		uint32_t numOriginalVertices = gmesh.getNumVertices();
+
+		// HPTS: Bone vertex ranges
+
+		uint16_t numWorkVertices = 0;
+		std::vector<float> workVertices;
+		std::map<uint32_t, std::vector<std::pair<uint32_t, float>>> oriToWorkMap;
+		hpts.maindata.resize(2 * numBones);
+		uint16_t* hptsPtr = (uint16_t*)hpts.maindata.data();
+		for (auto& [boneName,boneInfo] : boneInfos) {
+			for (auto& [oriVertexIndex, wWeight] : boneInfo->weights) {
+				auto it = gmesh.vertices.data() + 3 * oriVertexIndex;
+				Vector3 vec{ it[0], it[1], it[2] };
+				vec = vec.transform(boneInfo->invBind);
+				uint16_t workVertIndex = workVertices.size() / 3;
+				workVertices.insert(workVertices.end(), (float*)vec.coord, (float*)vec.coord + 3);
+				oriToWorkMap[oriVertexIndex].emplace_back(workVertIndex, wWeight);
+			}
+			numWorkVertices += (uint16_t)boneInfo->weights.size(); // What if someone tries a model with > 64Ki weights?
+			*hptsPtr++ = numWorkVertices;
+		}
+		assert(workVertices.size() == 3 * numWorkVertices);
+		printf("numWorkVertices=%u, numOriginalVertices=%u\n", numWorkVertices, numOriginalVertices);
+
+		// replace mesh vertices with "work buffer"
+		gmesh.vertices = workVertices;
+
+		// LCHE: Header
+
+		lche.maindata.resize(16);
+		uint32_t* lchePtr = (uint32_t*)lche.maindata.data();
+		*lchePtr++ = numBones;
+		*lchePtr++ = numWorkVertices;
+		*lchePtr++ = numWorkVertices;
+		*lchePtr++ = numOriginalVertices;
+
+		// HMTX: Bone transform matrices
+
+		hmtx.multidata.resize(numBones);
+		uint32_t boneIndex = 0;
+		for (auto& [boneName, boneInfo] : boneInfos) {
+			hmtx.multidata[boneIndex].resize(sizeof(double) * 4 * 3);
+			double* mat = (double*)hmtx.multidata[boneIndex].data();
+			for (int row = 3; row >= 0; --row) {
+				*mat++ = (double)boneInfo->transform.m[row][0];
+				*mat++ = (double)boneInfo->transform.m[row][1];
+				*mat++ = (double)boneInfo->transform.m[row][2];
+			}
+			boneIndex += 1;
+		}
+
+		// HPRE: Bone info
+
+		hpre.maindata.resize(sizeof(BonePre)* numBones);
+		BonePre* hprePtr = (BonePre*)hpre.maindata.data();
+		for (auto& [boneName, boneInfo] : boneInfos) {
+			memset(hprePtr->name, 0, sizeof(hprePtr->name));
+			std::copy_n(boneName->data(), std::min(boneName->size(), (size_t)15), hprePtr->name);
+			hprePtr->parentIndex = (uint16_t)boneInfo->parent;
+			hprePtr->flags = (boneInfo->numChildren == 1) ? 0 : ((boneInfo->numChildren == 0) ? 1 : 2);
+			for (double& d : hprePtr->stuff)
+				d = 0.0;
+			++hprePtr;
+		}
+
+		// HPVD: Weigting
+
+		ByteWriter<std::vector<uint8_t>> hpvdBytes;
+		auto* lastElem = &oriToWorkMap.rbegin()->first;
+		for (auto& [oriVertIndex, mWorkVerts] : oriToWorkMap) {
+			if (mWorkVerts.size() >= 2) { // ignore vertices with 0 or 1 weight
+				size_t last = mWorkVerts.size() - 1;
+				for (size_t i = 0; i < mWorkVerts.size(); ++i) {
+					auto& [index,weight] = mWorkVerts[i];
+					uint32_t flaggedIndex = index;
+					if (i == last) flaggedIndex |= 0x80000000;
+					hpvdBytes.addU32(flaggedIndex);
+					hpvdBytes.addFloat(weight);
+				}
+			}
+		}
+		auto hpvdVector = hpvdBytes.take();
+		assert(hpvdVector.size() >= 16);
+		assert(*(uint32_t*)(hpvdVector.data() + hpvdVector.size() - 8) & 0x80000000);
+		*(uint32_t*)(hpvdVector.data() + hpvdVector.size() - 8) |= 0xC0000000;
+		hpvd.maindata.resize(hpvdVector.size());
+		memcpy(hpvd.maindata.data(), hpvdVector.data(), hpvdVector.size());
+
+		// VRMP: Vertex remapping
+
+		static constexpr uint16_t novalue = 0xFFFF;
+		std::vector<uint16_t> k_eq_v_Map(numWorkVertices, novalue);
+		std::vector<uint16_t> v_eq_k_Map(numWorkVertices, novalue);
+		for (auto& [oriVertIndex, mWorkVerts] : oriToWorkMap) {
+			if (oriVertIndex != mWorkVerts.at(0).first) { // -> no self-loop
+				assert(k_eq_v_Map[oriVertIndex] == novalue);
+				k_eq_v_Map[oriVertIndex] = mWorkVerts.at(0).first;
+				assert(v_eq_k_Map[mWorkVerts.at(0).first] == novalue);
+				v_eq_k_Map[mWorkVerts.at(0).first] = oriVertIndex;
+			}
+		}
+		std::vector<std::pair<uint32_t, uint32_t>> remaps;
+		// for every start of chain component
+		for (uint16_t searchRight = 0; searchRight < numWorkVertices; ++searchRight) {
+			uint16_t searchLeft = v_eq_k_Map[searchRight];
+			if (searchLeft == novalue) {
+				// iterate the chain
+				uint16_t left = searchRight;
+				uint16_t right = k_eq_v_Map[left];
+				while (right != novalue) {
+					remaps.emplace_back((uint32_t)left * 3, (uint32_t)right * 3);
+					left = right;
+					right = k_eq_v_Map[right];
+				}
+			}
+		}
+		vrmp.maindata.resize(4 + remaps.size() * 8);
+		uint32_t* vrmpPtr = (uint32_t*)vrmp.maindata.data();
+		*vrmpPtr++ = (uint32_t)remaps.size();
+		for (auto& [a, b] : remaps) {
+			*vrmpPtr++ = a;
+			*vrmpPtr++ = b;
+		}
+
+
+
+		return std::make_pair(std::move(gmesh), std::move(excChunk));
+	}
 }
 
 void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, Chunk* excChunk)
@@ -152,14 +359,6 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 		vertices = ApplySkinToMesh(&gmesh, excChunk);
 	}
 
-#pragma pack(push, 1)
-	struct BonePre {
-		uint16_t parentIndex, flags;
-		double stuff[7];
-		char name[16];
-	};
-	static_assert(sizeof(BonePre) == 0x4C);
-#pragma pack(pop)
 	std::vector<std::vector<std::pair<uint32_t, float>>> mapVertToWeights;
 	std::map<uint16_t, uint16_t> mapFinalVertToWorkVert;
 	const BonePre* gbones = nullptr;

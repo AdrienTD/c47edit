@@ -583,7 +583,9 @@ void IGObjectInfo()
 				if (auto optMesh = ImportWithAssimp(filepath)) {
 					if (!selobj->mesh)
 						selobj->mesh = std::make_shared<Mesh>();
-					*selobj->mesh = std::move(*optMesh);
+					*selobj->mesh = std::move(optMesh->first);
+					if (optMesh->second)
+						*selobj->excChunk = std::move(*optMesh->second);
 					InvalidateMesh(selobj->mesh.get());
 					UncacheAllTextures();
 					GlifyAllTextures();
@@ -761,6 +763,30 @@ void IGObjectInfo()
 			}
 		}
 		if (selobj->excChunk && ImGui::CollapsingHeader("EXC")) {
+			if (ImGui::Button("Export EXC")) {
+				auto fpath = GuiUtils::SaveDialogBox("Bin file\0*.*\0\0\0\0\0", "bin");
+				if (!fpath.empty()) {
+					FILE* file;
+					_wfopen_s(&file, fpath.c_str(), L"wb");
+					if (file) {
+						auto str = selobj->excChunk->saveToString();
+						fwrite(str.data(), str.size(), 1, file);
+						fclose(file);
+					}
+				}
+			}
+			if (ImGui::Button("Dump HMTX")) {
+				Chunk* hmtx = selobj->excChunk->findSubchunk('HMTX');
+				int mid = 0;
+				for (auto& md : hmtx->multidata) {
+					double* mtx = (double*)md.data();
+					printf("--- Matrix %i ---\n", mid++);
+					for (int r = 0; r < 4; ++r) {
+						printf("  %18.12f %18.12f %18.12f\n", mtx[0], mtx[1], mtx[2]);
+						mtx += 3;
+					}
+				}
+			}
 			auto walkChunk = [](Chunk* chk, auto& rec) -> void {
 				std::string tag{ (char*)&chk->tag, 4};
 				if (ImGui::TreeNode(chk, "%s", tag.c_str())) {

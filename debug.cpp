@@ -113,6 +113,27 @@ void IGDebugMenus()
 			};
 			walkObj(g_scene.superroot, walkObj);
 		}
+		if (ImGui::MenuItem("Delete face anims")) {
+			auto walkObj = [](GameObject* obj, auto& rec) -> void {
+				if (obj->excChunk) {
+					auto& subchunks = obj->excChunk->subchunks;
+					for (auto it = subchunks.begin(); it != subchunks.end(); ) {
+						if (it->tag == 'HPMO') {
+							it = subchunks.erase(it);
+							printf("removed at %s\n", obj->getPath().c_str());
+						}
+						else {
+							++it;
+						}
+					}
+				}
+				for (auto* child : obj->subobj) {
+					rec(child, rec);
+				}
+			};
+			walkObj(g_scene.superroot, walkObj);
+
+		}
 		ImGui::EndMenu();
 	}
 }

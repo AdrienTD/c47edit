@@ -19,6 +19,8 @@ struct Chunk
 	std::vector<Chunk> subchunks;
 	DataBuffer maindata;
 
+	Chunk() = default;
+	Chunk(uint32_t tag) : tag(tag) {};
 	~Chunk();
 
 	Chunk *findSubchunk(uint32_t tag);

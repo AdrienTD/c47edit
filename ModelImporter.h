@@ -9,5 +9,5 @@ namespace std::filesystem {
 	class path;
 }
 
-std::optional<Mesh> ImportWithAssimp(const std::filesystem::path& filename);
+std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std::filesystem::path& filename);
 void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, Chunk* excChunk = nullptr);
