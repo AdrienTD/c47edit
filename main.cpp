@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
-#include <stack>
 
 #include "chunk.h"
 #include "classInfo.h"
@@ -40,7 +39,6 @@
 #include <stb_image_write.h>
 
 GameObject *selobj = 0, *viewobj = 0;
-float objviewscale = 0.0f;
 Vector3 campos(0, 0, -50), camori(0,0,0);
 float camNearDist = 1.0f, camFarDist = 10000.0f;
 float camspeed = 32;
@@ -840,7 +838,6 @@ void IGMain()
 	}
 	ImGui::SameLine();
 	ImGui::Text("%4u FPS", framespersec);
-	//ImGui::DragFloat("Scale", &objviewscale, 0.1f);
 	ImGui::DragFloat("Cam speed", &camspeed, 0.1f);
 	ImGui::DragFloat3("Cam pos", &campos.x, 1.0f);
 	ImGui::DragFloat2("Cam ori", &camori.x, 0.1f);
@@ -1048,21 +1045,18 @@ GameObject* FindObjectNamed(const char *name, GameObject *sup = g_scene.rootobj)
 	return 0;
 }
 
-std::stack<Matrix> g_renderMatrixStack{ std::deque{ Matrix::getIdentity() } };
-
-void RenderObject(GameObject *o)
+void RenderObject(GameObject *o, const Matrix& parentTransform)
 {
-	g_renderMatrixStack.push(o->matrix * Matrix::getTranslationMatrix(o->position) * g_renderMatrixStack.top());
+	Matrix transform = o->matrix * Matrix::getTranslationMatrix(o->position) * parentTransform;
 	if (o->mesh && (o->flags & 0x20)) {
 		if (!rendertextures) {
 			uint32_t clr = swap_rb(o->color);
 			glColor4ubv((uint8_t*)&clr);
 		}
-		DrawMesh(o->mesh.get(), g_renderMatrixStack.top(), o->excChunk.get());
+		DrawMesh(o->mesh.get(), transform, o->excChunk.get());
 	}
 	for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
-		RenderObject(*e);
-	g_renderMatrixStack.pop();
+		RenderObject(*e, transform);
 }
 
 Vector3 finalintersectpnt = Vector3(0, 0, 0);
@@ -1343,15 +1337,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			glDepthFunc(GL_LEQUAL);
 			glClearDepth(1.0f);
 			glMatrixMode(GL_PROJECTION);
-			glLoadIdentity();
 			Matrix persp = Matrix::getLHPerspectiveMatrix(60.0f * (float)M_PI / 180.0f, (float)screen_width / (float)screen_height, camNearDist, camFarDist);
-			glMultMatrixf(persp.v);
 			Matrix lookat = Matrix::getLHLookAtViewMatrix(campos, campos + ncd, Vector3(0.0f, 1.0f, 0.0f));
-			glMultMatrixf(lookat.v);
+			Matrix projMatrix = lookat * persp;
+			glLoadMatrixf(projMatrix.v);
 			glMatrixMode(GL_MODELVIEW);
-			glLoadIdentity();
-			float ovs = pow(2.0f, objviewscale);
-			glScalef(ovs, ovs, ovs);
 
 			glEnable(GL_CULL_FACE);
 			glCullFace(GL_BACK);
@@ -1359,12 +1349,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			BeginMeshDraw();
 			if (viewobj) {
 				//glTranslatef(-viewobj->position.x, -viewobj->position.y, -viewobj->position.z);
-				RenderObject(viewobj);
+				RenderObject(viewobj, Matrix::getIdentity());
 				RenderMeshLists();
-				assert(g_renderMatrixStack.size() == 1u);
 			}
 			EndMeshDraw();
 
+			glLoadIdentity();
 			if (renderExc && viewobj) {
 				if (Chunk* pexc = g_scene.spkchk.findSubchunk('CXEP')) {
 					glPointSize(5.0f);
@@ -1393,6 +1383,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 				}
 			}
 
+			glDisable(GL_TEXTURE_2D);
 			glPointSize(10);
 			glColor3f(1, 1, 1);
 			glBegin(GL_POINTS);
