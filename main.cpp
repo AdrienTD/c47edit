@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 
 #include "chunk.h"
 #include "classInfo.h"
@@ -1061,38 +1062,41 @@ void RenderObject(GameObject *o, const Matrix& parentTransform)
 
 Vector3 finalintersectpnt = Vector3(0, 0, 0);
 
-bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, float* bver, uint16_t* bfac, int numverts, Matrix *worldmtx)
+template <int numverts>
+bool IsRayIntersectingFace(const Vector3& raystart, const Vector3& raydir, float* bver, uint16_t* bfac, const Matrix& worldmtx)
 {
-	std::unique_ptr<Vector3[]> pnts = std::make_unique<Vector3[]>(numverts);
+	Vector3 pnts[numverts];
 	for (int i = 0; i < 3; i++)
 	{
 		Vector3 v(bver[bfac[i] * 3 / 2], bver[bfac[i] * 3 / 2 + 1], bver[bfac[i] * 3 / 2 + 2]);
-		pnts[i] = v.transform(*worldmtx);
+		pnts[i] = v.transform(worldmtx);
 	}
 
-	std::unique_ptr<Vector3[]> edges = std::make_unique<Vector3[]>(numverts);
+	Vector3 edges[numverts];
 	for (int i = 0; i < 2; i++)
 		edges[i] = pnts[i + 1] - pnts[i];
 
 	Vector3 planenorm = edges[1].cross(edges[0]);
 	float planeord = -planenorm.dot(pnts[0]);
 
-	float planenorm_dot_raydir = planenorm.dot(*raydir);
+	float planenorm_dot_raydir = planenorm.dot(raydir);
 	if (planenorm_dot_raydir >= 0) return false;
 
-	float param = -(planenorm.dot(*raystart) + planeord) / planenorm_dot_raydir;
+	float param = -(planenorm.dot(raystart) + planeord) / planenorm_dot_raydir;
 	if (param < 0) return false;
 
-	Vector3 interpnt = *raystart + *raydir * param;
+	Vector3 interpnt = raystart + raydir * param;
 
-	for (int i = 3; i < numverts; i++)
-	{
-		Vector3 v(bver[bfac[i] * 3 / 2], bver[bfac[i] * 3 / 2 + 1], bver[bfac[i] * 3 / 2 + 2]);
-		pnts[i] = v.transform(*worldmtx);
+	if constexpr (numverts >= 4) {
+		for (int i = 3; i < numverts; i++)
+		{
+			Vector3 v(bver[bfac[i] * 3 / 2], bver[bfac[i] * 3 / 2 + 1], bver[bfac[i] * 3 / 2 + 2]);
+			pnts[i] = v.transform(worldmtx);
+		}
+
+		for (int i = 2; i < numverts - 1; i++)
+			edges[i] = pnts[i + 1] - pnts[i];
 	}
-
-	for (int i = 2; i < numverts - 1; i++)
-		edges[i] = pnts[i + 1] - pnts[i];
 	edges[numverts - 1] = pnts[0] - pnts[numverts - 1];
 
 	// Check if plane/ray intersection point is inside face
@@ -1109,20 +1113,20 @@ bool IsRayIntersectingFace(Vector3 *raystart, Vector3 *raydir, float* bver, uint
 	return true;
 }
 
-GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObject *o, Matrix *worldmtx)
+GameObject *IsRayIntersectingObject(const Vector3& raystart, const Vector3& raydir, GameObject *o, const Matrix& worldmtx)
 {
 	float d;
 	Matrix objmtx = o->matrix;
 	objmtx._41 = o->position.x;
 	objmtx._42 = o->position.y;
 	objmtx._43 = o->position.z;
-	objmtx *= *worldmtx;
+	objmtx *= worldmtx;
 	if (o->mesh)
 	{
 		Mesh *m = o->mesh.get();
 		float* vertices = (o->excChunk && o->excChunk->findSubchunk('LCHE')) ? ApplySkinToMesh(m, o->excChunk.get()) : m->vertices.data();
 		for (size_t i = 0; i < m->getNumQuads(); i++)
-			if (IsRayIntersectingFace(raystart, raydir, vertices, m->quadindices.data() + i * 4, 4, &objmtx))
+			if (IsRayIntersectingFace<4>(raystart, raydir, vertices, m->quadindices.data() + i * 4, objmtx))
 				if ((d = (finalintersectpnt - campos).sqlen2xz()) < bestpickdist)
 				{
 					bestpickdist = d;
@@ -1130,7 +1134,7 @@ GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObje
 					bestpickintersectionpnt = finalintersectpnt;
 				}
 		for(size_t i = 0; i < m->getNumTris(); i++)
-			if (IsRayIntersectingFace(raystart, raydir, vertices, m->triindices.data() + i * 3, 3, &objmtx))
+			if (IsRayIntersectingFace<3>(raystart, raydir, vertices, m->triindices.data() + i * 3, objmtx))
 				if ((d = (finalintersectpnt - campos).sqlen2xz()) < bestpickdist)
 				{
 					bestpickdist = d;
@@ -1139,7 +1143,7 @@ GameObject *IsRayIntersectingObject(Vector3 *raystart, Vector3 *raydir, GameObje
 				}
 	}
 	for (auto c = o->subobj.begin(); c != o->subobj.end(); c++)
-		IsRayIntersectingObject(raystart, raydir, *c, &objmtx);
+		IsRayIntersectingObject(raystart, raydir, *c, objmtx);
 	return 0;
 }
 
@@ -1248,8 +1252,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 
 				bestpickobj = 0;
 				bestpickdist = std::numeric_limits<float>::infinity();
-				Matrix mtx = Matrix::getIdentity();
-				IsRayIntersectingObject(&raystart, &raydir, viewobj, &mtx);
+				IsRayIntersectingObject(raystart, raydir, viewobj, Matrix::getIdentity());
 				if (io.KeyAlt) {
 					if (bestpickobj && selobj)
 						selobj->position = bestpickintersectionpnt;
