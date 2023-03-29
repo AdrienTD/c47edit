@@ -372,6 +372,12 @@ void Scene::LoadSceneSPK(const char *fn)
 	assert(ands && sndr);
 	audioMgr.load(*ands, *sndr);
 
+	Chunk* zdef = spkchk.findSubchunk('FEDZ');
+	assert(zdef);
+	zdefNames = (const char*)zdef->multidata[0].data();
+	zdefValues.load(zdef->multidata[1].data(), idobjmap);
+	zdefTypes = (const char*)zdef->multidata[2].data();
+
 	ready = true;
 }
 
@@ -682,6 +688,20 @@ void Scene::ModifySPK()
 	chkcmp(sndrOld, &sndrNew, "SNDR");
 	*andsOld = std::move(andsNew);
 	*sndrOld = std::move(sndrNew);
+
+	// ZDefines
+	Chunk* zdefOld = spkchk.findSubchunk('FEDZ');
+	Chunk zdefNew('FEDZ');
+	zdefNew.multidata.resize(3);
+	auto strValues = zdefValues.save(saver);
+	zdefNew.multidata[0].resize(zdefNames.size() + 1);
+	zdefNew.multidata[1].resize(strValues.size());
+	zdefNew.multidata[2].resize(zdefTypes.size() + 1);
+	memcpy(zdefNew.multidata[0].data(), zdefNames.data(), zdefNew.multidata[0].size());
+	memcpy(zdefNew.multidata[1].data(), strValues.data(), zdefNew.multidata[1].size());
+	memcpy(zdefNew.multidata[2].data(), zdefTypes.data(), zdefNew.multidata[2].size());
+	chkcmp(zdefOld, &zdefNew, "ZDEF");
+	*zdefOld = std::move(zdefNew);
 }
 
 void Scene::SaveSceneSPK(const char *fn)

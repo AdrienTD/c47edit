@@ -39,6 +39,12 @@ namespace ClassInfo {
 		ObjectMember(const ClassMember* info, int arrayIndex = -1) : info(info), arrayIndex(arrayIndex) {}
 	};
 
+	// Parse a string containing a list of class members
+	std::vector<ClassMember> ProcessClassMemberListString(const std::string& membersString);
+
+	// Get an array of members for the DBL (arrays repeat the same member in the list)
+	void AddDBLMemberInfo(std::vector<ObjectMember>& members, const std::vector<ClassMember>& memlist);
+
 	// Return a list of names of all DBL members of the object
 	std::vector<ObjectMember> GetMemberNames(GameObject* obj);
 }

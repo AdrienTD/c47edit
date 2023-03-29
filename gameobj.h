@@ -151,6 +151,10 @@ struct Scene {
 	bool ready = false;
 	AudioManager audioMgr;
 
+	std::string zdefNames;
+	DBLList zdefValues;
+	std::string zdefTypes;
+
 	void LoadSceneSPK(const char *fn);
 	void ModifySPK();
 	void SaveSceneSPK(const char *fn);

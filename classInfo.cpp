@@ -88,47 +88,17 @@ void ClassInfo::ReadClassInfo()
 	std::ifstream file("classes.json");
 	file >> g_classInfoJson;
 
-	auto processMembers = [](const std::string& membersString) -> std::vector<ClassMember> {
-		std::vector<ClassMember> members;
-		MemberDecoder dec{ membersString.c_str() };
-		while (dec.next()) {
-			ClassMember& mem = members.emplace_back();
-			mem.type = strUpper(dec.type);
-			mem.name = dec.name;
-			if (dec.value.size() >= 1 && dec.value[0] == '{') {
-				const char* ptr = dec.value.data() + 1;
-				mem.valueChoices.emplace_back();
-				while (*ptr != '}') {
-					if (*ptr == ',')
-						mem.valueChoices.emplace_back();
-					else
-						mem.valueChoices.back().push_back(*ptr);
-					++ptr;
-				}
-			}
-			else {
-				mem.defaultValue = dec.value;
-			}
-			mem.arrayCount = dec.arrayCount;
-			if (mem.type.size() >= 1 && mem.type[0] == '@') {
-				mem.isProtected = true;
-				mem.type = mem.type.substr(1);
-			}
-		}
-		return members;
-	};
-
 	for (const auto& ci : g_classInfoJson.at("geoms")) {
 		int id = ci.at("num2").get<int>() & 0xFFFFF;
 		g_classInfo_idJsonMap[id] = &ci;
 		const std::string& name = ci.at("name").get_ref<const std::string&>();
 		g_classInfo_stringIdMap[name] = id;
-		g_classMemberLists[name] = processMembers(ci.at("members").get_ref<const std::string&>());
+		g_classMemberLists[name] = ProcessClassMemberListString(ci.at("members").get_ref<const std::string&>());
 	}
 	for (const auto& cpnt : g_classInfoJson.at("components")) {
 		std::string name = cpnt.at("infoClassName").get_ref<const std::string&>().substr(1);
 		g_cpntJsonMap[name] = &cpnt;
-		g_classMemberLists[name] = processMembers(cpnt.at("members").get_ref<const std::string&>());
+		g_classMemberLists[name] = ProcessClassMemberListString(cpnt.at("members").get_ref<const std::string&>());
 	}
 }
 
@@ -141,6 +111,53 @@ const char* ClassInfo::GetObjTypeString(int typeId)
 uint16_t ClassInfo::GetObjTypeCategory(int typeId)
 {
 	return g_classInfo_idJsonMap.at(typeId)->at("num2").get<uint32_t>() >> 16;
+}
+
+// Parse a string containing a list of class members
+std::vector<ClassInfo::ClassMember> ClassInfo::ProcessClassMemberListString(const std::string& membersString)
+{
+	std::vector<ClassMember> members;
+	MemberDecoder dec{ membersString.c_str() };
+	while (dec.next()) {
+		ClassMember& mem = members.emplace_back();
+		mem.type = strUpper(dec.type);
+		mem.name = dec.name;
+		if (dec.value.size() >= 1 && dec.value[0] == '{') {
+			const char* ptr = dec.value.data() + 1;
+			mem.valueChoices.emplace_back();
+			while (*ptr != '}') {
+				if (*ptr == ',')
+					mem.valueChoices.emplace_back();
+				else
+					mem.valueChoices.back().push_back(*ptr);
+				++ptr;
+			}
+		}
+		else {
+			mem.defaultValue = dec.value;
+		}
+		mem.arrayCount = dec.arrayCount;
+		if (mem.type.size() >= 1 && mem.type[0] == '@') {
+			mem.isProtected = true;
+			mem.type = mem.type.substr(1);
+		}
+	}
+	return members;
+}
+
+// Get an array of members for the DBL (arrays repeat the same member in the list)
+void ClassInfo::AddDBLMemberInfo(std::vector<ClassInfo::ObjectMember>& members, const std::vector<ClassInfo::ClassMember>& memlist)
+{
+	static const ClassMember emptyMember = { "", "" };
+	for (const ClassMember& mem : memlist) {
+		if (mem.arrayCount == 1)
+			members.emplace_back(&mem, -1);
+		else {
+			for (int i = 0; i < mem.arrayCount; ++i)
+				members.emplace_back(&mem, i);
+		}
+	}
+	members.emplace_back(&emptyMember);
 }
 
 // Return a list of names of all DBL members of the object
@@ -156,15 +173,7 @@ std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj)
 		rec(rec, *g_classInfo_idJsonMap.at(g_classInfo_stringIdMap.at(parent))); // recursive call to parent class
 		const auto& membersString = cl.at("members").get_ref<const std::string&>();
 		const auto& memlist = g_classMemberLists.at(cl.at("name").get_ref<const std::string&>());
-		for (const ClassMember& mem : memlist) {
-			if (mem.arrayCount == 1)
-				members.emplace_back(&mem, -1);
-			else {
-				for (int i = 0; i < mem.arrayCount; ++i)
-					members.emplace_back(&mem, i);
-			}
-		}
-		members.emplace_back(&emptyMember);
+		AddDBLMemberInfo(members, memlist);
 	};
 	onClass(onClass, *g_classInfo_idJsonMap.at(obj->type));
 
@@ -183,15 +192,7 @@ std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj)
 			skipWhitespace();
 
 			const auto& memlist = g_classMemberLists.at(std::string(cpntName));
-			for (const ClassMember& mem : memlist) {
-				if (mem.arrayCount == 1)
-					members.emplace_back(&mem, -1);
-				else {
-					for (int i = 0; i < mem.arrayCount; ++i)
-						members.emplace_back(&mem, i);
-				}
-			}
-			members.emplace_back(&emptyMember);
+			AddDBLMemberInfo(members, memlist);
 		}
 	}
 

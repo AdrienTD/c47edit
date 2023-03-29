@@ -56,6 +56,7 @@ Vector3 bestpickintersectionpnt(0, 0, 0);
 bool wndShowTextures = false;
 bool wndShowSounds = false;
 bool wndShowAudioObjects = false;
+bool wndShowZDefines = false;
 
 extern HWND hWindow;
 
@@ -1154,6 +1155,20 @@ void IGAudioObjects()
 	ImGui::End();
 }
 
+void IGZDefines()
+{
+	auto classMembers = ClassInfo::ProcessClassMemberListString(g_scene.zdefTypes);
+	std::vector<ClassInfo::ObjectMember> members;
+	ClassInfo::AddDBLMemberInfo(members, classMembers);
+
+	nextobjtosel = nullptr;
+	ImGui::Begin("ZDefines", &wndShowZDefines);
+	IGDBLList(g_scene.zdefValues, members);
+	ImGui::End();
+	if (nextobjtosel)
+		selobj = nextobjtosel;
+}
+
 GameObject* FindObjectNamed(const char *name, GameObject *sup = g_scene.rootobj)
 {
 	if (sup->name == name)
@@ -1394,6 +1409,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			if (wndShowTextures) IGTextures();
 			if (wndShowSounds) IGSounds();
 			if (wndShowAudioObjects) IGAudioObjects();
+			if (wndShowZDefines) IGZDefines();
 			if (ImGui::BeginMainMenuBar()) {
 				if (ImGui::BeginMenu("Scene")) {
 					if (ImGui::MenuItem("Open..."))
@@ -1431,6 +1447,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 					ImGui::MenuItem("Textures", nullptr, &wndShowTextures);
 					ImGui::MenuItem("Waves", nullptr, &wndShowSounds);
 					ImGui::MenuItem("Audio objects", nullptr, &wndShowAudioObjects);
+					ImGui::MenuItem("ZDefines", nullptr, &wndShowZDefines);
 					ImGui::EndMenu();
 				}
 				if (ImGui::BeginMenu("Help")) {
