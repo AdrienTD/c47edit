@@ -121,6 +121,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AudioManager.cpp" />
     <ClCompile Include="chunk.cpp" />
     <ClCompile Include="classInfo.cpp" />
     <ClCompile Include="debug.cpp" />
@@ -143,6 +144,7 @@
     <ClCompile Include="window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AudioManager.h" />
     <ClInclude Include="ByteWriter.h" />
     <ClInclude Include="chunk.h" />
     <ClInclude Include="classInfo.h" />

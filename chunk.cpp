@@ -10,9 +10,9 @@
 
 Chunk::~Chunk() = default;
 
-Chunk *Chunk::findSubchunk(uint32_t tagkey)
+const Chunk *Chunk::findSubchunk(uint32_t tagkey) const
 {
-	for (Chunk& sub : subchunks)
+	for (const Chunk& sub : subchunks)
 		if (sub.tag == tagkey)
 			return &sub;
 	return nullptr;

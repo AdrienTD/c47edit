@@ -23,7 +23,8 @@ struct Chunk
 	Chunk(uint32_t tag) : tag(tag) {};
 	~Chunk();
 
-	Chunk *findSubchunk(uint32_t tag);
+	const Chunk* findSubchunk(uint32_t tag) const;
+	Chunk* findSubchunk(uint32_t tag) { return (Chunk*)std::as_const(*this).findSubchunk(tag); }
 
 	void load(void *bytes);
 	std::string saveToString();

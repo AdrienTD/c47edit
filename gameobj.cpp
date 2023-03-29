@@ -367,6 +367,11 @@ void Scene::LoadSceneSPK(const char *fn)
 	f(pclp, cliprootobj);
 	f(prot, rootobj);
 
+	Chunk* ands = spkchk.findSubchunk('SDNA');
+	Chunk* sndr = spkchk.findSubchunk('RDNS');
+	assert(ands && sndr);
+	audioMgr.load(*ands, *sndr);
+
 	ready = true;
 }
 
@@ -668,6 +673,15 @@ void Scene::ModifySPK()
 	serveChunk("PEXC", saver.excPackBuf.buffer);
 
 	((uint32_t*)spkchk.maindata.data())[1] = 0x40000;
+
+	// Audio stuff
+	Chunk* andsOld = spkchk.findSubchunk('SDNA');
+	Chunk* sndrOld = spkchk.findSubchunk('RDNS');
+	auto [andsNew, sndrNew] = audioMgr.save();
+	chkcmp(andsOld, &andsNew, "ANDS");
+	chkcmp(sndrOld, &sndrNew, "SNDR");
+	*andsOld = std::move(andsNew);
+	*sndrOld = std::move(sndrNew);
 }
 
 void Scene::SaveSceneSPK(const char *fn)
@@ -848,9 +862,9 @@ GameObject* Scene::CreateObject(int type, GameObject* parent)
 			de.type = 10;
 			de.value.emplace<uint32_t>(0);
 		}
-		else if (cm->type == "SNDREF") {
+		else if (cm->type == "SNDREF" || cm->type == "SNDSETREF") {
 			de.type = 11;
-			de.value.emplace<uint32_t>(0);
+			de.value.emplace<AudioRef>();
 		}
 		else if (cm->type == "SCRIPT") {
 			de.type = 12;
@@ -912,7 +926,6 @@ void DBLList::load(uint8_t* dpbeg, const std::map<uint32_t, GameObject*>& idobjm
 			break;
 		case 3:
 		case 0xA:
-		case 0xB:
 			e.value = *(uint32_t*)dp;
 			dp += 4;
 			break;
@@ -939,6 +952,12 @@ void DBLList::load(uint8_t* dpbeg, const std::map<uint32_t, GameObject*>& idobjm
 			for (uint32_t i = 0; i < nobjs; i++)
 				objlist.emplace_back(decodeRef(*(uint32_t*)(dp + 4 + 4 * i)));
 			dp += *(uint32_t*)dp;
+			break;
+		}
+		case 0xB: {
+			AudioRef& aoref = e.value.emplace<AudioRef>();
+			aoref.id = *(uint32_t*)dp;
+			dp += 4;
 			break;
 		}
 		case 0xC: {
@@ -974,7 +993,6 @@ std::string DBLList::save(SceneSaver& sceneSaver)
 			dblsav.addFloat(std::get<float>(e->value)); break;
 		case 3:
 		case 0xA:
-		case 0xB:
 			dblsav.addU32(std::get<uint32_t>(e->value)); break;
 		case 4:
 		case 5:
@@ -1006,6 +1024,8 @@ std::string DBLList::save(SceneSaver& sceneSaver)
 			}
 			break;
 		}
+		case 0xB:
+			dblsav.addU32(std::get<AudioRef>(e->value).id); break;
 		case 0xC:
 		{
 			auto& sublist = std::get<DBLList>(e->value);

@@ -16,6 +16,7 @@
 
 #include "chunk.h"
 #include "vecmat.h"
+#include "AudioManager.h"
 
 struct GameObject;
 struct Chunk;
@@ -99,7 +100,7 @@ struct DBLEntry
 {
 	int type = 0;
 	int flags = 0;
-	using VariantType = std::variant<std::monostate, double, float, uint32_t, std::string, std::vector<uint8_t>, GORef, std::vector<GORef>, DBLList>;
+	using VariantType = std::variant<std::monostate, double, float, uint32_t, std::string, std::vector<uint8_t>, GORef, std::vector<GORef>, DBLList, AudioRef>;
 	VariantType value;
 
 	static const char* getTypeName(int type);
@@ -148,6 +149,7 @@ struct Scene {
 	Chunk palPack, dxtPack, lgtPack, anmPack, wavPack;
 	bool hasAnmPack = false;
 	bool ready = false;
+	AudioManager audioMgr;
 
 	void LoadSceneSPK(const char *fn);
 	void ModifySPK();
