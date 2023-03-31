@@ -121,6 +121,29 @@ void IGAudioRef(const char* name, AudioRef& ref)
 	}
 }
 
+void IGMessageValue(const char* name, uint32_t& ref)
+{
+	auto getName = [](int id) -> std::string {
+		auto it = g_scene.msgDefinitions.find(id);
+		if (it != g_scene.msgDefinitions.end()) {
+			return std::to_string(id) + ": " + it->second.first;
+		}
+		return "(empty)";
+	};
+
+	if (ImGui::BeginCombo(name, getName(ref).c_str())) {
+		if (ImGui::Selectable("(empty)", ref == 0))
+			ref = 0;
+		for (auto& [id, msg] : g_scene.msgDefinitions) {
+			if (ImGui::Selectable(getName(id).c_str(), ref == id))
+				ref = id;
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("%s", msg.second.c_str());
+		}
+		ImGui::EndCombo();
+	}
+}
+
 void IGOTNode(GameObject *o)
 {
 	bool op, colorpushed = 0;
@@ -407,7 +430,6 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 		case 2:
 			ImGui::InputFloat(name.c_str(), &std::get<float>(e->value)); break;
 		case 3:
-		case 0xA:
 		{
 			uint32_t& ref = std::get<uint32_t>(e->value);
 			if (mem->type == "BOOL") {
@@ -543,6 +565,9 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 			}
 			break;
 		}
+		case 0xA:
+			IGMessageValue(name.c_str(), std::get<uint32_t>(e->value));
+			break;
 		case 0xB: {
 			IGAudioRef(name.c_str(), std::get<AudioRef>(e->value));
 			break;
@@ -1498,31 +1523,29 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 
 			glLoadIdentity();
 			if (renderExc && viewobj) {
-				if (Chunk* pexc = g_scene.spkchk.findSubchunk('CXEP')) {
-					glPointSize(5.0f);
-					glBegin(GL_POINTS);
-					auto renderAnim = [pexc](auto rec, GameObject* obj, const Matrix& prevmat) -> void {
-						Matrix mat = obj->matrix * Matrix::getTranslationMatrix(obj->position) * prevmat;
-						if (obj->excChunk) {
-							Chunk& exchk = *obj->excChunk;
-							assert(exchk.tag == 'HEAD');
-							if (auto* keys = exchk.findSubchunk('KEYS')) {
-								uint32_t cnt = *(uint32_t*)(keys->multidata[0].data());
-								for (uint32_t i = 1; i <= cnt; ++i) {
-									float* kpos = (float*)((char*)(keys->multidata[i].data()) + 4);
-									Vector3 vpos = Vector3(kpos[0], kpos[1], kpos[2]).transform(mat);
-									glVertex3fv(&vpos.x);
-								}
+				glPointSize(5.0f);
+				glBegin(GL_POINTS);
+				auto renderAnim = [](auto rec, GameObject* obj, const Matrix& prevmat) -> void {
+					Matrix mat = obj->matrix * Matrix::getTranslationMatrix(obj->position) * prevmat;
+					if (obj->excChunk) {
+						Chunk& exchk = *obj->excChunk;
+						assert(exchk.tag == 'HEAD');
+						if (auto* keys = exchk.findSubchunk('KEYS')) {
+							uint32_t cnt = *(uint32_t*)(keys->multidata[0].data());
+							for (uint32_t i = 1; i <= cnt; ++i) {
+								float* kpos = (float*)((char*)(keys->multidata[i].data()) + 4);
+								Vector3 vpos = Vector3(kpos[0], kpos[1], kpos[2]).transform(mat);
+								glVertex3fv(&vpos.x);
 							}
 						}
-						for (auto& child : obj->subobj) {
-							rec(rec, child, mat);
-						}
-					};
-					renderAnim(renderAnim, viewobj, Matrix::getIdentity());
-					glEnd();
-					glPointSize(1.0f);
-				}
+					}
+					for (auto& child : obj->subobj) {
+						rec(rec, child, mat);
+					}
+				};
+				renderAnim(renderAnim, viewobj, Matrix::getIdentity());
+				glEnd();
+				glPointSize(1.0f);
 			}
 
 			glDisable(GL_TEXTURE_2D);

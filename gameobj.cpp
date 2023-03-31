@@ -378,6 +378,12 @@ void Scene::LoadSceneSPK(const char *fn)
 	zdefValues.load(zdef->multidata[1].data(), idobjmap);
 	zdefTypes = (const char*)zdef->multidata[2].data();
 
+	Chunk* msgv = spkchk.findSubchunk('VGSM');
+	for (Chunk& msg : msgv->subchunks) {
+		uint32_t id = msg.tag;
+		msgDefinitions[id] = std::make_pair((char*)msg.multidata[0].data(), (char*)msg.multidata[1].data());
+	}
+
 	ready = true;
 }
 
@@ -702,6 +708,21 @@ void Scene::ModifySPK()
 	memcpy(zdefNew.multidata[2].data(), zdefTypes.data(), zdefNew.multidata[2].size());
 	chkcmp(zdefOld, &zdefNew, "ZDEF");
 	*zdefOld = std::move(zdefNew);
+
+	// Messages
+	Chunk* msgvOld = spkchk.findSubchunk('VGSM');
+	Chunk msgvNew = Chunk('VGSM');
+	msgvNew.subchunks.reserve(msgDefinitions.size());
+	for (auto& [id, msg] : msgDefinitions) {
+		Chunk& chk = msgvNew.subchunks.emplace_back(id);
+		chk.multidata.resize(2);
+		chk.multidata[0].resize(msg.first.size() + 1);
+		chk.multidata[1].resize(msg.second.size() + 1);
+		memcpy(chk.multidata[0].data(), msg.first.data(), chk.multidata[0].size());
+		memcpy(chk.multidata[1].data(), msg.second.data(), chk.multidata[1].size());
+	}
+	chkcmp(msgvOld, &msgvNew, "MSGV");
+	*msgvOld = std::move(msgvNew);
 }
 
 void Scene::SaveSceneSPK(const char *fn)

@@ -154,6 +154,7 @@ struct Scene {
 	std::string zdefNames;
 	DBLList zdefValues;
 	std::string zdefTypes;
+	std::map<uint32_t, std::pair<std::string, std::string>> msgDefinitions;
 
 	void LoadSceneSPK(const char *fn);
 	void ModifySPK();
