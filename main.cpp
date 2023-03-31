@@ -39,7 +39,7 @@
 #include <stb_image.h>
 #include <stb_image_write.h>
 
-GameObject *selobj = 0, *viewobj = 0;
+GameObject* selobj = 0;
 Vector3 campos(0, 0, -50), camori(0,0,0);
 float camNearDist = 1.0f, camFarDist = 10000.0f;
 float camspeed = 32;
@@ -48,6 +48,26 @@ bool findsel = false;
 uint32_t framesincursec = 0, framespersec = 0, lastfpscheck;
 Vector3 cursorpos(0, 0, 0);
 bool renderExc = false;
+
+enum class ObjVisibility {
+	Default = 0,
+	Show = 1,
+	Hide = 2
+};
+std::unordered_map<GameObject*, ObjVisibility> objVisibilityMap;
+//GameObject* rightclickedObject = nullptr;
+bool IsObjectVisible(GameObject* obj) {
+	for (GameObject* par = obj; par != nullptr; par = par->parent) {
+		auto it = objVisibilityMap.find(par);
+		if (it != objVisibilityMap.end()) {
+			if (it->second == ObjVisibility::Show)
+				return true;
+			if (it->second == ObjVisibility::Hide)
+				return false;
+		}
+	}
+	return false;
+}
 
 GameObject *bestpickobj = 0;
 float bestpickdist;
@@ -152,9 +172,11 @@ void IGOTNode(GameObject *o)
 	if (findsel)
 		if (ObjInObj(selobj, o))
 			ImGui::SetNextItemOpen(true, ImGuiCond_Always);
-	if (o == viewobj) {
+	auto visibilityIt = objVisibilityMap.find(o);
+	if (visibilityIt != objVisibilityMap.end() && visibilityIt->second != ObjVisibility::Default) {
 		colorpushed = 1;
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 1, 0, 1));
+		ImVec4 color = (visibilityIt->second == ObjVisibility::Show) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1);
+		ImGui::PushStyleColor(ImGuiCol_Text, color);
 	}
 	op = ImGui::TreeNodeEx(o, (o->subobj.empty() ? ImGuiTreeNodeFlags_Leaf : 0) | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ((o == selobj) ? ImGuiTreeNodeFlags_Selected : 0), "%s::%s", ClassInfo::GetObjTypeString(o->type), o->name.c_str());
 	if (colorpushed)
@@ -165,7 +187,7 @@ void IGOTNode(GameObject *o)
 	if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0)) {
 		ImGuiIO& io = ImGui::GetIO();
 		if (io.KeyShift)
-			viewobj = o;
+			objVisibilityMap[o] = ObjVisibility(((int)objVisibilityMap[o] + 1) % 3);
 		else
 		{
 			selobj = o;
@@ -178,6 +200,16 @@ void IGOTNode(GameObject *o)
 			ImGui::Text("GameObject: %s", o->name.c_str());
 			ImGui::EndDragDropSource();
 		}
+	ImGui::PushID(o);
+	if (ImGui::BeginPopupContextItem("ObjectRightClickMenu", ImGuiPopupFlags_MouseButtonRight)) {
+		auto it = objVisibilityMap.find(o);
+		ObjVisibility vis = (it != objVisibilityMap.end()) ? it->second : ObjVisibility::Default;
+		if (ImGui::MenuItem("Default", nullptr, vis == ObjVisibility::Default)) objVisibilityMap[o] = ObjVisibility::Default;
+		if (ImGui::MenuItem("Show", nullptr, vis == ObjVisibility::Show)) objVisibilityMap[o] = ObjVisibility::Show;
+		if (ImGui::MenuItem("Hide", nullptr, vis == ObjVisibility::Hide)) objVisibilityMap[o] = ObjVisibility::Hide;
+		ImGui::EndPopup();
+	}
+	ImGui::PopID();
 	if(op)
 	{
 		for (auto e = o->subobj.begin(); e != o->subobj.end(); e++)
@@ -1209,7 +1241,7 @@ GameObject* FindObjectNamed(const char *name, GameObject *sup = g_scene.rootobj)
 void RenderObject(GameObject *o, const Matrix& parentTransform)
 {
 	Matrix transform = o->matrix * Matrix::getTranslationMatrix(o->position) * parentTransform;
-	if (o->mesh && (o->flags & 0x20)) {
+	if (o->mesh && (o->flags & 0x20) && IsObjectVisible(o)) {
 		if (!rendertextures) {
 			uint32_t clr = swap_rb(o->color);
 			glColor4ubv((uint8_t*)&clr);
@@ -1281,7 +1313,7 @@ GameObject *IsRayIntersectingObject(const Vector3& raystart, const Vector3& rayd
 	objmtx._42 = o->position.y;
 	objmtx._43 = o->position.z;
 	objmtx *= worldmtx;
-	if (o->mesh)
+	if (o->mesh && IsObjectVisible(o))
 	{
 		Mesh *m = o->mesh.get();
 		float* vertices = (o->excChunk && o->excChunk->findSubchunk('LCHE')) ? ApplySkinToMesh(m, o->excChunk.get()) : m->vertices.data();
@@ -1317,7 +1349,7 @@ bool CmdOpenScene()
 	g_scene.LoadSceneSPK(zipPath.string().c_str());
 	GlifyAllTextures();
 	selobj = nullptr;
-	viewobj = nullptr;
+	objVisibilityMap.clear();
 	bestpickobj = nullptr;
 	objtogive = nullptr;
 	nextobjtosel = nullptr;
@@ -1397,7 +1429,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 				camori.y += io.MouseDelta.x * 0.01f;
 				camori.x += io.MouseDelta.y * 0.01f;
 			}
-			if (!io.WantCaptureMouse && viewobj)
+			if (!io.WantCaptureMouse)
 			if (io.MouseClicked[1] || (io.MouseClicked[0] && (io.KeyAlt || io.KeyCtrl)))
 			{
 				Vector3 raystart, raydir;
@@ -1412,7 +1444,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 
 				bestpickobj = 0;
 				bestpickdist = std::numeric_limits<float>::infinity();
-				IsRayIntersectingObject(raystart, raydir, viewobj, Matrix::getIdentity());
+				IsRayIntersectingObject(raystart, raydir, g_scene.superroot, Matrix::getIdentity());
 				if (io.KeyAlt) {
 					if (bestpickobj && selobj)
 						selobj->position = bestpickintersectionpnt;
@@ -1514,28 +1546,27 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			glCullFace(GL_BACK);
 			glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
 			BeginMeshDraw();
-			if (viewobj) {
-				//glTranslatef(-viewobj->position.x, -viewobj->position.y, -viewobj->position.z);
-				RenderObject(viewobj, Matrix::getIdentity());
-				RenderMeshLists();
-			}
+			RenderObject(g_scene.superroot, Matrix::getIdentity());
+			RenderMeshLists();
 			EndMeshDraw();
 
 			glLoadIdentity();
-			if (renderExc && viewobj) {
+			if (renderExc) {
 				glPointSize(5.0f);
 				glBegin(GL_POINTS);
 				auto renderAnim = [](auto rec, GameObject* obj, const Matrix& prevmat) -> void {
 					Matrix mat = obj->matrix * Matrix::getTranslationMatrix(obj->position) * prevmat;
-					if (obj->excChunk) {
-						Chunk& exchk = *obj->excChunk;
-						assert(exchk.tag == 'HEAD');
-						if (auto* keys = exchk.findSubchunk('KEYS')) {
-							uint32_t cnt = *(uint32_t*)(keys->multidata[0].data());
-							for (uint32_t i = 1; i <= cnt; ++i) {
-								float* kpos = (float*)((char*)(keys->multidata[i].data()) + 4);
-								Vector3 vpos = Vector3(kpos[0], kpos[1], kpos[2]).transform(mat);
-								glVertex3fv(&vpos.x);
+					if (IsObjectVisible(obj)) {
+						if (obj->excChunk) {
+							Chunk& exchk = *obj->excChunk;
+							assert(exchk.tag == 'HEAD');
+							if (auto* keys = exchk.findSubchunk('KEYS')) {
+								uint32_t cnt = *(uint32_t*)(keys->multidata[0].data());
+								for (uint32_t i = 1; i <= cnt; ++i) {
+									float* kpos = (float*)((char*)(keys->multidata[i].data()) + 4);
+									Vector3 vpos = Vector3(kpos[0], kpos[1], kpos[2]).transform(mat);
+									glVertex3fv(&vpos.x);
+								}
 							}
 						}
 					}
@@ -1543,7 +1574,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 						rec(rec, child, mat);
 					}
 				};
-				renderAnim(renderAnim, viewobj, Matrix::getIdentity());
+				renderAnim(renderAnim, g_scene.superroot, Matrix::getIdentity());
 				glEnd();
 				glPointSize(1.0f);
 			}
