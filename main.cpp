@@ -55,8 +55,18 @@ enum class ObjVisibility {
 	Hide = 2
 };
 std::unordered_map<GameObject*, ObjVisibility> objVisibilityMap;
-//GameObject* rightclickedObject = nullptr;
+bool showZGates = false, showZBounds = false;
+bool showInvisibleObjects = false;
+
 bool IsObjectVisible(GameObject* obj) {
+	if (!(obj->flags & 0x20))
+		return false;
+	if (!showInvisibleObjects && std::get<uint32_t>(obj->dbl.entries.at(9).value) != 0)
+		return false;
+	if (!showZGates && obj->type == 21)
+		return false;
+	if (!showZBounds && obj->type == 28)
+		return false;
 	for (GameObject* par = obj; par != nullptr; par = par->parent) {
 		auto it = objVisibilityMap.find(par);
 		if (it != objVisibilityMap.end()) {
@@ -817,6 +827,21 @@ void IGObjectInfo()
 				}
 				InvalidateMesh(selobj->mesh.get());
 			}
+			ImGui::SameLine();
+			static Mesh::FTXFace newFace{ 0,0,0,0,0,0 };
+			if (ImGui::Button("Edit")) {
+				ImGui::OpenPopup("EditFTX");
+			}
+			if (ImGui::BeginPopup("EditFTX")) {
+				for(int i = 0; i < 6; ++i)
+					ImGui::InputScalar(std::to_string(i).c_str(), ImGuiDataType_U16, &newFace[i], nullptr, nullptr, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
+				if (ImGui::Button("Apply")) {
+					for (auto& ftxFace : selobj->mesh->ftxFaces)
+						ftxFace = newFace;
+					InvalidateMesh(selobj->mesh.get());
+				}
+				ImGui::EndPopup();
+			}
 			if (!selobj->mesh->ftxFaces.empty()) {
 				float* uvCoords = (float*)selobj->mesh->textureCoords.data();
 				float* uvCoords2 = (float*)selobj->mesh->lightCoords.data();
@@ -942,6 +967,12 @@ void IGMain()
 	ImGui::Checkbox("Lightmaps", &renderLightmaps);
 	ImGui::SameLine();
 	ImGui::Checkbox("Alpha Test", &enableAlphaTest);
+	ImGui::Checkbox("Gates", &showZGates);
+	ImGui::SameLine();
+	ImGui::Checkbox("Bounds", &showZBounds);
+	ImGui::SameLine();
+	ImGui::Checkbox("Invisible Objects", &showInvisibleObjects);
+	ImGui::Checkbox("Untextured Faces in Tex mode", &renderUntexturedFaces);
 	ImGui::End();
 }
 

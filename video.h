@@ -13,6 +13,7 @@ extern int drawframes;
 extern bool rendertextures;
 extern bool renderColorTextures, renderLightmaps;
 extern bool enableAlphaTest;
+extern bool renderUntexturedFaces;
 
 void InitVideo();
 void BeginDrawing();

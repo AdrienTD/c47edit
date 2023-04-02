@@ -27,6 +27,7 @@ extern HWND hWindow;
 bool rendertextures = false;
 bool renderColorTextures = true, renderLightmaps = true;
 bool enableAlphaTest = true;
+bool renderUntexturedFaces = false;
 
 void InitVideo()
 {
@@ -185,7 +186,14 @@ struct ProMesh {
 		std::vector<uint32_t> colors;
 		std::vector<IndexType> indices;
 	};
-	using PartKey = std::tuple<uint16_t, uint16_t, uint16_t>;
+	struct PartKey {
+		uint16_t flags, texId, lgtId; bool invisible;
+		PartKey(uint16_t texId, uint16_t lgtId, uint16_t flags) :
+			flags(flags & 0x020A), texId(texId), lgtId(lgtId), invisible(!(flags & 0x0020)) {}
+		auto asRefTuple() const { return std::tie(flags, texId, lgtId, invisible); }
+		bool operator<(const PartKey& other) const { return asRefTuple() < other.asRefTuple(); }
+		bool operator==(const PartKey& other) const { return asRefTuple() == other.asRefTuple(); }
+	};
 	std::map<PartKey, Part> parts;
 
 	inline static std::map<Mesh*, ProMesh> g_proMeshes;
@@ -234,7 +242,7 @@ struct ProMesh {
 			bool isLit = hasFtx && (ftxFace[0] & 0x80);
 			uint16_t texid = isTextured ? ftxFace[2] : 0xFFFF;
 			uint16_t lgtid = isLit ? ftxFace[3] : 0xFFFF;
-			auto& part = pro.parts[std::make_tuple(texid, lgtid, ftxFace[0] & 0x0202)];
+			auto& part = pro.parts[PartKey(texid, lgtid, ftxFace[0])];
 			IndexType prostart = (IndexType)part.vertices.size();
 			for (int j = 0; j < shape; j++) {
 				const float* uu = (isTextured ? uvCoords : defUvs) + uvit[j] * 2;
@@ -290,8 +298,7 @@ void DrawMesh(Mesh* mesh, const Matrix& matrix, Chunk* excChunk)
 	{
 		ProMesh* pro = ProMesh::getProMesh(mesh, excChunk);
 		for (auto& [mat,part] : pro->parts) {
-			auto& [texid, lgtid, flags] = mat;
-			if (texid == 0xFFFF)
+			if (!renderUntexturedFaces && mat.invisible)
 				continue;
 			g_meshLists[mat].push_back({ matrix, &part });
 		}
@@ -303,19 +310,18 @@ void RenderMeshLists()
 	if (!rendertextures)
 		return;
 	for (auto& [mat, partList] : g_meshLists) {
-		auto& [texid, lgtid, flags] = mat;
 		GLuint gltex = 0, gllgt = 0;
 		if (renderColorTextures)
-			if (auto t = texmap.find(texid); t != texmap.end())
+			if (auto t = texmap.find(mat.texId); t != texmap.end())
 				gltex = (GLuint)(uintptr_t)t->second;
 		if (renderLightmaps)
-			if (auto t = texmap.find(lgtid); t != texmap.end())
+			if (auto t = texmap.find(mat.lgtId); t != texmap.end())
 				gllgt = (GLuint)(uintptr_t)t->second;
 		glActiveTextureARB(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, gltex);
 		glActiveTextureARB(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, gllgt);
-		if (enableAlphaTest && (flags & 0x0200)) {
+		if (enableAlphaTest && (mat.flags & 0x0200)) {
 			glEnable(GL_ALPHA_TEST);
 			glAlphaFunc(GL_GEQUAL, 0.1f);
 		}
