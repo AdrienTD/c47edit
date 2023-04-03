@@ -232,7 +232,7 @@ void IGObjectTree()
 {
 	ImGui::SetNextWindowPos(ImVec2(3, 23), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSize(ImVec2(316, 632), ImGuiCond_FirstUseEver);
-	ImGui::Begin("Object tree", 0, ImGuiWindowFlags_HorizontalScrollbar);
+	ImGui::Begin("Scene graph", 0, ImGuiWindowFlags_HorizontalScrollbar);
 	IGOTNode(g_scene.superroot);
 	findsel = false;
 	ImGui::End();
@@ -657,7 +657,7 @@ void IGObjectInfo()
 			if(objtogive)
 				g_scene.GiveObject(objtogive, selobj);
 		
-		if (ImGui::Button("Find in tree"))
+		if (ImGui::Button("Find in graph"))
 			findsel = true;
 		if (selobj->parent)
 		{
@@ -667,10 +667,10 @@ void IGObjectInfo()
 		}
 		ImGui::Separator();
 
-		ImGui::Text("%s (%i, %04X)", ClassInfo::GetObjTypeString(selobj->type), selobj->type, selobj->flags);
+		ImGui::Text("%s (%i, %04X), %i", ClassInfo::GetObjTypeString(selobj->type), selobj->type, selobj->flags, selobj->state);
 		IGStdStringInput("Name", selobj->name);
-		ImGui::InputScalar("State", ImGuiDataType_U32, &selobj->state);
-		ImGui::Separator();
+		//ImGui::InputScalar("State", ImGuiDataType_U32, &selobj->state);
+		//ImGui::Separator();
 		ImGui::DragFloat3("Position", &selobj->position.x);
 		/*for (int i = 0; i < 3; i++) {
 			ImGui::PushID(i);
@@ -688,7 +688,7 @@ void IGObjectInfo()
 			selobj->matrix = mz * mx * my;
 		}
 		ImGui::Text("Num. references: %zu", selobj->getRefCount());
-		if (ImGui::CollapsingHeader("DBL"))
+		if (ImGui::CollapsingHeader("Properties (DBL)"))
 		{
 			auto members = ClassInfo::GetMemberNames(selobj);
 			IGDBLList(selobj->dbl, members);
@@ -1035,6 +1035,25 @@ void IGTextures()
 	ImGui::RadioButton("Lgt", &packShown, 1);
 	auto& pack = (packShown == 0) ? g_scene.palPack : g_scene.lgtPack;
 
+	// Texture size conformance
+	// Verifies if the texture size is allowed by some or all renderers provided by the game.
+	static const ImVec4 conformanceColor[3] = { ImVec4(1.0f,1.0f,1.0f,1.0f), ImVec4(1.0f,1.0f,0.0f,1.0f), ImVec4(1.0f,0.0f,0.0f,1.0f) };
+	static const char* const conformanceText[3] = {
+		"Texture size looks fine!\nShould work on all renderers and drivers.",
+		"width or height is not a power of 2!\nWill work on Direct3D+OpenGL but not Glide.",
+		"width or height is not a multiple of 4!\nWill not work on Direct3D with texture compression, nor Glide."
+	};
+	auto getConformanceLevel = [](int width, int height) {
+		// not multiple of 4 -> red
+		if ((width % 4) != 0 || (height % 4) != 0)
+			return 2;
+		// not power of two -> yellow
+		if ((width & (width - 1)) || (height & (height - 1)))
+			return 1;
+		// otherwise -> green/white
+		return 0;
+	};
+
 	if (ImGui::BeginTable("TextureColumnsa", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoHostExtendY | ImGuiTableFlags_NoHostExtendX, ImGui::GetContentRegionAvail())) {
 		ImGui::TableSetupColumn("TexListCol", ImGuiTableColumnFlags_WidthFixed, 256.0f);
 		ImGui::TableNextRow();
@@ -1051,7 +1070,10 @@ void IGTextures()
 				auto t = texmap.find(ti->id);
 				ImGui::Image((t != texmap.end()) ? t->second : nullptr, ImVec2(imgsize, imgsize));
 				ImGui::SameLine();
-				ImGui::Text("%i: %s\n%i*%i", ti->id, ti->name, ti->width, ti->height);
+				ImGui::BeginGroup();
+				ImGui::Text("%i: %s", ti->id, ti->name);
+				ImGui::TextColored(conformanceColor[getConformanceLevel(ti->width, ti->height)], "%i*%i", ti->width, ti->height);
+				ImGui::EndGroup();
 			}
 			ImGui::PopID();
 		}
@@ -1060,6 +1082,8 @@ void IGTextures()
 		if (Chunk* palchk = FindTextureChunk(g_scene, curtexid).first) {
 			TexInfo* ti = (TexInfo*)palchk->maindata.data();
 			ImGui::Text("ID: %i\nSize: %i*%i\nNum mipmaps: %i\nFlags: %08X\nUnknown: %08X\nName: %s", ti->id, ti->width, ti->height, ti->numMipmaps, ti->flags, ti->random, ti->name);
+			auto conform = getConformanceLevel(ti->width, ti->height);
+			ImGui::TextColored(conformanceColor[conform], "%s", conformanceText[conform]);
 			ImGui::Image(texmap.at(curtexid), ImVec2(ti->width, ti->height));
 		}
 		ImGui::EndTable();
@@ -1557,6 +1581,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 				ImGui::TextUnformatted(APP_VERSION);
 				ImGui::EndMainMenuBar();
 			}
+
+			// First time message
+			if (objVisibilityMap.empty()) {
+				ImGui::SetNextWindowPos(ImVec2((float)screen_width * 0.5f, (float)screen_height * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+				ImGui::SetNextWindowSize(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
+				ImGui::Begin("FirstTimeMessage", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs);
+				ImGui::TextUnformatted("Welcome!\nNo object is rendered at the moment.\nTo render the scene, look at the Scene graph window,\nthen hold SHIFT and click a ROOT object.");
+				ImGui::End();
+			}
+
 			ImGui::EndFrame();
 
 			BeginDrawing();
