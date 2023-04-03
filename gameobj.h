@@ -108,11 +108,11 @@ struct DBLEntry
 
 struct GameObject
 {
-	uint32_t state = 0;
 	std::string name;
 	Matrix matrix = Matrix::getIdentity();
 	Vector3 position = Vector3(0.0f, 0.0f, 0.0f);
 	uint32_t type = 0, flags = 0;
+	bool isIncludedScene = false;
 
 	std::vector<GameObject*> subobj;
 	GameObject* parent = nullptr;

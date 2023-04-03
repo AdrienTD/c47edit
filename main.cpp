@@ -667,10 +667,8 @@ void IGObjectInfo()
 		}
 		ImGui::Separator();
 
-		ImGui::Text("%s (%i, %04X), %i", ClassInfo::GetObjTypeString(selobj->type), selobj->type, selobj->flags, selobj->state);
+		ImGui::Text("%s (%i, %04X) %s", ClassInfo::GetObjTypeString(selobj->type), selobj->type, selobj->flags, selobj->isIncludedScene ? "Included Scene" : "");
 		IGStdStringInput("Name", selobj->name);
-		//ImGui::InputScalar("State", ImGuiDataType_U32, &selobj->state);
-		//ImGui::Separator();
 		ImGui::DragFloat3("Position", &selobj->position.x);
 		/*for (int i = 0; i < 3; i++) {
 			ImGui::PushID(i);

@@ -232,7 +232,9 @@ void Scene::LoadSceneSPK(const char *fn)
 		char *objname = (char*)pnam->maindata.data() + p[2];
 
 		GameObject *o = chkobjmap[c];
-		o->state = (c->tag >> 24) & 255;
+		uint8_t state = (c->tag >> 24) & 255;
+		assert(state >= 0 && state < 4);
+		o->isIncludedScene = state & 2;
 		o->flags = *((unsigned short*)(&p[5]) + 1);
 		o->root = o->parent->root;
 
@@ -576,7 +578,7 @@ struct SceneSaver {
 		}
 
 		// Object Chunk
-		uint32_t tagstate = o->state | (isclp ? 1 : 0);
+		uint32_t tagstate = (o->isIncludedScene ? 2 : 0) | (isclp ? 1 : 0);
 		c->tag = heaoff | (tagstate << 24);
 		c->subchunks.resize(o->subobj.size());
 		int i = 0;
