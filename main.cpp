@@ -201,7 +201,7 @@ void IGOTNode(GameObject *o)
 		else
 		{
 			selobj = o;
-			cursorpos = selobj->position;
+			cursorpos = selobj->matrix.getTranslationVector();
 		}
 	}
 	if (ImGui::IsItemActive())
@@ -669,7 +669,7 @@ void IGObjectInfo()
 
 		ImGui::Text("%s (%i, %04X) %s", ClassInfo::GetObjTypeString(selobj->type), selobj->type, selobj->flags, selobj->isIncludedScene ? "Included Scene" : "");
 		IGStdStringInput("Name", selobj->name);
-		ImGui::DragFloat3("Position", &selobj->position.x);
+		ImGui::DragFloat3("Position", &selobj->matrix._41);
 		/*for (int i = 0; i < 3; i++) {
 			ImGui::PushID(i);
 			ImGui::DragFloat3((i==0) ? "Matrix" : "", selobj->matrix.m[i]);
@@ -1293,7 +1293,7 @@ GameObject* FindObjectNamed(const char *name, GameObject *sup = g_scene.rootobj)
 
 void RenderObject(GameObject *o, const Matrix& parentTransform)
 {
-	Matrix transform = o->matrix * Matrix::getTranslationMatrix(o->position) * parentTransform;
+	Matrix transform = o->matrix * parentTransform;
 	if (o->mesh && (o->flags & 0x20) && IsObjectVisible(o)) {
 		if (!rendertextures) {
 			uint32_t clr = swap_rb(o->color);
@@ -1361,11 +1361,7 @@ bool IsRayIntersectingFace(const Vector3& raystart, const Vector3& raydir, float
 GameObject *IsRayIntersectingObject(const Vector3& raystart, const Vector3& raydir, GameObject *o, const Matrix& worldmtx)
 {
 	float d;
-	Matrix objmtx = o->matrix;
-	objmtx._41 = o->position.x;
-	objmtx._42 = o->position.y;
-	objmtx._43 = o->position.z;
-	objmtx *= worldmtx;
+	Matrix objmtx = o->matrix * worldmtx;
 	if (o->mesh && IsObjectVisible(o))
 	{
 		Mesh *m = o->mesh.get();
@@ -1500,7 +1496,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 				IsRayIntersectingObject(raystart, raydir, g_scene.superroot, Matrix::getIdentity());
 				if (io.KeyAlt) {
 					if (bestpickobj && selobj)
-						selobj->position = bestpickintersectionpnt;
+						selobj->matrix.setTranslationVector(bestpickintersectionpnt);
 				}
 				else
 					selobj = bestpickobj;
@@ -1618,7 +1614,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 				glPointSize(5.0f);
 				glBegin(GL_POINTS);
 				auto renderAnim = [](auto rec, GameObject* obj, const Matrix& prevmat) -> void {
-					Matrix mat = obj->matrix * Matrix::getTranslationMatrix(obj->position) * prevmat;
+					Matrix mat = obj->matrix * prevmat;
 					if (IsObjectVisible(obj)) {
 						if (obj->excChunk) {
 							Chunk& exchk = *obj->excChunk;

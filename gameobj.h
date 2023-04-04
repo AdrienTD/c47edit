@@ -110,7 +110,6 @@ struct GameObject
 {
 	std::string name;
 	Matrix matrix = Matrix::getIdentity();
-	Vector3 position = Vector3(0.0f, 0.0f, 0.0f);
 	uint32_t type = 0, flags = 0;
 	bool isIncludedScene = false;
 

@@ -185,6 +185,13 @@ Matrix Matrix::getTranspose() const
 	return t;
 }
 
+void Matrix::setTranslationVector(const Vector3& vec)
+{
+	_41 = vec.x;
+	_42 = vec.y;
+	_43 = vec.z;
+}
+
 Vector3 Vector3::transform(const Matrix & m) const
 {
 	const Vector3 &a = *this;

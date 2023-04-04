@@ -238,8 +238,8 @@ void Scene::LoadSceneSPK(const char *fn)
 		o->flags = *((unsigned short*)(&p[5]) + 1);
 		o->root = o->parent->root;
 
-		o->position = *(Vector3*)((char*)ppos->maindata.data() + p[4]);
-		o->matrix = Matrix::getIdentity();
+		Vector3 position = *(Vector3*)((char*)ppos->maindata.data() + p[4]);
+		o->matrix = Matrix::getTranslationMatrix(position);
 		float mc[4];
 		int32_t *mtxoff  = (int32_t*)pmtx->maindata.data() + p[3] * 4;
 		for (int i = 0; i < 4; i++)
@@ -442,7 +442,8 @@ struct SceneSaver {
 		*c = {};
 
 		// Position
-		std::array<float, 3> cpos = { o->position.x, o->position.y, o->position.z };
+		Vector3 position = o->matrix.getTranslationVector();
+		std::array<float, 3> cpos = { position.x, position.y, position.z };
 		uint32_t posoff = posPackBuf.add(cpos);
 
 		// Matrix

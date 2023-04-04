@@ -43,6 +43,8 @@ struct /*alignas(16)*/ Matrix
 	Matrix getInverse4x3() const;
 	Matrix getTranspose() const;
 
+	void setTranslationVector(const Vector3& vec);
+
 	static Matrix getIdentity()
 	{
 		Matrix mat;
