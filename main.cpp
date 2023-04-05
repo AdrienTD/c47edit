@@ -35,6 +35,7 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_opengl2.h"
 #include "imgui/imgui_impl_win32.h"
+#include "imgui/ImGuizmo.h"
 
 #include <stb_image.h>
 #include <stb_image_write.h>
@@ -1455,21 +1456,21 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			ImGuiIO& io = ImGui::GetIO();
 			if (!io.WantCaptureKeyboard)
 			{
-				if (ImGui::IsKeyDown(VK_LEFT))
+				if (ImGui::IsKeyDown((ImGuiKey)VK_LEFT) || ImGui::IsKeyDown((ImGuiKey)'A') || ImGui::IsKeyDown((ImGuiKey)'Q'))
 					cammove -= crab;
-				if (ImGui::IsKeyDown(VK_RIGHT))
+				if (ImGui::IsKeyDown((ImGuiKey)VK_RIGHT) || ImGui::IsKeyDown((ImGuiKey)'D'))
 					cammove += crab;
-				if (ImGui::IsKeyDown(VK_UP))
+				if (ImGui::IsKeyDown((ImGuiKey)VK_UP) || ImGui::IsKeyDown((ImGuiKey)'W') || ImGui::IsKeyDown((ImGuiKey)'Z'))
 					cammove += ncd;
-				if (ImGui::IsKeyDown(VK_DOWN))
+				if (ImGui::IsKeyDown((ImGuiKey)VK_DOWN) || ImGui::IsKeyDown((ImGuiKey)'S'))
 					cammove -= ncd;
-				if (ImGui::IsKeyDown('E'))
+				if (ImGui::IsKeyDown((ImGuiKey)'R'))
 					cammove.y += 1;
-				if (ImGui::IsKeyDown('D'))
+				if (ImGui::IsKeyDown((ImGuiKey)'F'))
 					cammove.y -= 1;
-				if (ImGui::IsKeyPressed('W'))
+				if (ImGui::IsKeyPressed((ImGuiKey)'Y'))
 					wireframe = !wireframe;
-				if (ImGui::IsKeyPressed('T'))
+				if (ImGui::IsKeyPressed((ImGuiKey)'T'))
 					rendertextures = !rendertextures;
 			}
 			campos += cammove * camspeed * (io.KeyShift ? 2.0f : 1.0f);
@@ -1503,9 +1504,24 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 				cursorpos = bestpickintersectionpnt;
 			}
 
+			Matrix persp = Matrix::getLHPerspectiveMatrix(60.0f * (float)M_PI / 180.0f, (float)screen_width / (float)screen_height, camNearDist, camFarDist);
+			Matrix lookat = Matrix::getLHLookAtViewMatrix(campos, campos + ncd, Vector3(0.0f, 1.0f, 0.0f));
+
 			ImGui_ImplOpenGL2_NewFrame();
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
+
+			if (selobj) {
+				ImGuizmo::BeginFrame();
+				ImGuizmo::SetRect(0.0f, 0.0f, (float)screen_width, (float)screen_height);
+				Matrix parentMat = Matrix::getIdentity();
+				for (GameObject* par = selobj->parent; par; par = par->parent)
+					parentMat *= par->matrix;
+				Matrix globalMat = selobj->matrix * parentMat;
+				if (ImGuizmo::Manipulate(lookat.v, persp.v, ImGuizmo::TRANSLATE | ImGuizmo::ROTATE, ImGuizmo::WORLD, globalMat.v))
+					selobj->matrix = globalMat * parentMat.getInverse4x3();
+			}
+
 			IGMain();
 			IGObjectTree();
 			IGObjectInfo();
@@ -1595,8 +1611,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			glDepthFunc(GL_LEQUAL);
 			glClearDepth(1.0f);
 			glMatrixMode(GL_PROJECTION);
-			Matrix persp = Matrix::getLHPerspectiveMatrix(60.0f * (float)M_PI / 180.0f, (float)screen_width / (float)screen_height, camNearDist, camFarDist);
-			Matrix lookat = Matrix::getLHLookAtViewMatrix(campos, campos + ncd, Vector3(0.0f, 1.0f, 0.0f));
 			Matrix projMatrix = lookat * persp;
 			glLoadMatrixf(projMatrix.v);
 			glMatrixMode(GL_MODELVIEW);

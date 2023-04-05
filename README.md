@@ -32,3 +32,4 @@ The program requires Visual Studio 2017 (with latest update) or a more recent ve
 * [libsquish](https://sourceforge.net/projects/libsquish/) (MIT license) for DXT/S3TC texture compression
 * [glew](https://github.com/nigels-com/glew) (BSD3 license) for access to OpenGL APIs
 * [assimp](https://github.com/assimp/assimp) (BSD3 license) for 3D model import from and export to various file formats
+* [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) (MIT license) for the Transform Gizmo

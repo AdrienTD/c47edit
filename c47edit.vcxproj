@@ -128,6 +128,7 @@
     <ClCompile Include="gameobj.cpp" />
     <ClCompile Include="GuiUtils.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
+    <ClCompile Include="imgui\ImGuizmo.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />
     <ClCompile Include="imgui\imgui_impl_opengl2.cpp" />
@@ -154,6 +155,7 @@
     <ClInclude Include="global.h" />
     <ClInclude Include="GuiUtils.h" />
     <ClInclude Include="imgui\imgui.h" />
+    <ClInclude Include="imgui\ImGuizmo.h" />
     <ClInclude Include="imgui\imgui_impl_opengl2.h" />
     <ClInclude Include="imgui\imgui_impl_win32.h" />
     <ClInclude Include="ModelImporter.h" />
