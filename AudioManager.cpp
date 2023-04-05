@@ -102,7 +102,7 @@ void AudioManager::load(const Chunk& ands, const Chunk& sndr)
 			obj->reflect(rl);
 			if constexpr (std::is_same_v<T, SetAudioObject>) {
 				SetAudioObject* set = (SetAudioObject*)obj.get();
-				const Chunk::DataBuffer* setsPtr = chk->subchunks[i].multidata.data();
+				const Chunk::DataBuffer* setsPtr = chk->subchunks[i].multidata.empty() ? &chk->subchunks[i].maindata : chk->subchunks[i].multidata.data();
 				uint32_t numEntries;
 				mdcReadTo(setsPtr, numEntries);
 				set->sounds.resize(numEntries);
