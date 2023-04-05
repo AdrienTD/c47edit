@@ -1563,7 +1563,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 					if (ImGui::MenuItem("About...")) {
 						MessageBox(hWindow, "c47edit\nUnofficial scene editor for \"Hitman: Codename 47\"\n\n"
 							"(C) 2018-2023 AdrienTD\nLicensed under the GPL 3.\nSee LICENSE file for details.\n"
-							"See 3RDPARTY file for copyright and licensing of 3rd-party libraries.", "c47edit", 0);
+							"See https://github.com/AdrienTD/c47edit#libraries-used for copyright and licensing of 3rd-party libraries.", "c47edit", 0);
 					}
 					ImGui::EndMenu();
 				}
