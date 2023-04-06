@@ -135,7 +135,21 @@ void IGAudioRef(const char* name, AudioRef& ref)
 		preview += g_scene.audioMgr.audioNames[ref.id];
 	}
 	if (ImGui::BeginCombo(name, preview.c_str())) {
-		ImGui::TextUnformatted("TODO :)\nMeanwhile please use drag&drop ;)");
+		if (ImGui::Selectable("/", ref.id == 0))
+			ref.id = 0;
+		for (size_t i = 0; i < g_scene.audioMgr.audioObjects.size(); ++i) {
+			auto& objptr = g_scene.audioMgr.audioObjects[i];
+			if (objptr) {
+				auto& name = g_scene.audioMgr.audioNames[i];
+				ImGui::PushID(i);
+				if (ImGui::Selectable("##Sound", ref.id == (uint32_t)i)) {
+					ref.id = (uint32_t)i;
+				}
+				ImGui::SameLine();
+				ImGui::Text("%zu: %s", i, name.c_str());
+				ImGui::PopID();
+			}
+		}
 		ImGui::EndCombo();
 	}
 	if (ImGui::BeginDragDropSource()) {
