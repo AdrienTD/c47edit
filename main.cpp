@@ -1443,6 +1443,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 
 	ImGui::CreateContext(0);
 	ImGui::GetStyle().WindowRounding = 7.0f;
+	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	ImGui_ImplWin32_Init((void*)hWindow);
 	ImGui_ImplOpenGL2_Init();
 	lastfpscheck = GetTickCount();
@@ -1524,6 +1525,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			ImGui_ImplOpenGL2_NewFrame();
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
+			ImGui::DockSpaceOverViewport(nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
 
 			if (selobj) {
 				ImGuizmo::BeginFrame();
