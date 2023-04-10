@@ -725,9 +725,15 @@ void IGObjectInfo()
 							selobj->mesh = std::make_shared<Mesh>();
 						*selobj->mesh = std::move(optMesh->first);
 						if (optMesh->second) {
-							if (!selobj->excChunk)
-								selobj->excChunk = std::make_shared<Chunk>();
-							*selobj->excChunk = std::move(*optMesh->second);
+							selobj->excChunk = std::make_shared<Chunk>(std::move(*optMesh->second));
+							// set exchunk to every other object sharing the same mesh
+							auto walkObj = [](GameObject* obj, auto& rec) -> void {
+								if (obj->mesh == selobj->mesh)
+									obj->excChunk = std::make_shared<Chunk>(*selobj->excChunk);
+								for (GameObject* child : obj->subobj)
+									rec(child, rec);
+							};
+							walkObj(g_scene.superroot, walkObj);
 						}
 						//else
 						//	selobj->excChunk = nullptr;

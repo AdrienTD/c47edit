@@ -54,7 +54,7 @@ static uint32_t GetTextureFromAssimp(const aiTexture* atex, std::string_view nam
 std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std::filesystem::path& filename)
 {
 	Assimp::Importer importer;
-	const aiScene* ais = importer.ReadFile(filename.u8string(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_MakeLeftHanded | aiProcess_PopulateArmatureData | aiProcess_JoinIdenticalVertices);
+	const aiScene* ais = importer.ReadFile(filename.u8string(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_MakeLeftHanded | aiProcess_JoinIdenticalVertices);
 	if (!ais) {
 		std::string msg = "Assimp Import Error:\n";
 		msg += importer.GetErrorString();
@@ -162,15 +162,7 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 		// Bones
 		for (unsigned int b = 0; b < amesh->mNumBones; ++b) {
 			aiBone* abone = amesh->mBones[b];
-			auto [it, inserted] = boneMap.try_emplace(abone->mName.C_Str());
-			auto& ws = it->second;
-			if (inserted) {
-				memcpy(&ws.transform, &abone->mNode->mTransformation, 64);
-				memcpy(&ws.invBind, &abone->mOffsetMatrix, 64);
-				ws.transform = ws.transform.getTranspose();
-				ws.invBind = ws.invBind.getTranspose();
-				ws.numChildren = abone->mNode->mNumChildren;
-			}
+			auto& ws = boneMap[abone->mName.C_Str()];
 			for (unsigned int w = 0; w < abone->mNumWeights; ++w)
 				if (abone->mWeights[w].mWeight > 0.0f)
 					ws.weights[remap[abone->mWeights[w].mVertexId]] = abone->mWeights[w].mWeight;
@@ -193,16 +185,25 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 		
 		// construct vector of BoneInfo* in order of hierarchy
 		std::vector<std::pair<const std::string*, BoneInfo*>> boneInfos;
-		auto walkBoneNode = [&boneMap,&boneInfos](aiNode* node, int parent, const auto& rec) -> void {
-			auto it = boneMap.find(node->mName.C_Str());
-			assert(it != boneMap.end());
+		auto walkBoneNode = [&boneMap,&boneInfos](aiNode* node, int parent, const Matrix& parentMat, const auto& rec) -> void {
+			Matrix transform;
+			memcpy(&transform, &node->mTransformation, 64);
+			transform = transform.getTranspose();
+			Matrix globMat = transform * parentMat;
+
+			auto it = boneMap.try_emplace(node->mName.C_Str()).first;
+			auto& ws = it->second;
+			ws.transform = transform;
+			ws.invBind = globMat.getInverse4x3();
+			ws.numChildren = node->mNumChildren;
+
 			int id = boneInfos.size();
-			it->second.parent = parent;
+			ws.parent = parent;
 			boneInfos.emplace_back(&it->first, &it->second);
 			for (size_t i = 0; i < node->mNumChildren; ++i)
-				rec(node->mChildren[i], id, rec);
+				rec(node->mChildren[i], id, globMat, rec);
 		};
-		walkBoneNode(rootBone, -1, walkBoneNode);
+		walkBoneNode(rootBone, -1, Matrix::getIdentity(), walkBoneNode);
 
 		Chunk excChunk;
 		excChunk.tag = 'HEAD';
@@ -581,10 +582,11 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 	}
 
 	ascene.mRootNode = new aiNode;
-	ascene.mRootNode->mNumMeshes = parts.size();
-	ascene.mRootNode->mMeshes = new unsigned int[parts.size()];
+	aiNode* meshNode = new aiNode;
+	meshNode->mNumMeshes = parts.size();
+	meshNode->mMeshes = new unsigned int[parts.size()];
 	for (size_t i = 0; i < parts.size(); ++i)
-		ascene.mRootNode->mMeshes[i] = i;
+		meshNode->mMeshes[i] = i;
 	if (hasBones) {
 		std::vector<aiNode*> boneNodes;
 		std::map<aiNode*, std::vector<aiNode*>> boneChildNodes;
@@ -595,7 +597,7 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 			boneNodes[b] = node;
 			node->mName = gbones[b].name;
 			if (gbones[b].parentIndex != 0xFFFF)
-				node->mParent = boneNodes[gbones[b].parentIndex];
+				node->mParent = boneNodes.at(gbones[b].parentIndex);
 			else
 				node->mParent = ascene.mRootNode;
 			boneChildNodes[node->mParent].push_back(node);
@@ -615,6 +617,7 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 			memcpy(node->mChildren, children.data(), children.size() * sizeof(aiNode*));
 		}
 	}
+	ascene.mRootNode->addChildren(1, &meshNode);
 
 	auto fileext = filename.extension().string().substr(1);
 	std::transform(fileext.begin(), fileext.end(), fileext.begin(), [](char c) {return (char)std::tolower(c); });
