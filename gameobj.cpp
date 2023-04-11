@@ -369,22 +369,38 @@ void Scene::LoadSceneSPK(const char *fn)
 	f(pclp, cliprootobj);
 	f(prot, rootobj);
 
+	// Audio objects
 	Chunk* ands = spkchk.findSubchunk('SDNA');
 	Chunk* sndr = spkchk.findSubchunk('RDNS');
 	assert(ands && sndr);
 	audioMgr.load(*ands, *sndr);
 
+	// ZDefines
 	Chunk* zdef = spkchk.findSubchunk('FEDZ');
 	assert(zdef);
 	zdefNames = (const char*)zdef->multidata[0].data();
 	zdefValues.load(zdef->multidata[1].data(), idobjmap);
 	zdefTypes = (const char*)zdef->multidata[2].data();
 
+	// Messages
 	Chunk* msgv = spkchk.findSubchunk('VGSM');
 	for (Chunk& msg : msgv->subchunks) {
 		uint32_t id = msg.tag;
 		msgDefinitions[id] = std::make_pair((char*)msg.multidata[0].data(), (char*)msg.multidata[1].data());
 	}
+
+	// Texture to material assignment map
+	Chunk* matl = spkchk.findSubchunk('LTAM');
+	assert(matl);
+	Chunk* mtlv = matl->findSubchunk('VLTM');
+	assert(mtlv && mtlv->maindata.size() == 4 && *(uint32_t*)mtlv->maindata.data() == 1);
+	for (size_t i = 0; i < matl->multidata.size(); i += 3) {
+		textureMaterialMap.emplace_back((char*)matl->multidata[i].data(), (char*)matl->multidata[i + 1].data(), *(uint32_t*)matl->multidata[i + 2].data());
+	}
+
+	// Texture info (last ID)
+	Chunk* ptxi = spkchk.findSubchunk('IXTP');
+	numTextures = *(uint32_t*)ptxi->maindata.data();
 
 	ready = true;
 }
@@ -664,6 +680,20 @@ void Scene::ModifySPK()
 			else
 				printf("Same bytesum\n");
 		}
+		else if (chka->multidata.size()) {
+			int numSizeDiff = 0, numContentDiff = 0, numSame = 0, numTotal = (int)chka->multidata.size();
+			for (size_t i = 0; i < chka->multidata.size(); ++i) {
+				if (chka->multidata[i].size() != chkb->multidata[i].size())
+					numSizeDiff += 1;
+				else if (memcmp(chka->multidata[i].data(), chkb->multidata[i].data(), chka->multidata[i].size()))
+					numContentDiff += 1;
+				else
+					numSame += 1;
+			}
+			printf("%i/%i parts have different sizes\n", numSizeDiff, numTotal);
+			printf("%i/%i parts have same size but content is different\n", numContentDiff, numTotal);
+			printf("%i/%i parts have same size and content\n", numSame, numTotal);
+		}
 	};
 
 	// Final move
@@ -726,6 +756,32 @@ void Scene::ModifySPK()
 	}
 	chkcmp(msgvOld, &msgvNew, "MSGV");
 	*msgvOld = std::move(msgvNew);
+
+	// Texture to material assignment map
+	Chunk* matlOld = spkchk.findSubchunk('LTAM');
+	Chunk matlNew = Chunk('LTAM');
+	Chunk& mtlvNew = matlNew.subchunks.emplace_back('VLTM');
+	mtlvNew.maindata.resize(4);
+	*(uint32_t*)mtlvNew.maindata.data() = 1;
+	matlNew.multidata.resize(3 * textureMaterialMap.size());
+	for (size_t i = 0; i < textureMaterialMap.size(); ++i) {
+		auto& [texName, matName, num] = textureMaterialMap[i];
+		matlNew.multidata[3 * i].resize(texName.size() + 1);
+		matlNew.multidata[3 * i + 1].resize(matName.size() + 1);
+		matlNew.multidata[3 * i + 2].resize(4);
+		memcpy(matlNew.multidata[3 * i].data(), texName.data(), matlNew.multidata[3 * i].size());
+		memcpy(matlNew.multidata[3 * i + 1].data(), matName.data(), matlNew.multidata[3 * i + 1].size());
+		*(uint32_t*)matlNew.multidata[3 * i + 2].data() = num;
+	}
+	chkcmp(matlOld, &matlNew, "MATL");
+	*matlOld = std::move(matlNew);
+
+	// Texture info (last ID)
+	Chunk* ptxi = spkchk.findSubchunk('IXTP');
+	Chunk ptxiNew = Chunk('IXTP');
+	ptxiNew.maindata.resize(4);
+	*(uint32_t*)ptxiNew.maindata.data() = numTextures;
+	*ptxi = std::move(ptxiNew);
 }
 
 void Scene::SaveSceneSPK(const char *fn)

@@ -155,6 +155,10 @@ struct Scene {
 	std::string zdefTypes;
 	std::map<uint32_t, std::pair<std::string, std::string>> msgDefinitions;
 
+	std::vector<std::tuple<std::string, std::string, uint32_t>> textureMaterialMap;
+	uint32_t numTextures = 0;
+	//std::vector<Chunk> remainingChunks; // PSCR, PZFI, DLCF, SPAT
+
 	void LoadSceneSPK(const char *fn);
 	void ModifySPK();
 	void SaveSceneSPK(const char *fn);

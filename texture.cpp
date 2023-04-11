@@ -98,14 +98,10 @@ void UncacheAllTextures()
 
 std::tuple<uint32_t, Chunk*, Chunk*> AddUninitializedTexture(Scene& scene)
 {
-	Chunk* ptxi = scene.spkchk.findSubchunk('IXTP');
-	assert(ptxi);
-	uint32_t& numTextureIds = *(uint32_t*)ptxi->maindata.data();
-	numTextureIds += 1;
-
+	uint32_t texId = ++scene.numTextures;
 	Chunk& chk = scene.palPack.subchunks.emplace_back();
 	Chunk& dxtchk = scene.dxtPack.subchunks.emplace_back();
-	return { numTextureIds, &chk, &dxtchk };
+	return { texId, &chk, &dxtchk };
 }
 
 uint32_t AddTexture(Scene& scene, uint8_t* pixels, int width, int height, std::string_view name)
