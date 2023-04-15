@@ -1520,8 +1520,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 					if (bestpickobj && selobj)
 						selobj->matrix.setTranslationVector(bestpickintersectionpnt);
 				}
-				else
+				else {
 					selobj = bestpickobj;
+					if (io.MouseDoubleClicked[0] || io.MouseDoubleClicked[1])
+						selobj = selobj->parent;
+				}
 				cursorpos = bestpickintersectionpnt;
 			}
 
