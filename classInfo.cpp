@@ -164,7 +164,7 @@ void ClassInfo::AddDBLMemberInfo(std::vector<ClassInfo::ObjectMember>& members, 
 std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj)
 {
 	static const ClassMember emptyMember = { "", "" };
-	static const ClassMember initialMembers[3] = { {"CHAR*", "Components"}, {"ENUM", "Create", "", {"ROOT", "CLIP"}}, {"SCRIPT", "ZGeomScript"}}; // some objects might have less or more initial members...
+	static const ClassMember initialMembers[3] = { {"CHAR*", "Routs"}, {"ENUM", "Create", "", {"ROOT", "CLIP"}}, {"SCRIPT", "ZGeomScript"}}; // some objects might have less or more initial members...
 	std::vector<ClassInfo::ObjectMember> members = { {&initialMembers[0]}, {&initialMembers[1]}, {&initialMembers[2]}, {&emptyMember} };
 	auto onClass = [&members](const auto& rec, const nlohmann::json& cl) -> void {
 		if (cl.at("name") == "ZGEOM")

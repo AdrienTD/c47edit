@@ -893,28 +893,12 @@ void Scene::GiveObject(GameObject *o, GameObject *t)
 	o->parent = t;
 }
 
-GameObject* Scene::CreateObject(int type, GameObject* parent)
+void DBLList::addMembers(const std::vector<ClassInfo::ObjectMember>& members)
 {
-	GameObject* obj = new GameObject();
-	obj->type = type;
-	obj->flags = ClassInfo::GetObjTypeCategory(type);
-	
-	//obj->parent = parent;
-	GiveObject(obj, parent);
-	obj->root = parent->root;
-
-	if (obj->flags & 0x0020)
-		obj->mesh = std::make_shared<Mesh>();
-	if (obj->flags & 0x0080)
-		obj->light = std::make_shared<Light>();
-	if (obj->flags & 0x0400)
-		obj->line = std::make_shared<ObjLine>();
-
-	auto members = ClassInfo::GetMemberNames(obj);
 	for (auto& mem : members) {
 		auto& cm = mem.info;
 		auto& defValue = cm->defaultValue;
-		DBLEntry& de = obj->dbl.entries.emplace_back();
+		DBLEntry& de = entries.emplace_back();
 		if (cm->type == "DOUBLE") {
 			de.type = 1;
 			de.value.emplace<double>(defValue.empty() ? 0.0f : std::stod(defValue));
@@ -977,9 +961,27 @@ GameObject* Scene::CreateObject(int type, GameObject* parent)
 			printf("What is %s?\n", cm->type.c_str());
 		}
 	}
-	auto& last = obj->dbl.entries.emplace_back();
-	last.type = 0x3F;
-	last.flags = 0xC0;
+}
+
+GameObject* Scene::CreateObject(int type, GameObject* parent)
+{
+	GameObject* obj = new GameObject();
+	obj->type = type;
+	obj->flags = ClassInfo::GetObjTypeCategory(type);
+	
+	//obj->parent = parent;
+	GiveObject(obj, parent);
+	obj->root = parent->root;
+
+	if (obj->flags & 0x0020)
+		obj->mesh = std::make_shared<Mesh>();
+	if (obj->flags & 0x0080)
+		obj->light = std::make_shared<Light>();
+	if (obj->flags & 0x0400)
+		obj->line = std::make_shared<ObjLine>();
+
+	auto members = ClassInfo::GetMemberNames(obj);
+	obj->dbl.addMembers(members);
 	return obj;
 }
 
@@ -1008,6 +1010,10 @@ void DBLList::load(uint8_t* dpbeg, const std::map<uint32_t, GameObject*>& idobjm
 	uint8_t* dp = dpbeg + 4;
 	while (dp - dpbeg < ds)
 	{
+		if (*dp == 0xFF) {
+			assert(dp - dpbeg == ds - 1);
+			break;
+		}
 		DBLEntry& e = entries.emplace_back();
 		e.type = *dp & 0x3F;
 		e.flags = *dp & 0xC0;
@@ -1067,8 +1073,6 @@ void DBLList::load(uint8_t* dpbeg, const std::map<uint32_t, GameObject*>& idobjm
 			dp += dblsize;
 			break;
 		}
-		case 0x3F:
-			break;
 		default:
 			ferr("Unknown DBL entry type!");
 		}
@@ -1098,7 +1102,6 @@ std::string DBLList::save(SceneSaver& sceneSaver)
 		case 5:
 			dblsav.addStringNT(std::get<std::string>(e->value)); break;
 		case 6:
-		case 0x3f:
 			break;
 		case 7:
 		{
@@ -1135,6 +1138,8 @@ std::string DBLList::save(SceneSaver& sceneSaver)
 		}
 		}
 	}
+	if (!entries.empty())
+		dblsav.addU8(0xFF);
 	std::string str = dblsav.take();
 	*(uint32_t*)str.data() = (uint32_t)str.size() | (flags << 24);
 	return str;

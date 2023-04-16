@@ -703,6 +703,26 @@ void IGObjectInfo()
 		ImGui::Text("Num. references: %zu", selobj->getRefCount());
 		if (ImGui::CollapsingHeader("Properties (DBL)"))
 		{
+			if (ImGui::Button("Add routine")) {
+				ImGui::OpenPopup("AddRoutineMenu");
+			}
+			if (ImGui::BeginPopup("AddRoutineMenu")) {
+				for (auto& [name, memlist] : g_classMemberLists) {
+					if (name.find('_') != name.npos) {
+						if (ImGui::MenuItem(name.c_str())) {
+							std::string& routstr = std::get<std::string>(selobj->dbl.entries[0].value);
+							if (!routstr.empty())
+								routstr += ',';
+							routstr += name;
+							routstr += " 0";
+							std::vector<ClassInfo::ObjectMember> objmems;
+							ClassInfo::AddDBLMemberInfo(objmems, memlist);
+							selobj->dbl.addMembers(objmems);
+						}
+					}
+				}
+				ImGui::EndPopup();
+			}
 			auto members = ClassInfo::GetMemberNames(selobj);
 			IGDBLList(selobj->dbl, members);
 		}

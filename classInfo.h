@@ -48,3 +48,5 @@ namespace ClassInfo {
 	// Return a list of names of all DBL members of the object
 	std::vector<ObjectMember> GetMemberNames(GameObject* obj);
 }
+
+extern std::map<std::string, std::vector<ClassInfo::ClassMember>> g_classMemberLists;

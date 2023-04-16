@@ -134,6 +134,21 @@ void IGDebugMenus()
 			walkObj(g_scene.superroot, walkObj);
 
 		}
+		if (ImGui::MenuItem("List Components")) {
+			auto walkObj = [](GameObject* obj, auto& rec) -> void {
+				if (!obj->dbl.entries.empty()) {
+					const std::string& str = std::get<std::string>(obj->dbl.entries[0].value);
+					if (!str.empty()) {
+						printf("%s\n", obj->getPath().c_str());
+						printf("  %s\n", str.c_str());
+					}
+				}
+				for (auto* child : obj->subobj) {
+					rec(child, rec);
+				}
+			};
+			walkObj(g_scene.superroot, walkObj);
+		}
 		ImGui::EndMenu();
 	}
 }

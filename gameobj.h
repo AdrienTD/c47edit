@@ -22,6 +22,10 @@ struct GameObject;
 struct Chunk;
 struct Scene;
 
+namespace ClassInfo {
+	struct ObjectMember;
+}
+
 extern std::unordered_map<GameObject*, size_t> g_objRefCounts;
 
 class GORef
@@ -94,6 +98,7 @@ struct DBLList {
 
 	void load(uint8_t* ptr, const std::map<uint32_t, GameObject*>& idobjmap);
 	std::string save(SceneSaver& sceneSaver);
+	void addMembers(const std::vector<ClassInfo::ObjectMember>& members);
 };
 
 struct DBLEntry
