@@ -229,13 +229,16 @@ struct ProMesh {
 			lgtCoords = (float*)mesh->lightCoords.data();
 		}
 
-		assert(g_scene.lgtPack.subchunks[0].tag == 'RGBA');
-		uint8_t* colorMapData = g_scene.lgtPack.subchunks[0].maindata.data();
-		assert(*(uint16_t*)(colorMapData + 6) == 2); // the width of color map must be 2
-		colorMapData += 0x14; // skip texture header until name
-		while (*colorMapData++); // skip texture name
-		colorMapData += 4; // skip mipmap size
-		uint32_t* colorMap = (uint32_t*)colorMapData;
+		uint32_t* colorMap = nullptr;
+		if (!g_scene.lgtPack.subchunks.empty()) {
+			assert(g_scene.lgtPack.subchunks[0].tag == 'RGBA');
+			uint8_t* colorMapData = g_scene.lgtPack.subchunks[0].maindata.data();
+			assert(*(uint16_t*)(colorMapData + 6) == 2); // the width of color map must be 2
+			colorMapData += 0x14; // skip texture header until name
+			while (*colorMapData++); // skip texture name
+			colorMapData += 4; // skip mipmap size
+			colorMap = (uint32_t*)colorMapData;
+		}
 
 		auto nextFace = [&](int shape, ProMesh::IndexType* indices) {
 			bool isTextured = hasFtx && (ftxFace[0] & 0x20);
@@ -255,7 +258,7 @@ struct ProMesh {
 					lmOffsetV = 0.5f / lgtInfo->height;
 				}
 				part.lightmapCoords.push_back({ lu[0] + lmOffsetU, lu[1] + lmOffsetV });
-				uint32_t color = (isLit && ftxFace[3] == 0xFFFF) ? colorMap[4 * (ftxFace[5] - 1) + lgtit[j]] : 0xFFFFFFFF;
+				uint32_t color = (isLit && ftxFace[3] == 0xFFFF && colorMap) ? colorMap[4 * (ftxFace[5] - 1) + lgtit[j]] : 0xFFFFFFFF;
 				part.colors.push_back(color);
 				const float* v = verts + indices[j] * 3 / 2;
 				part.vertices.push_back({ v[0], v[1], v[2] });

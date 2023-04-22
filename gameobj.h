@@ -169,6 +169,7 @@ struct Scene {
 
 	std::vector<Chunk> remainingChunks; // such as PSCR
 
+	void LoadEmpty();
 	void LoadSceneSPK(const char *fn);
 	Chunk ConstructSPK();
 	void SaveSceneSPK(const char *fn);

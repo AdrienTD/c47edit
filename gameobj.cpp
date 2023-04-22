@@ -131,6 +131,33 @@ static void ReadAssetPacks(Scene* scene, mz_zip_archive* zip)
 	assert(scene->palPack.subchunks.size() == scene->dxtPack.subchunks.size());
 }
 
+void Scene::LoadEmpty()
+{
+	Close();
+
+	// Duplicated :(
+	rootobj = new GameObject("Root", 0x21 /*ZROOM*/);
+	cliprootobj = new GameObject("ClipRoot", 0x21 /*ZROOM*/);
+	superroot = new GameObject("SuperRoot", 0x21);
+	superroot->subobj.push_back(rootobj);
+	superroot->subobj.push_back(cliprootobj);
+	rootobj->parent = cliprootobj->parent = superroot;
+	rootobj->root = rootobj;
+	cliprootobj->root = cliprootobj;
+
+	palPack.tag = 'PAL';
+	dxtPack.tag = 'DXT';
+	lgtPack.tag = 'LGT';
+	anmPack.tag = 'ANM';
+	wavPack.tag = 'WAV';
+
+	dlcFiles = { "GeomsBase.dlc", "EventsBase.dlc" };
+	scenePaths = { "Worlds", "Masters", "Z:\\c47edit", "Sounds", "" };
+	zdefValues.entries.emplace_back().type = 6;
+
+	ready = true;
+}
+
 void Scene::LoadSceneSPK(const char *fn)
 {
 	Close();
@@ -830,30 +857,34 @@ Chunk Scene::ConstructSPK()
 
 void Scene::SaveSceneSPK(const char *fn)
 {
-	mz_zip_archive inzip, outzip;
-	mz_zip_zero_struct(&inzip);
+	mz_zip_archive outzip;
 	mz_zip_zero_struct(&outzip);
-
 	mz_bool mzr;
-	mzr = mz_zip_reader_init_mem(&inzip, zipmem.data(), zipmem.size(), 0);
-	if (!mzr) { warn("Couldn't reopen the original scene ZIP file."); return; }
 	mzr = mz_zip_writer_init_file(&outzip, fn, 0);
 	if (!mzr) { warn("Couldn't create the new scene ZIP file for saving."); return; }
 
-	int nfiles = mz_zip_reader_get_num_files(&inzip);
-	// Determine files to copy from original ZIP
-	static constexpr const char* nocopyFiles[] = {"Pack.SPK", "Pack.PAL", "Pack.DXT", "Pack.ANM", "Pack.WAV", "Pack.LGT",
-		"PackRepeat.PAL", "PackRepeat.DXT", "PackRepeat.ANM", "PackRepeat.WAV" };
-	std::vector<bool> allowCopy = std::vector<bool>(nfiles, true);
-	for (size_t i = 0; i < std::size(nocopyFiles); ++i) {
-		int x = mz_zip_reader_locate_file(&inzip, nocopyFiles[i], nullptr, 0);
-		if (x != -1)
-			allowCopy[x] = false;
+	if (!zipmem.empty()) {
+		mz_zip_archive inzip;
+		mz_zip_zero_struct(&inzip);
+		mzr = mz_zip_reader_init_mem(&inzip, zipmem.data(), zipmem.size(), 0);
+		if (!mzr) { warn("Couldn't reopen the original scene ZIP file."); return; }
+
+		int nfiles = mz_zip_reader_get_num_files(&inzip);
+		// Determine files to copy from original ZIP
+		static constexpr const char* nocopyFiles[] = { "Pack.SPK", "Pack.PAL", "Pack.DXT", "Pack.ANM", "Pack.WAV", "Pack.LGT",
+			"PackRepeat.PAL", "PackRepeat.DXT", "PackRepeat.ANM", "PackRepeat.WAV" };
+		std::vector<bool> allowCopy = std::vector<bool>(nfiles, true);
+		for (size_t i = 0; i < std::size(nocopyFiles); ++i) {
+			int x = mz_zip_reader_locate_file(&inzip, nocopyFiles[i], nullptr, 0);
+			if (x != -1)
+				allowCopy[x] = false;
+		}
+		// Copy the files
+		for (int i = 0; i < nfiles; i++)
+			if (allowCopy[i])
+				mz_zip_writer_add_from_zip_reader(&outzip, &inzip, i);
+		mz_zip_reader_end(&inzip);
 	}
-	// Copy the files
-	for (int i = 0; i < nfiles; i++)
-		if (allowCopy[i])
-			mz_zip_writer_add_from_zip_reader(&outzip, &inzip, i);
 
 	auto saveChunk = [&outzip](Chunk* chk, const char* filename) {
 		auto str = chk->saveToString();
@@ -871,7 +902,6 @@ void Scene::SaveSceneSPK(const char *fn)
 
 	mz_zip_writer_finalize_archive(&outzip);
 	mz_zip_writer_end(&outzip);
-	mz_zip_reader_end(&inzip);
 }
 
 void Scene::Close()

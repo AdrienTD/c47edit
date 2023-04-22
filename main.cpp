@@ -1429,21 +1429,34 @@ GameObject *IsRayIntersectingObject(const Vector3& raystart, const Vector3& rayd
 	return 0;
 }
 
-bool CmdOpenScene()
+void UIClean()
 {
-	auto zipPath = GuiUtils::OpenDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", "Select a Scene ZIP archive (containing Pack.SPK)");
-	if (zipPath.empty())
-		return false;
 	UncacheAllTextures();
 	UncacheAllMeshes();
-	g_scene.LoadSceneSPK(zipPath.string().c_str());
-	GlifyAllTextures();
 	selobj = nullptr;
 	objVisibilityMap.clear();
 	bestpickobj = nullptr;
 	objtogive = nullptr;
 	nextobjtosel = nullptr;
+}
+
+bool CmdOpenScene()
+{
+	auto zipPath = GuiUtils::OpenDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", "Select a Scene ZIP archive (containing Pack.SPK)");
+	if (zipPath.empty())
+		return false;
+	UIClean();
+	g_scene.LoadSceneSPK(zipPath.string().c_str());
+	GlifyAllTextures();
 	return true;
+}
+
+void CmdNewScene()
+{
+	if (MessageBoxW(hWindow, L"Create a new empty scene?", L"c47edit", MB_ICONWARNING | MB_YESNO) == IDYES) {
+		UIClean();
+		g_scene.LoadEmpty();
+	}
 }
 
 #ifndef APPVEYOR
@@ -1475,7 +1488,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 	lastfpscheck = GetTickCount();
 
 	if (!CmdOpenScene())
-		exit(-1);
+		g_scene.LoadEmpty();
 
 	while (appnoquit = HandleWindow())
 	{
@@ -1579,10 +1592,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			if (wndShowZDefines) IGZDefines();
 			if (ImGui::BeginMainMenuBar()) {
 				if (ImGui::BeginMenu("Scene")) {
+					if (ImGui::MenuItem("New"))
+						CmdNewScene();
 					if (ImGui::MenuItem("Open..."))
 						CmdOpenScene();
 					if (ImGui::MenuItem("Save as..."))
 						CmdSaveScene();
+					ImGui::Separator();
 					if (ImGui::MenuItem("Exit"))
 						DestroyWindow(hWindow);
 					ImGui::EndMenu();
