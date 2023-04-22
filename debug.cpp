@@ -94,8 +94,8 @@ void IGDebugMenus()
 			printf("face[5] in [0x%04X, 0x%04X]\n", minI5, maxI5);
 		}
 		if (ImGui::MenuItem("Remove PSCR")) {
-			auto& subchunks = g_scene.spkchk.subchunks;
-			for (auto it = subchunks.begin(); it != subchunks.end(); ++it) {
+			auto& remchunks = g_scene.remainingChunks;
+			for (auto it = remchunks.begin(); it != remchunks.end(); ++it) {
 				if (it->tag == 'RCSP') {
 					it->tag = 'ABCD';
 					it->maindata.resize(0);

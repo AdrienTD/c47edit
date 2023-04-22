@@ -146,7 +146,7 @@ inline void GORef::deref() noexcept { if (m_obj) { g_objRefCounts[m_obj]--; m_ob
 inline void GORef::set(GameObject * obj) noexcept { deref(); m_obj = obj; if (m_obj) g_objRefCounts[m_obj]++; }
 
 struct Scene {
-	Chunk spkchk;
+	Chunk oldSpkChunk;
 	GameObject* rootobj = nullptr, * cliprootobj = nullptr, * superroot = nullptr;
 	std::string lastspkfn;
 	std::vector<uint8_t> zipmem;
@@ -162,10 +162,10 @@ struct Scene {
 
 	std::vector<std::tuple<std::string, std::string, uint32_t>> textureMaterialMap;
 	uint32_t numTextures = 0;
-	//std::vector<Chunk> remainingChunks; // PSCR, PZFI, DLCF, SPAT
+	std::vector<Chunk> remainingChunks; // PSCR, PZFI, DLCF, SPAT
 
 	void LoadSceneSPK(const char *fn);
-	void ModifySPK();
+	Chunk ConstructSPK();
 	void SaveSceneSPK(const char *fn);
 	void Close();
 	~Scene() { Close(); }

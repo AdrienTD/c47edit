@@ -152,6 +152,7 @@ void Scene::LoadSceneSPK(const char *fn)
 	if (!spkmem) ferr("Failed to extract Pack.SPK from ZIP archive.");
 	ReadAssetPacks(this, &zip);
 	mz_zip_reader_end(&zip);
+	Chunk spkchk;
 	spkchk.load(spkmem);
 	free(spkmem);
 	lastspkfn = fn;
@@ -402,6 +403,20 @@ void Scene::LoadSceneSPK(const char *fn)
 	Chunk* ptxi = spkchk.findSubchunk('IXTP');
 	numTextures = *(uint32_t*)ptxi->maindata.data();
 
+	// Remaining chunks
+	static constexpr uint32_t knownChunks[] = {
+		'TORP', 'PLCP', 'AEHP', 'MANP', 'SOPP',
+		'XTMP', 'REVP', 'CAFP', 'XTFP', 'CVUP',
+		'LBDP', 'TADP', 'CXEP', 'SDNA', 'RDNS',
+		'FEDZ', 'VGSM', 'LTAM', 'IXTP'
+	};
+	for (auto& chk : spkchk.subchunks) {
+		if (std::find(std::begin(knownChunks), std::end(knownChunks), chk.tag) == std::end(knownChunks)) {
+			remainingChunks.push_back(std::move(chk)); // move since spkchk is going to be destroyed anyway
+		}
+	}
+
+	oldSpkChunk = std::move(spkchk);
 	ready = true;
 }
 
@@ -609,13 +624,14 @@ struct SceneSaver {
 	}
 };
 
-void Scene::ModifySPK()
+Chunk Scene::ConstructSPK()
 {
 	SceneSaver saver;
+	Chunk newSpkChunk('SPK');
+	newSpkChunk.subchunks.reserve(30);
 
-	Chunk nrot, nclp;
-	nrot.tag = 'TORP';
-	nclp.tag = 'PLCP';
+	Chunk& nrot = newSpkChunk.subchunks.emplace_back('TORP');
+	Chunk& nclp = newSpkChunk.subchunks.emplace_back('PLCP');
 
 	uint32_t objid = 1;
 	auto z = [&objid,&saver](GameObject *o, auto& rec) -> void {
@@ -642,12 +658,6 @@ void Scene::ModifySPK()
 	};
 	f(&nrot, rootobj);
 	f(&nclp, cliprootobj);
-
-	Chunk* prot = spkchk.findSubchunk('TORP');
-	Chunk* pclp = spkchk.findSubchunk('PLCP');
-	assert(prot && pclp);
-	*prot = std::move(nrot);
-	*pclp = std::move(nclp);
 
 	// Fills a chunk
 	auto fillMaindata = [](uint32_t tag, Chunk *nthg, const auto& buf) {
@@ -698,12 +708,8 @@ void Scene::ModifySPK()
 
 	// Final move
 	auto serveChunk = [&](const char* name, const auto& buffer) {
-		Chunk* oldChunk = spkchk.findSubchunk(*(uint32_t*)name);
-		assert(oldChunk != nullptr); // might as well create it if it didn't exist
-		Chunk newChunk;
+		Chunk& newChunk = newSpkChunk.subchunks.emplace_back();
 		fillMaindata(*(uint32_t*)name, &newChunk, buffer);
-		chkcmp(oldChunk, &newChunk, name);
-		*oldChunk = std::move(newChunk);
 	};
 	serveChunk("PHEA", saver.heabuf.take());
 	serveChunk("PNAM", saver.namPackBuf.buffer);
@@ -717,20 +723,17 @@ void Scene::ModifySPK()
 	serveChunk("PUVC", saver.uvcPackBuf.buffer);
 	serveChunk("PEXC", saver.excPackBuf.buffer);
 
-	((uint32_t*)spkchk.maindata.data())[1] = 0x40000;
+	newSpkChunk.maindata.resize(8);
+	((uint32_t*)newSpkChunk.maindata.data())[0] = 10;
+	((uint32_t*)newSpkChunk.maindata.data())[1] = 0x40000;
 
 	// Audio stuff
-	Chunk* andsOld = spkchk.findSubchunk('SDNA');
-	Chunk* sndrOld = spkchk.findSubchunk('RDNS');
 	auto [andsNew, sndrNew] = audioMgr.save();
-	chkcmp(andsOld, &andsNew, "ANDS");
-	chkcmp(sndrOld, &sndrNew, "SNDR");
-	*andsOld = std::move(andsNew);
-	*sndrOld = std::move(sndrNew);
+	newSpkChunk.subchunks.emplace_back(std::move(andsNew));
+	newSpkChunk.subchunks.emplace_back(std::move(sndrNew));
 
 	// ZDefines
-	Chunk* zdefOld = spkchk.findSubchunk('FEDZ');
-	Chunk zdefNew('FEDZ');
+	Chunk& zdefNew = newSpkChunk.subchunks.emplace_back('FEDZ');
 	zdefNew.multidata.resize(3);
 	auto strValues = zdefValues.save(saver);
 	zdefNew.multidata[0].resize(zdefNames.size() + 1);
@@ -739,12 +742,9 @@ void Scene::ModifySPK()
 	memcpy(zdefNew.multidata[0].data(), zdefNames.data(), zdefNew.multidata[0].size());
 	memcpy(zdefNew.multidata[1].data(), strValues.data(), zdefNew.multidata[1].size());
 	memcpy(zdefNew.multidata[2].data(), zdefTypes.data(), zdefNew.multidata[2].size());
-	chkcmp(zdefOld, &zdefNew, "ZDEF");
-	*zdefOld = std::move(zdefNew);
 
 	// Messages
-	Chunk* msgvOld = spkchk.findSubchunk('VGSM');
-	Chunk msgvNew = Chunk('VGSM');
+	Chunk& msgvNew = newSpkChunk.subchunks.emplace_back('VGSM');
 	msgvNew.subchunks.reserve(msgDefinitions.size());
 	for (auto& [id, msg] : msgDefinitions) {
 		Chunk& chk = msgvNew.subchunks.emplace_back(id);
@@ -754,12 +754,9 @@ void Scene::ModifySPK()
 		memcpy(chk.multidata[0].data(), msg.first.data(), chk.multidata[0].size());
 		memcpy(chk.multidata[1].data(), msg.second.data(), chk.multidata[1].size());
 	}
-	chkcmp(msgvOld, &msgvNew, "MSGV");
-	*msgvOld = std::move(msgvNew);
 
 	// Texture to material assignment map
-	Chunk* matlOld = spkchk.findSubchunk('LTAM');
-	Chunk matlNew = Chunk('LTAM');
+	Chunk& matlNew = newSpkChunk.subchunks.emplace_back('LTAM');
 	Chunk& mtlvNew = matlNew.subchunks.emplace_back('VLTM');
 	mtlvNew.maindata.resize(4);
 	*(uint32_t*)mtlvNew.maindata.data() = 1;
@@ -773,15 +770,31 @@ void Scene::ModifySPK()
 		memcpy(matlNew.multidata[3 * i + 1].data(), matName.data(), matlNew.multidata[3 * i + 1].size());
 		*(uint32_t*)matlNew.multidata[3 * i + 2].data() = num;
 	}
-	chkcmp(matlOld, &matlNew, "MATL");
-	*matlOld = std::move(matlNew);
 
 	// Texture info (last ID)
-	Chunk* ptxi = spkchk.findSubchunk('IXTP');
-	Chunk ptxiNew = Chunk('IXTP');
+	Chunk& ptxiNew = newSpkChunk.subchunks.emplace_back('IXTP');
 	ptxiNew.maindata.resize(4);
 	*(uint32_t*)ptxiNew.maindata.data() = numTextures;
-	*ptxi = std::move(ptxiNew);
+
+	// Remaining chunks
+	for (auto& rem : remainingChunks)
+		newSpkChunk.subchunks.push_back(rem);
+
+	// Chunk Comparisons
+	for (Chunk& nchunk : newSpkChunk.subchunks) {
+		Chunk* ochunk = oldSpkChunk.findSubchunk(nchunk.tag);
+		char name[5];
+		*(uint32_t*)name = nchunk.tag;
+		name[4] = 0;
+		if (ochunk) {
+			chkcmp(ochunk, &nchunk, name);
+		}
+		else {
+			printf("!! New chunk %s !!\n", name);
+		}
+	}
+
+	return newSpkChunk;
 }
 
 void Scene::SaveSceneSPK(const char *fn)
@@ -815,8 +828,9 @@ void Scene::SaveSceneSPK(const char *fn)
 		auto str = chk->saveToString();
 		mz_zip_writer_add_mem(&outzip, filename, str.data(), str.size(), MZ_DEFAULT_COMPRESSION);
 	};
-	ModifySPK();
+	Chunk spkchk = ConstructSPK();
 	saveChunk(&spkchk, "Pack.SPK");
+	oldSpkChunk = std::move(spkchk);
 	saveChunk(&palPack, "Pack.PAL");
 	saveChunk(&dxtPack, "Pack.DXT");
 	saveChunk(&lgtPack, "Pack.LGT");
