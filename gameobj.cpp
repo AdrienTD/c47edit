@@ -403,12 +403,28 @@ void Scene::LoadSceneSPK(const char *fn)
 	Chunk* ptxi = spkchk.findSubchunk('IXTP');
 	numTextures = *(uint32_t*)ptxi->maindata.data();
 
+	// Info string lists
+	Chunk* pzfi = spkchk.findSubchunk('IFZP');
+	Chunk* dlcf = spkchk.findSubchunk('FCLD');
+	Chunk* spat = spkchk.findSubchunk('TAPS');
+	assert(pzfi && dlcf && spat);
+	auto loadStrList = [](std::vector<std::string>& vec, Chunk* chk) {
+		if (chk->maindata.size())
+			vec.emplace_back((const char*)chk->maindata.data());
+		for (auto& dat : chk->multidata)
+			vec.emplace_back((const char*)dat.data());
+	};
+	loadStrList(zipFilesIncluded, pzfi);
+	loadStrList(dlcFiles, dlcf);
+	loadStrList(scenePaths, spat);
+
 	// Remaining chunks
 	static constexpr uint32_t knownChunks[] = {
 		'TORP', 'PLCP', 'AEHP', 'MANP', 'SOPP',
 		'XTMP', 'REVP', 'CAFP', 'XTFP', 'CVUP',
 		'LBDP', 'TADP', 'CXEP', 'SDNA', 'RDNS',
-		'FEDZ', 'VGSM', 'LTAM', 'IXTP'
+		'FEDZ', 'VGSM', 'LTAM', 'IXTP',
+		'IFZP', 'FCLD', 'TAPS'
 	};
 	for (auto& chk : spkchk.subchunks) {
 		if (std::find(std::begin(knownChunks), std::end(knownChunks), chk.tag) == std::end(knownChunks)) {
@@ -775,6 +791,21 @@ Chunk Scene::ConstructSPK()
 	Chunk& ptxiNew = newSpkChunk.subchunks.emplace_back('IXTP');
 	ptxiNew.maindata.resize(4);
 	*(uint32_t*)ptxiNew.maindata.data() = numTextures;
+
+	// Scene info String lists
+	auto saveStrList = [&newSpkChunk](const std::vector<std::string>& vec, uint32_t tag) {
+		Chunk& chk = newSpkChunk.subchunks.emplace_back(tag);
+		chk.multidata.resize(vec.size());
+		for (size_t i = 0; i < vec.size(); ++i) {
+			auto& str = vec[i];
+			auto& dat = chk.multidata[i];
+			dat.resize(str.size() + 1);
+			memcpy(dat.data(), str.data(), str.size() + 1);
+		}
+	};
+	saveStrList(zipFilesIncluded, 'IFZP');
+	saveStrList(dlcFiles, 'FCLD');
+	saveStrList(scenePaths, 'TAPS');
 
 	// Remaining chunks
 	for (auto& rem : remainingChunks)

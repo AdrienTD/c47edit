@@ -162,7 +162,12 @@ struct Scene {
 
 	std::vector<std::tuple<std::string, std::string, uint32_t>> textureMaterialMap;
 	uint32_t numTextures = 0;
-	std::vector<Chunk> remainingChunks; // PSCR, PZFI, DLCF, SPAT
+	
+	std::vector<std::string> zipFilesIncluded;
+	std::vector<std::string> dlcFiles;
+	std::vector<std::string> scenePaths;
+
+	std::vector<Chunk> remainingChunks; // such as PSCR
 
 	void LoadSceneSPK(const char *fn);
 	Chunk ConstructSPK();
