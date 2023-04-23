@@ -189,6 +189,79 @@ void IGMessageValue(const char* name, uint32_t& ref)
 	}
 }
 
+class c47editException : public std::runtime_error { using std::runtime_error::runtime_error; };
+
+std::unique_ptr<Scene> ExtractSubscene(Scene& ogScene, GameObject* ogObject)
+{
+	auto subscenePtr = std::make_unique<Scene>();
+	Scene& subscene = *subscenePtr;
+	subscene.LoadEmpty();
+	std::map<GameObject*, GameObject*> cloneMap;
+	auto walkObj = [&cloneMap](GameObject* obj, GameObject* parent, auto& rec) -> void {
+		GameObject* clone = new GameObject(*obj);
+		clone->subobj.clear();
+		clone->parent = parent;
+		parent->subobj.push_back(clone);
+		cloneMap[obj] = clone;
+		for (GameObject* child : obj->subobj)
+			rec(child, clone, rec);
+	};
+	walkObj(ogObject, subscene.rootobj, walkObj);
+
+	if (!ogScene.lgtPack.subchunks.empty())
+		subscene.lgtPack.subchunks.emplace_back(ogScene.lgtPack.subchunks[0]);
+	std::map<int, int> textureMap;
+	auto fixref = [&cloneMap](GORef& ref) {
+		if (ref) {
+			auto it = cloneMap.find(ref.get());
+			if (it == cloneMap.end())
+				throw c47editException("Reference to object outside of the subscene");
+			ref = it->second;
+		}
+	};
+	for (const auto& [obj, clone] : cloneMap) {
+		for (auto& de : clone->dbl.entries) {
+			if (de.type == 8)
+				fixref(std::get<GORef>(de.value));
+			else if (de.type == 9)
+				for (auto& go : std::get<std::vector<GORef>>(de.value))
+					fixref(go);
+		}
+
+		if (clone->mesh) {
+			for (auto& face : clone->mesh->ftxFaces) {
+				for (auto& [flag, index] : std::array<std::pair<int, int>, 2>{ { {0x20, 2}, { 0x80, 3 } }}) {
+					if ((face[0] & flag) && !(face[index] & 0x8000)) {
+						int ogTexId = face[index];
+						auto it = textureMap.find(ogTexId);
+						if (it != textureMap.end()) {
+							face[index] = (uint16_t)it->second;
+						}
+						else {
+							subscene.numTextures += 1;
+							auto [ogPal, ogDxt] = FindTextureChunk(ogScene, ogTexId);
+							if (ogDxt) {
+								auto& texCopyPal = subscene.palPack.subchunks.emplace_back(*ogPal);
+								auto& texCopyDxt = subscene.dxtPack.subchunks.emplace_back(*ogDxt);
+								*(uint32_t*)texCopyPal.maindata.data() = subscene.numTextures;
+								*(uint32_t*)texCopyDxt.maindata.data() = subscene.numTextures;
+							}
+							else {
+								auto& texCopyLgt = subscene.lgtPack.subchunks.emplace_back(*ogPal);
+								*(uint32_t*)texCopyLgt.maindata.data() = subscene.numTextures;
+							}
+							textureMap[ogTexId] = subscene.numTextures;
+							face[index] = (uint16_t)subscene.numTextures;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return subscenePtr;
+}
+
 void IGOTNode(GameObject *o)
 {
 	bool op, colorpushed = 0;
@@ -232,6 +305,25 @@ void IGOTNode(GameObject *o)
 		if (ImGui::MenuItem("Default", nullptr, vis == ObjVisibility::Default)) objVisibilityMap[o] = ObjVisibility::Default;
 		if (ImGui::MenuItem("Show", nullptr, vis == ObjVisibility::Show)) objVisibilityMap[o] = ObjVisibility::Show;
 		if (ImGui::MenuItem("Hide", nullptr, vis == ObjVisibility::Hide)) objVisibilityMap[o] = ObjVisibility::Hide;
+		ImGui::Separator();
+		if (ImGui::MenuItem("Extract subscene")) {
+			std::string fname = o->name;
+			for (char& c : fname)
+				if (c == '/' || c == '\\')
+					c = '!';
+			auto fpath = GuiUtils::SaveDialogBox("Scene (*.zip)\0*.zip\0\0\0\0\0", "zip", fname.c_str());
+			if (!fpath.empty()) {
+				try {
+					auto subscenePtr = ExtractSubscene(g_scene, o);
+					subscenePtr->SaveSceneSPK(fpath.string().c_str());
+				}
+				catch (const std::exception& exc) {
+					std::string msg = "Failed to extract subscene!\nReason: ";
+					msg += exc.what();
+					MessageBoxA(hWindow, msg.c_str(), "c47edit", 16);
+				}
+			}
+		}
 		ImGui::EndPopup();
 	}
 	ImGui::PopID();
