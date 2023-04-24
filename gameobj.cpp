@@ -153,7 +153,7 @@ void Scene::LoadEmpty()
 
 	dlcFiles = { "GeomsBase.dlc", "EventsBase.dlc" };
 	scenePaths = { "Worlds", "Masters", "Z:\\c47edit", "Sounds", "" };
-	zdefValues.entries.emplace_back().type = 6;
+	zdefValues.entries.emplace_back().type = DBLEntry::EType::TERMINATOR;
 
 	ready = true;
 }
@@ -970,16 +970,17 @@ void Scene::GiveObject(GameObject *o, GameObject *t)
 
 void DBLList::addMembers(const std::vector<ClassInfo::ObjectMember>& members)
 {
+	using ET = DBLEntry::EType;
 	for (auto& mem : members) {
 		auto& cm = mem.info;
 		auto& defValue = cm->defaultValue;
 		DBLEntry& de = entries.emplace_back();
 		if (cm->type == "DOUBLE") {
-			de.type = 1;
+			de.type = ET::DOUBLE;
 			de.value.emplace<double>(defValue.empty() ? 0.0f : std::stod(defValue));
 		}
 		else if (cm->type == "FLOAT") {
-			de.type = 2;
+			de.type = ET::FLOAT;
 			de.value.emplace<float>(defValue.empty() ? 0.0f : std::stof(defValue));
 		}
 		else if (cm->type == "INT" || cm->type == "LONG" || cm->type == "BOOL" || cm->type == "COLOR") {
@@ -990,47 +991,47 @@ void DBLList::addMembers(const std::vector<ClassInfo::ObjectMember>& members)
 				value = 1;
 			else
 				value = std::stoi(defValue);
-			de.type = 3;
+			de.type = ET::INT;
 			de.value.emplace<uint32_t>(value);
 		}
 		else if (cm->type == "ENUM") {
-			de.type = 3;
+			de.type = ET::INT;
 			de.value.emplace<uint32_t>(0);
 		}
 		else if (cm->type == "WINOBJTYPE") {
-			de.type = 3;
+			de.type = ET::INT;
 			de.value.emplace<uint32_t>(0);
 		}
 		else if (cm->type == "CHAR*" || cm->type == "SUBPIC") {
-			de.type = 4;
+			de.type = ET::STRING;
 			de.value.emplace<std::string>(defValue);
 		}
 		else if (cm->type == "DATA" || cm->type == "TABLE") {
-			de.type = 7;
+			de.type = ET::DATA;
 			de.value.emplace<std::vector<uint8_t>>();
 		}
 		else if (cm->type == "ZGEOMREF") {
-			de.type = 8;
+			de.type = ET::ZGEOMREF;
 			de.value.emplace<GORef>();
 		}
 		else if (cm->type == "ZGEOMREFTAB") {
-			de.type = 9;
+			de.type = ET::ZGEOMREFTAB;
 			de.value.emplace<std::vector<GORef>>();
 		}
 		else if (cm->type == "MSG") {
-			de.type = 10;
+			de.type = ET::MSG;
 			de.value.emplace<uint32_t>(0);
 		}
 		else if (cm->type == "SNDREF" || cm->type == "SNDSETREF") {
-			de.type = 11;
+			de.type = ET::SNDREF;
 			de.value.emplace<AudioRef>();
 		}
 		else if (cm->type == "SCRIPT") {
-			de.type = 12;
+			de.type = ET::SCRIPT;
 			de.value.emplace<DBLList>();
 		}
 		else if (cm->type == "") {
-			de.type = 6;
+			de.type = ET::TERMINATOR;
 		}
 		else {
 			printf("What is %s?\n", cm->type.c_str());
@@ -1073,6 +1074,7 @@ const char * DBLEntry::getTypeName(int type)
 
 void DBLList::load(uint8_t* dpbeg, const std::map<uint32_t, GameObject*>& idobjmap)
 {
+	using ET = DBLEntry::EType;
 	auto decodeRef = [&idobjmap](uint32_t id) -> GameObject* {
 		if (id != 0)
 			return idobjmap.at(id);
@@ -1090,44 +1092,44 @@ void DBLList::load(uint8_t* dpbeg, const std::map<uint32_t, GameObject*>& idobjm
 			break;
 		}
 		DBLEntry& e = entries.emplace_back();
-		e.type = *dp & 0x3F;
+		e.type = ET(*dp & 0x3F);
 		e.flags = *dp & 0xC0;
 		dp++;
 		switch (e.type)
 		{
-		case 0:
+		case ET::UNDEFINED:
 			break;
-		case 1:
+		case ET::DOUBLE:
 			e.value = *(double*)dp;
 			dp += 8;
 			break;
-		case 2:
+		case ET::FLOAT:
 			e.value = *(float*)dp;
 			dp += 4;
 			break;
-		case 3:
-		case 0xA:
+		case ET::INT:
+		case ET::MSG:
 			e.value = *(uint32_t*)dp;
 			dp += 4;
 			break;
-		case 4:
-		case 5:
+		case ET::STRING:
+		case ET::FILE:
 			e.value.emplace<std::string>((const char*)dp);
 			while (*(dp++));
 			break;
-		case 6:
+		case ET::TERMINATOR:
 			break;
-		case 7: {
+		case ET::DATA: {
 			auto datsize = *(uint32_t*)dp - 4;
 			e.value.emplace<std::vector<uint8_t>>(dp + 4, dp + 4 + datsize);
 			dp += *(uint32_t*)dp;
 			break;
 		}
-		case 8:
+		case ET::ZGEOMREF:
 			e.value.emplace<GORef>(decodeRef(*(uint32_t*)dp));
 			dp += 4;
 			break;
-		case 9: {
+		case ET::ZGEOMREFTAB: {
 			uint32_t nobjs = (*(uint32_t*)dp - 4) / 4;
 			std::vector<GORef>& objlist = e.value.emplace<std::vector<GORef>>();
 			for (uint32_t i = 0; i < nobjs; i++)
@@ -1135,13 +1137,13 @@ void DBLList::load(uint8_t* dpbeg, const std::map<uint32_t, GameObject*>& idobjm
 			dp += *(uint32_t*)dp;
 			break;
 		}
-		case 0xB: {
+		case ET::SNDREF: {
 			AudioRef& aoref = e.value.emplace<AudioRef>();
 			aoref.id = *(uint32_t*)dp;
 			dp += 4;
 			break;
 		}
-		case 0xC: {
+		case ET::SCRIPT: {
 			DBLList& sublist = e.value.emplace<DBLList>();
 			uint32_t dblsize = *(uint32_t*)dp;
 			sublist.load(dp, idobjmap);
@@ -1156,42 +1158,43 @@ void DBLList::load(uint8_t* dpbeg, const std::map<uint32_t, GameObject*>& idobjm
 
 std::string DBLList::save(SceneSaver& sceneSaver)
 {
+	using ET = DBLEntry::EType;
 	ByteWriter<std::string> dblsav;
 	dblsav.addU32(0);
 	for (auto e = entries.begin(); e != entries.end(); e++)
 	{
-		uint8_t typ = e->type | e->flags;
+		uint8_t typ = (uint8_t)e->type | e->flags;
 		dblsav.addU8(typ);
 		switch (e->type)
 		{
-		case 0:
+		case ET::UNDEFINED:
 			break;
-		case 1:
+		case ET::DOUBLE:
 			dblsav.addDouble(std::get<double>(e->value)); break;
-		case 2:
+		case ET::FLOAT:
 			dblsav.addFloat(std::get<float>(e->value)); break;
-		case 3:
-		case 0xA:
+		case ET::INT:
+		case ET::MSG:
 			dblsav.addU32(std::get<uint32_t>(e->value)); break;
-		case 4:
-		case 5:
+		case ET::STRING:
+		case ET::FILE:
 			dblsav.addStringNT(std::get<std::string>(e->value)); break;
-		case 6:
+		case ET::TERMINATOR:
 			break;
-		case 7:
+		case ET::DATA:
 		{
 			auto& vec = std::get<std::vector<uint8_t>>(e->value);
 			dblsav.addU32((uint32_t)vec.size() + 4);
 			dblsav.addData(vec.data(), vec.size());
 			break;
 		}
-		case 8:
+		case ET::ZGEOMREF:
 		{
 			auto& obj = std::get<GORef>(e->value);
 			uint32_t x = sceneSaver.objidmap[obj.get()];
 			dblsav.addU32(x); break;
 		}
-		case 9:
+		case ET::ZGEOMREFTAB:
 		{
 			auto& vec = std::get<std::vector<GORef>>(e->value);
 			uint32_t siz = (uint32_t)vec.size() * 4 + 4;
@@ -1202,9 +1205,9 @@ std::string DBLList::save(SceneSaver& sceneSaver)
 			}
 			break;
 		}
-		case 0xB:
+		case ET::SNDREF:
 			dblsav.addU32(std::get<AudioRef>(e->value).id); break;
-		case 0xC:
+		case ET::SCRIPT:
 		{
 			auto& sublist = std::get<DBLList>(e->value);
 			auto subdblsav = sublist.save(sceneSaver);

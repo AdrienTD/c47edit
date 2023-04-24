@@ -219,9 +219,9 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 	};
 	for (const auto& [obj, clone] : cloneMap) {
 		for (auto& de : clone->dbl.entries) {
-			if (de.type == 8)
+			if (de.type == DBLEntry::EType::ZGEOMREF)
 				fixref(std::get<GORef>(de.value));
-			else if (de.type == 9)
+			else if (de.type == DBLEntry::EType::ZGEOMREFTAB)
 				for (auto& go : std::get<std::vector<GORef>>(de.value))
 					fixref(go);
 		}
@@ -586,15 +586,16 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 			ImGui::BeginDisabled();
 		ImGui::Text("%1X", e->flags >> 4);
 		ImGui::SameLine();
+		using ET = DBLEntry::EType;
 		switch (e->type)
 		{
-		case 0:
+		case ET::UNDEFINED:
 			ImGui::Text("0"); break;
-		case 1:
+		case ET::DOUBLE:
 			ImGui::InputDouble(name.c_str(), &std::get<double>(e->value)); break;
-		case 2:
+		case ET::FLOAT:
 			ImGui::InputFloat(name.c_str(), &std::get<float>(e->value)); break;
-		case 3:
+		case ET::INT:
 		{
 			uint32_t& ref = std::get<uint32_t>(e->value);
 			if (mem->type == "BOOL") {
@@ -615,17 +616,17 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 			}
 			break;
 		}
-		case 4:
-		case 5:
+		case ET::STRING:
+		case ET::FILE:
 		{
 			auto& str = std::get<std::string>(e->value);
 			//IGStdStringInput((e->type == 5) ? "Filename" : "String", str);
 			IGStdStringInput(name.c_str(), str);
 			break;
 		}
-		case 6:
+		case ET::TERMINATOR:
 			ImGui::Separator(); break;
-		case 7: {
+		case ET::DATA: {
 			auto& data = std::get<std::vector<uint8_t>>(e->value);
 			ImGui::Text("Data (%s): %zu bytes", name.c_str(), data.size());
 			ImGui::SameLine();
@@ -690,7 +691,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 			}
 			break;
 		}
-		case 8:
+		case ET::ZGEOMREF:
 			if (auto& obj = std::get<GORef>(e->value); obj.valid()) {
 				ImGui::LabelText(name.c_str(), "Object %s::%s", ClassInfo::GetObjTypeString(obj->type), obj->name.c_str());
 				if (ImGui::IsItemClicked())
@@ -707,7 +708,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 				ImGui::EndDragDropTarget();
 			}
 			break;
-		case 9: {
+		case ET::ZGEOMREFTAB: {
 			auto& vec = std::get<std::vector<GORef>>(e->value);
 			if (ImGui::BeginListBox("##Objlist", ImVec2(0, 64))) {
 				for (auto& obj : vec)
@@ -730,14 +731,14 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 			}
 			break;
 		}
-		case 0xA:
+		case ET::MSG:
 			IGMessageValue(name.c_str(), std::get<uint32_t>(e->value));
 			break;
-		case 0xB: {
+		case ET::SNDREF: {
 			IGAudioRef(name.c_str(), std::get<AudioRef>(e->value));
 			break;
 		}
-		case 0xC: {
+		case ET::SCRIPT: {
 			ImGui::Indent();
 			static const ClassInfo::ClassMember scriptHeader[2] = { {"", "ScriptFile"}, {"", "ScriptMembers"} };
 			static const std::vector<ClassInfo::ObjectMember> oScriptHeader = { {&scriptHeader[0]}, {&scriptHeader[1]} };
@@ -745,8 +746,6 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 			ImGui::Unindent();
 			break;
 		}
-		case 0x3F:
-			ImGui::Text("End"); break;
 		default:
 			ImGui::Text("Unknown type %u", e->type); break;
 		}

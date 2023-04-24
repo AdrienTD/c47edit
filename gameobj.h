@@ -103,7 +103,23 @@ struct DBLList {
 
 struct DBLEntry
 {
-	int type = 0;
+	enum class EType : int {
+		UNDEFINED = 0,
+		DOUBLE = 1,
+		FLOAT = 2,
+		INT = 3,
+		STRING = 4,
+		FILE = 5,
+		TERMINATOR = 6,
+		DATA = 7,
+		ZGEOMREF = 8,
+		ZGEOMREFTAB = 9,
+		MSG = 10,
+		SNDREF = 11,
+		SCRIPT = 12
+	};
+
+	EType type = EType::UNDEFINED;
 	int flags = 0;
 	using VariantType = std::variant<std::monostate, double, float, uint32_t, std::string, std::vector<uint8_t>, GORef, std::vector<GORef>, DBLList, AudioRef>;
 	VariantType value;
