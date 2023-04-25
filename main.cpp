@@ -191,8 +191,43 @@ void IGMessageValue(const char* name, uint32_t& ref)
 
 class c47editException : public std::runtime_error { using std::runtime_error::runtime_error; };
 
+template <typename F>
+void VisitAudioObject(AudioObject* obj, const F& lambda) {
+	if (obj->getType() == WaveAudioObject::TYPEID)
+		lambda((WaveAudioObject*)obj);
+	else if (obj->getType() == SoundAudioObject::TYPEID)
+		lambda((SoundAudioObject*)obj);
+	else if (obj->getType() == SetAudioObject::TYPEID)
+		lambda((SetAudioObject*)obj);
+	else if (obj->getType() == MaterialAudioObject::TYPEID)
+		lambda((MaterialAudioObject*)obj);
+	else if (obj->getType() == ImpactAudioObject::TYPEID)
+		lambda((ImpactAudioObject*)obj);
+	else if (obj->getType() == RoomAudioObject::TYPEID)
+		lambda((RoomAudioObject*)obj);
+}
+
+struct AudioRefReflector {
+	std::function<void(AudioRef&)>& cloner;
+	template <typename T> void member(T& val, const char* name) {}
+	template <> void member(AudioRef& val, const char* name) { cloner(val); }
+};
+
 void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogObject)
 {
+	auto getMessageId = [](Scene& scene, const std::string& name) -> uint32_t {
+		for (auto& [id, name_desc_pair] : scene.msgDefinitions)
+			if (name_desc_pair.first == name)
+				return id;
+		return 0;
+	};
+	auto getSoundId = [](Scene& scene, const std::string& name) -> uint32_t {
+		for (size_t i = 1; i < scene.audioMgr.audioNames.size(); ++i)
+			if (scene.audioMgr.audioNames[i] == name)
+				return (uint32_t)i;
+		return 0;
+	};
+
 	std::map<GameObject*, GameObject*> cloneMap;
 	auto walkObj = [&cloneMap,&destScene](GameObject* obj, GameObject* parent, auto& rec) -> void {
 		GameObject* clone = new GameObject(*obj);
@@ -224,6 +259,68 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 			else if (de.type == DBLEntry::EType::ZGEOMREFTAB)
 				for (auto& go : std::get<std::vector<GORef>>(de.value))
 					fixref(go);
+			else if (de.type == DBLEntry::EType::SNDREF) {
+				std::function<void(AudioRef&)> fixAudioRef;
+				AudioRefReflector arr{ fixAudioRef };
+				fixAudioRef = [&srcScene, &destScene, &getSoundId, &arr](AudioRef& aref) -> void {
+					if (aref.id == 0)
+						return;
+					const auto& name = srcScene.audioMgr.audioNames[aref.id];
+					uint32_t destId = getSoundId(destScene, name);
+					if (!destId || !destScene.audioMgr.audioObjects[destId]) {
+						if (!destId) {
+							destId = destScene.audioMgr.audioObjects.size();
+							destScene.audioMgr.allocateSlot(destId);
+							destScene.audioMgr.audioNames[destId] = name;
+						}
+						AudioObject* srcAudioObj = srcScene.audioMgr.audioObjects[aref.id].get();
+						VisitAudioObject(srcAudioObj, [&arr, &destId, &destScene](auto* derSrcAudioObj) -> void {
+							using AOT = std::remove_pointer_t<decltype(derSrcAudioObj)>;
+							auto clonePtr = std::make_shared<AOT>(*derSrcAudioObj);;
+							clonePtr->reflect(arr);
+							destScene.audioMgr.audioObjects[destId] = std::move(clonePtr);
+							});
+						if (srcAudioObj->getType() == WaveAudioObject::TYPEID) {
+							// find the index in the source Pack.WAV
+							int srcWaveIndex = 0;
+							for (auto& ptr : srcScene.audioMgr.audioObjects) {
+								if (ptr && ptr->getType() == WaveAudioObject::TYPEID) {
+									if (ptr.get() == srcAudioObj)
+										break;
+									srcWaveIndex += 1;
+								}
+							}
+							// find the index in the destination Pack.WAV
+							int destWaveIndex = 0;
+							AudioObject* destWaveObj = destScene.audioMgr.audioObjects[destId].get();
+							for (auto& ptr : destScene.audioMgr.audioObjects) {
+								if (ptr && ptr->getType() == WaveAudioObject::TYPEID) {
+									if (ptr.get() == destWaveObj)
+										break;
+									destWaveIndex += 1;
+								}
+							}
+							// then do the copy
+							destScene.wavPack.subchunks.insert(destScene.wavPack.subchunks.begin() + destWaveIndex, srcScene.wavPack.subchunks.at(srcWaveIndex));
+						}
+					}
+					aref.id = destId;
+				};
+				AudioRef& aref = std::get<AudioRef>(de.value);
+				fixAudioRef(aref);
+			}
+			else if (de.type == DBLEntry::EType::MSG) {
+				uint32_t mid = std::get<uint32_t>(de.value);
+				if (mid != 0) {
+					auto& [name, desc] = srcScene.msgDefinitions.at(mid);
+					uint32_t destId = getMessageId(destScene, name);
+					if (!destId) {
+						destId = destScene.msgDefinitions.empty() ? 1 : destScene.msgDefinitions.rbegin()->first + 1;
+						destScene.msgDefinitions[destId] = { name, desc };
+					}
+					de.value = destId;
+				}
+			}
 		}
 
 		if (clone->mesh) {

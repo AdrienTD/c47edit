@@ -155,6 +155,9 @@ void Scene::LoadEmpty()
 	scenePaths = { "Worlds", "Masters", "Z:\\c47edit", "Sounds", "" };
 	zdefValues.entries.emplace_back().type = DBLEntry::EType::TERMINATOR;
 
+	audioMgr.audioNames.resize(1);
+	audioMgr.audioObjects.resize(1);
+
 	ready = true;
 }
 
