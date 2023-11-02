@@ -902,7 +902,7 @@ void IGObjectInfo()
 			Matrix my = Matrix::getRotationYMatrix(rota.y);
 			Matrix mx = Matrix::getRotationXMatrix(rota.x);
 			Matrix mz = Matrix::getRotationZMatrix(rota.z);
-			selobj->matrix = mz * mx * my;
+			selobj->matrix = mz * mx * my * Matrix::getTranslationMatrix(selobj->matrix.getTranslationVector());
 		}
 		ImGui::Text("Num. references: %zu", selobj->getRefCount());
 		if (ImGui::CollapsingHeader("Properties (DBL)"))
