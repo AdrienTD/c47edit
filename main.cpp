@@ -791,11 +791,17 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 		case ET::ZGEOMREF:
 			if (auto& obj = std::get<GORef>(e->value); obj.valid()) {
 				ImGui::LabelText(name.c_str(), "Object %s::%s", ClassInfo::GetObjTypeString(obj->type), obj->name.c_str());
-				if (ImGui::IsItemClicked())
+				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 					nextobjtosel = obj.get();
 			}
 			else
 				ImGui::LabelText(name.c_str(), "Object <Invalid>");
+
+			if (ImGui::BeginPopupContextItem("ObjRefMenu")) {
+				if (ImGui::MenuItem("Clear"))
+					e->value = GORef();
+				ImGui::EndPopup();
+			}
 			if (ImGui::BeginDragDropTarget())
 			{
 				if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("GameObject"))
@@ -808,11 +814,21 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 		case ET::ZGEOMREFTAB: {
 			auto& vec = std::get<std::vector<GORef>>(e->value);
 			if (ImGui::BeginListBox("##Objlist", ImVec2(0, 64))) {
+				int id = 0;
 				for (auto& obj : vec)
 				{
-					ImGui::Text("%s", obj->name.c_str());
-					if (ImGui::IsItemClicked())
+					ImGui::PushID(id++);
+					if (obj.valid())
+						ImGui::Text("%s", obj->name.c_str());
+					else
+						ImGui::TextUnformatted("<Invalid>");
+					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 						nextobjtosel = obj.get();
+					if (ImGui::BeginPopupContextItem("ObjRefMenu")) {
+						if (ImGui::MenuItem("Clear"))
+							obj.deref();
+						ImGui::EndPopup();
+					}
 					if (ImGui::BeginDragDropTarget())
 					{
 						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("GameObject"))
@@ -821,10 +837,17 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 						}
 						ImGui::EndDragDropTarget();
 					}
+					ImGui::PopID();
 				}
 				ImGui::EndListBox();
 				ImGui::SameLine();
-				ImGui::Text("%s\n%zu objects", name.c_str(), vec.size());
+				ImGui::BeginGroup();
+				ImGui::Text("%s\n\nCount:", name.c_str());
+				ImGui::SetNextItemWidth(-1.0f);
+				uint32_t listCount = (uint32_t)vec.size();
+				if (ImGui::InputScalar("##ListLabel", ImGuiDataType_U32, &listCount, nullptr, nullptr, nullptr, ImGuiInputTextFlags_EnterReturnsTrue))
+					vec.resize(listCount);
+				ImGui::EndGroup();
 			}
 			break;
 		}
