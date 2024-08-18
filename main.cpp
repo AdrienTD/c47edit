@@ -23,6 +23,7 @@
 #include "GuiUtils.h"
 #include "debug.h"
 #include "ModelImporter.h"
+#include "PathfinderInfo.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -88,6 +89,7 @@ bool wndShowTextures = false;
 bool wndShowSounds = false;
 bool wndShowAudioObjects = false;
 bool wndShowZDefines = false;
+bool wndShowPathfinderInfo = false;
 
 extern HWND hWindow;
 
@@ -1547,6 +1549,82 @@ void IGZDefines()
 		selobj = nextobjtosel;
 }
 
+GORef g_pathfinderObject;
+PfInfo g_pfInfo;
+bool g_renderPfInfo = false;
+
+void IGPathfinderInfo()
+{
+	ImGui::Begin("Pathfinder info", &wndShowPathfinderInfo);
+	auto walkObj = [](GameObject* obj, const auto& rec) -> void {
+		if (obj->type == 111) { // ZPathFinder2
+			if (ImGui::Selectable(obj->name.c_str(), g_pathfinderObject.get() == obj)) {
+				g_pathfinderObject = obj;
+				auto& dblEntry = obj->dbl.entries.at(14);
+				auto& pfdata = std::get<std::vector<uint8_t>>(dblEntry.value);
+				g_pfInfo = PfInfo::fromBytes(pfdata.data());
+			}
+		}
+		for (GameObject* child : obj->subobj)
+			rec(child, rec);
+		};
+	if (ImGui::BeginCombo("Pathfinder Object", g_pathfinderObject ? g_pathfinderObject->name.c_str() : "")) {
+		walkObj(g_scene.rootobj, walkObj);
+		ImGui::EndCombo();
+	}
+	ImGui::Checkbox("Render", &g_renderPfInfo);
+	ImGui::Separator();
+	if (GameObject* pathfinderObject = g_pathfinderObject.get()) {
+		ImGui::Text("Num rooms: %zu", g_pfInfo.rooms.size());
+		ImGui::Text("Num room instances: %zu", g_pfInfo.roomInstances.size());
+		ImGui::Text("Num door instances: %zu", g_pfInfo.doorInstances.size());
+		ImGui::Text("Last value: %u", g_pfInfo.lastValue);
+	}
+	ImGui::End();
+}
+
+void DrawBox(const Vector3& minCoords, const Vector3& maxCoords)
+{
+	Vector3 box0(minCoords.x, minCoords.y, minCoords.z);
+	Vector3 box1(minCoords.x, minCoords.y, maxCoords.z);
+	Vector3 box2(maxCoords.x, minCoords.y, maxCoords.z);
+	Vector3 box3(maxCoords.x, minCoords.y, minCoords.z);
+	Vector3 box4(minCoords.x, maxCoords.y, minCoords.z);
+	Vector3 box5(minCoords.x, maxCoords.y, maxCoords.z);
+	Vector3 box6(maxCoords.x, maxCoords.y, maxCoords.z);
+	Vector3 box7(maxCoords.x, maxCoords.y, minCoords.z);
+	glBegin(GL_LINES);
+	glVertex3fv(&box0.x); glVertex3fv(&box1.x);
+	glVertex3fv(&box1.x); glVertex3fv(&box2.x);
+	glVertex3fv(&box2.x); glVertex3fv(&box3.x);
+	glVertex3fv(&box3.x); glVertex3fv(&box0.x);
+	glVertex3fv(&box4.x); glVertex3fv(&box5.x);
+	glVertex3fv(&box5.x); glVertex3fv(&box6.x);
+	glVertex3fv(&box6.x); glVertex3fv(&box7.x);
+	glVertex3fv(&box7.x); glVertex3fv(&box4.x);
+	glVertex3fv(&box0.x); glVertex3fv(&box4.x);
+	glVertex3fv(&box1.x); glVertex3fv(&box5.x);
+	glVertex3fv(&box2.x); glVertex3fv(&box6.x);
+	glVertex3fv(&box3.x); glVertex3fv(&box7.x);
+	glEnd();
+}
+
+void RenderPathfinderInfo()
+{
+	if (!g_pathfinderObject || !g_renderPfInfo)
+		return;
+	glDisable(GL_TEXTURE_2D);
+	for (const auto& room : g_pfInfo.rooms) {
+		glColor3f(0.0f, 0.5f, 1.0f);
+		DrawBox(room.minCoords, room.maxCoords);
+		for (const auto& door : room.doors) {
+			static const Vector3 adjustVec = Vector3(1.0f, 1.0f, 1.0f) * 10.0f;
+			glColor3f(1.0f, 0.5f, 0.0f);
+			DrawBox(door.position - adjustVec, door.position + adjustVec);
+		}
+	}
+}
+
 GameObject* FindObjectNamed(const char *name, GameObject *sup = g_scene.rootobj)
 {
 	if (sup->name == name)
@@ -1665,6 +1743,8 @@ void UIClean()
 	bestpickobj = nullptr;
 	objtogive = nullptr;
 	nextobjtosel = nullptr;
+	g_pathfinderObject = nullptr;
+	g_pfInfo = {};
 }
 
 bool CmdOpenScene()
@@ -1817,6 +1897,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			if (wndShowSounds) IGSounds();
 			if (wndShowAudioObjects) IGAudioObjects();
 			if (wndShowZDefines) IGZDefines();
+			if (wndShowPathfinderInfo) IGPathfinderInfo();
 			if (ImGui::BeginMainMenuBar()) {
 				if (ImGui::BeginMenu("Scene")) {
 					if (ImGui::MenuItem("New"))
@@ -1858,6 +1939,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 					ImGui::MenuItem("Waves", nullptr, &wndShowSounds);
 					ImGui::MenuItem("Audio objects", nullptr, &wndShowAudioObjects);
 					ImGui::MenuItem("ZDefines", nullptr, &wndShowZDefines);
+					ImGui::MenuItem("Pathfinder info", nullptr, &wndShowPathfinderInfo);
 					ImGui::EndMenu();
 				}
 				if (ImGui::BeginMenu("Help")) {
@@ -1947,6 +2029,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			glVertex3f(cursorpos.x, cursorpos.y, cursorpos.z);
 			glEnd();
 			glPointSize(1);
+
+			RenderPathfinderInfo();
 
 			ImGui::Render();
 			ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());

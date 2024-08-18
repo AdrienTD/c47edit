@@ -138,6 +138,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ModelImporter.cpp" />
     <ClCompile Include="ObjModel.cpp" />
+    <ClCompile Include="PathfinderInfo.cpp" />
     <ClCompile Include="stb_implementations.cpp" />
     <ClCompile Include="texture.cpp" />
     <ClCompile Include="vecmat.cpp" />
@@ -146,6 +147,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AudioManager.h" />
+    <ClInclude Include="ByteReader.h" />
     <ClInclude Include="ByteWriter.h" />
     <ClInclude Include="chunk.h" />
     <ClInclude Include="classInfo.h" />
@@ -160,6 +162,7 @@
     <ClInclude Include="imgui\imgui_impl_win32.h" />
     <ClInclude Include="ModelImporter.h" />
     <ClInclude Include="ObjModel.h" />
+    <ClInclude Include="PathfinderInfo.h" />
     <ClInclude Include="texture.h" />
     <ClInclude Include="vecmat.h" />
     <ClInclude Include="video.h" />
