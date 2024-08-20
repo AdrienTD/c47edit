@@ -17,15 +17,15 @@ PfInfo PfInfo::fromBytes(const void* data)
     for (auto& room : info.rooms) {
         room.leafNodes.resize(reader.readUint32());
         for (auto& leafNode : room.leafNodes) {
-            reader.readTo(leafNode.unk1, leafNode.unk2, leafNode.unk3, leafNode.unk4, leafNode.unk5, leafNode.unk6);
+            reader.readTo(leafNode.unk1, leafNode.whatIndex, leafNode.unk3, leafNode.unk4, leafNode.unk5, leafNode.unk6);
         }
         room.nodes.resize(reader.readUint32());
         for (auto& node : room.nodes) {
-            reader.readTo(node.unk1, node.unk2, node.unk3, node.unk4, node.unk5);
+            reader.readTo(node.value, node.comparison, node.leftNodeIndex, node.rightNodeIndex);
         }
         room.layers.resize(reader.readUint32());
         for (auto& layer : room.layers) {
-            reader.readTo(layer.data);
+            reader.readTo(layer.startNodeIndex);
         }
         room.whats.resize(reader.readUint32());
         for (auto& what : room.whats) {
@@ -36,7 +36,7 @@ PfInfo PfInfo::fromBytes(const void* data)
         }
         reader.readTo(room.minCoords);
         reader.readTo(room.maxCoords);
-        reader.readTo(room.altVec);
+        reader.readTo(room.resolution);
 
         room.doors.resize(reader.readUint32());
         for (auto& door : room.doors) {

@@ -1583,7 +1583,7 @@ void IGPathfinderInfo()
 	ImGui::End();
 }
 
-void DrawBox(const Vector3& minCoords, const Vector3& maxCoords)
+void DrawBox(const Vector3& minCoords, const Vector3& maxCoords, bool filled = false)
 {
 	Vector3 box0(minCoords.x, minCoords.y, minCoords.z);
 	Vector3 box1(minCoords.x, minCoords.y, maxCoords.z);
@@ -1593,20 +1593,56 @@ void DrawBox(const Vector3& minCoords, const Vector3& maxCoords)
 	Vector3 box5(minCoords.x, maxCoords.y, maxCoords.z);
 	Vector3 box6(maxCoords.x, maxCoords.y, maxCoords.z);
 	Vector3 box7(maxCoords.x, maxCoords.y, minCoords.z);
-	glBegin(GL_LINES);
-	glVertex3fv(&box0.x); glVertex3fv(&box1.x);
-	glVertex3fv(&box1.x); glVertex3fv(&box2.x);
-	glVertex3fv(&box2.x); glVertex3fv(&box3.x);
-	glVertex3fv(&box3.x); glVertex3fv(&box0.x);
-	glVertex3fv(&box4.x); glVertex3fv(&box5.x);
-	glVertex3fv(&box5.x); glVertex3fv(&box6.x);
-	glVertex3fv(&box6.x); glVertex3fv(&box7.x);
-	glVertex3fv(&box7.x); glVertex3fv(&box4.x);
-	glVertex3fv(&box0.x); glVertex3fv(&box4.x);
-	glVertex3fv(&box1.x); glVertex3fv(&box5.x);
-	glVertex3fv(&box2.x); glVertex3fv(&box6.x);
-	glVertex3fv(&box3.x); glVertex3fv(&box7.x);
-	glEnd();
+	if (filled) {
+		glBegin(GL_QUADS);
+		glVertex3fv(&box3.x); glVertex3fv(&box2.x); glVertex3fv(&box1.x); glVertex3fv(&box0.x);
+		glVertex3fv(&box7.x); glVertex3fv(&box6.x);	glVertex3fv(&box5.x); glVertex3fv(&box4.x);
+		glVertex3fv(&box4.x); glVertex3fv(&box5.x);	glVertex3fv(&box1.x); glVertex3fv(&box0.x);
+		glVertex3fv(&box5.x); glVertex3fv(&box6.x);	glVertex3fv(&box2.x); glVertex3fv(&box1.x);
+		glVertex3fv(&box6.x); glVertex3fv(&box7.x);	glVertex3fv(&box3.x); glVertex3fv(&box2.x);
+		glVertex3fv(&box7.x); glVertex3fv(&box4.x);	glVertex3fv(&box0.x); glVertex3fv(&box3.x);
+		glEnd();
+	}
+	else {
+		glBegin(GL_LINES);
+		glVertex3fv(&box0.x); glVertex3fv(&box1.x);
+		glVertex3fv(&box1.x); glVertex3fv(&box2.x);
+		glVertex3fv(&box2.x); glVertex3fv(&box3.x);
+		glVertex3fv(&box3.x); glVertex3fv(&box0.x);
+		glVertex3fv(&box4.x); glVertex3fv(&box5.x);
+		glVertex3fv(&box5.x); glVertex3fv(&box6.x);
+		glVertex3fv(&box6.x); glVertex3fv(&box7.x);
+		glVertex3fv(&box7.x); glVertex3fv(&box4.x);
+		glVertex3fv(&box0.x); glVertex3fv(&box4.x);
+		glVertex3fv(&box1.x); glVertex3fv(&box5.x);
+		glVertex3fv(&box2.x); glVertex3fv(&box6.x);
+		glVertex3fv(&box3.x); glVertex3fv(&box7.x);
+		glEnd();
+	}
+}
+
+void DrawPfNode(const PfRoom& room, int layer, int nodeIndex, int minX, int minZ, int maxX, int maxZ)
+{
+	if (nodeIndex == 0)
+		return;
+	if (nodeIndex > 0) {
+		// not leaf
+		const auto& node = room.nodes[nodeIndex];
+		const auto cmp = node.comparison;
+		if (cmp == 0 || cmp == 2 || cmp == 5 || cmp == 7) {
+			DrawPfNode(room, layer, node.leftNodeIndex, minX, minZ, maxX, node.value);
+			DrawPfNode(room, layer, node.rightNodeIndex, minX, node.value, maxX, maxZ);
+		}
+		else {
+			DrawPfNode(room, layer, node.leftNodeIndex, minX, minZ, node.value, maxZ);
+			DrawPfNode(room, layer, node.rightNodeIndex, node.value, minZ, maxX, maxZ);
+		}
+	}
+	else {
+		// leaf
+		DrawBox(room.minCoords + Vector3(minX, layer, minZ) * room.resolution,
+			room.minCoords + Vector3(maxX, layer + 1, maxZ) * room.resolution, true);
+	}
 }
 
 void RenderPathfinderInfo()
@@ -1621,6 +1657,11 @@ void RenderPathfinderInfo()
 			static const Vector3 adjustVec = Vector3(1.0f, 1.0f, 1.0f) * 10.0f;
 			glColor3f(1.0f, 0.5f, 0.0f);
 			DrawBox(door.position - adjustVec, door.position + adjustVec);
+		}
+		const Vector3 numBlocks = (room.maxCoords - room.minCoords) / room.resolution;
+		for (int layer = 0; layer < room.layers.size(); ++layer) {
+			glColor3f(0.5f, 1.0f, 0.5f);
+			DrawPfNode(room, layer, room.layers[layer].startNodeIndex, 0, 0, (int)numBlocks.x, (int)numBlocks.z);
 		}
 	}
 }
