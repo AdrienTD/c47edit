@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <random>
 
 #include "chunk.h"
 #include "classInfo.h"
@@ -1621,6 +1622,9 @@ void DrawBox(const Vector3& minCoords, const Vector3& maxCoords, bool filled = f
 	}
 }
 
+std::minstd_rand colorValueGenerator;
+std::uniform_int_distribution colorValueDistribution(0, 0xFFFFFF);
+
 void DrawPfNode(const PfRoom& room, int layer, int nodeIndex, int minX, int minZ, int maxX, int maxZ)
 {
 	if (nodeIndex == 0)
@@ -1640,6 +1644,8 @@ void DrawPfNode(const PfRoom& room, int layer, int nodeIndex, int minX, int minZ
 	}
 	else {
 		// leaf
+		int color = colorValueDistribution(colorValueGenerator);
+		glColor3ubv((uint8_t*)&color);
 		DrawBox(room.minCoords + Vector3(minX, layer, minZ) * room.resolution,
 			room.minCoords + Vector3(maxX, layer + 1, maxZ) * room.resolution, true);
 	}
@@ -1650,19 +1656,40 @@ void RenderPathfinderInfo()
 	if (!g_pathfinderObject || !g_renderPfInfo)
 		return;
 	glDisable(GL_TEXTURE_2D);
+	colorValueGenerator.seed();
+	colorValueDistribution.reset();
 	for (const auto& room : g_pfInfo.rooms) {
 		glColor3f(0.0f, 0.5f, 1.0f);
 		DrawBox(room.minCoords, room.maxCoords);
+		static const Vector3 adjustVec = Vector3(1.0f, 1.0f, 1.0f) * 10.0f;
+		glColor3f(1.0f, 0.5f, 0.0f);
 		for (const auto& door : room.doors) {
-			static const Vector3 adjustVec = Vector3(1.0f, 1.0f, 1.0f) * 10.0f;
-			glColor3f(1.0f, 0.5f, 0.0f);
 			DrawBox(door.position - adjustVec, door.position + adjustVec);
 		}
 		const Vector3 numBlocks = (room.maxCoords - room.minCoords) / room.resolution;
 		for (int layer = 0; layer < room.layers.size(); ++layer) {
-			glColor3f(0.5f, 1.0f, 0.5f);
+			//glColor3f(0.5f, 1.0f, 0.5f);
 			DrawPfNode(room, layer, room.layers[layer].startNodeIndex, 0, 0, (int)numBlocks.x, (int)numBlocks.z);
 		}
+
+		glColor3f(0.0f, 1.0f, 1.0f);
+		for (auto& leaf : room.leafNodes) {
+			Vector3 pos = room.minCoords + Vector3(leaf.centerX, leaf.centerY + 1.0f, leaf.centerZ) * room.resolution;
+			DrawBox(pos - adjustVec, pos + adjustVec);
+		}
+
+		glColor3f(1.0f, 1.0f, 1.0f);
+		glBegin(GL_LINES);
+		for (auto& leaf : room.leafNodes) {
+			for (int w = leaf.firstEdgeIndex; w < leaf.firstEdgeIndex + leaf.edgeCount; ++w) {
+				const PfLeafNode& neighbour = room.leafNodes[room.leafEdges[w].neighborLeafNodeIndex];
+				Vector3 start = room.minCoords + Vector3(leaf.centerX, leaf.centerY + 1.5f, leaf.centerZ) * room.resolution;
+				Vector3 end = room.minCoords + Vector3(neighbour.centerX, neighbour.centerY + 1.5f, neighbour.centerZ) * room.resolution;
+				glVertex3fv(&start.x);
+				glVertex3fv(&end.x);
+			}
+		}
+		glEnd();
 	}
 }
 

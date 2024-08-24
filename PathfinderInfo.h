@@ -7,11 +7,11 @@
 
 struct PfLeafNode
 {
-	int unk1;
-	int whatIndex;
-	float unk3;
-	float unk4;
-	float unk5;
+	int edgeCount;
+	int firstEdgeIndex;
+	float centerX;
+	float centerZ;
+	float centerY;
 	int unk6;
 };
 
@@ -28,10 +28,10 @@ struct PfLayer
 	int startNodeIndex;
 };
 
-struct PfWhat
+struct PfLeafEdge
 {
-	int unk1;
-	float unk2;
+	int neighborLeafNodeIndex;
+	float cost;
 };
 
 struct PfDoor
@@ -54,7 +54,7 @@ struct PfRoom
 	std::vector<PfLeafNode> leafNodes;
 	std::vector<PfNode> nodes;
 	std::vector<PfLayer> layers;
-	std::vector<PfWhat> whats;
+	std::vector<PfLeafEdge> leafEdges;
 	Vector3 minCoords;
 	Vector3 maxCoords;
 	Vector3 resolution;
