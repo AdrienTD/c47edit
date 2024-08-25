@@ -1025,7 +1025,7 @@ void DBLList::addMembers(const std::vector<ClassInfo::ObjectMember>& members)
 			de.type = ET::MSG;
 			de.value.emplace<uint32_t>(0);
 		}
-		else if (cm->type == "SNDREF" || cm->type == "SNDSETREF") {
+		else if (cm->type == "SNDREF" || cm->type == "SNDSETREF" || cm->type == "ROOMREF" || cm->type == "MATERIALREF") {
 			de.type = ET::SNDREF;
 			de.value.emplace<AudioRef>();
 		}

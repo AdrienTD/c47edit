@@ -1,5 +1,6 @@
 #include "PathfinderInfo.h"
 #include "ByteReader.h"
+#include "ByteWriter.h"
 
 PfInfo PfInfo::fromBytes(const void* data)
 {
@@ -81,4 +82,95 @@ PfInfo PfInfo::fromBytes(const void* data)
     reader.readTo(info.lastValue);
 
     return info;
+}
+
+std::vector<uint8_t> PfInfo::toBytes() const
+{
+    ByteWriter<std::vector<uint8_t>> writer;
+
+    writer.addU32(0x12312312);
+
+    ByteWriter<std::vector<uint8_t>> nameBuffer;
+    std::vector<int> roomNameOffsets(rooms.size(), 0);
+    std::vector<int> roomInstNameOffsets(rooms.size(), 0);
+    for (size_t i = 0; i < rooms.size(); ++i) {
+        auto& room = rooms[i];
+        roomNameOffsets[i] = (int)nameBuffer.size();
+        nameBuffer.addStringNT(room.unkString);
+    }
+    for (size_t i = 0; i < roomInstances.size(); ++i) {
+        auto& inst = roomInstances[i];
+        roomInstNameOffsets[i] = (int)nameBuffer.size();
+        nameBuffer.addStringNT(inst.name);
+    }
+
+    writer.addU32(nameBuffer.size());
+    writer.addData(nameBuffer.getPointer(), nameBuffer.size());
+
+    writer.addU32(rooms.size());
+    for (size_t r = 0; r < rooms.size(); ++r) {
+        auto& room = rooms[r];
+        writer.addU32(room.leafNodes.size());
+        for (auto& leafNode : room.leafNodes) {
+            writer.addValues(leafNode.edgeCount, leafNode.firstEdgeIndex, leafNode.centerX, leafNode.centerZ, leafNode.centerY, leafNode.unk6);
+        }
+        writer.addU32(room.nodes.size());
+        for (auto& node : room.nodes) {
+            writer.addValues(node.value, node.comparison, node.leftNodeIndex, node.rightNodeIndex);
+        }
+        writer.addU32(room.layers.size());
+        for (auto& layer : room.layers) {
+            writer.addValues(layer.startNodeIndex);
+        }
+        writer.addU32(room.leafEdges.size());
+        for (auto& what : room.leafEdges) {
+            writer.addValues(what.neighborLeafNodeIndex);
+        }
+        for (auto& what : room.leafEdges) {
+            writer.addValues(what.cost);
+        }
+        writer.addValue(room.minCoords);
+        writer.addValue(room.maxCoords);
+        writer.addValue(room.resolution);
+
+        writer.addU32(room.doors.size());
+        for (auto& door : room.doors) {
+            writer.addValues(door.position, door.unk);
+        }
+
+        for (auto& edge : room.doorEdges) {
+            writer.addValues(edge.unk1, edge.unk2, edge.unk3);
+        }
+
+        for (auto& door : room.doors) {
+            for (auto& x : door.addData)
+                writer.addValues(x);
+        }
+
+        writer.addU32(room.kongs.size());
+        for (auto& kong : room.kongs) {
+            writer.addValues(kong);
+        }
+
+        writer.addU32(roomNameOffsets[r]);
+    }
+
+    writer.addU32(roomInstances.size());
+    for (size_t i = 0; i < roomInstances.size(); ++i) {
+        auto& roomInst = roomInstances[i];
+        writer.addU32(roomInstNameOffsets[i]);
+        writer.addValue(roomInst.roomIndex);
+        for (auto& x : roomInst.doorInstanceIndices)
+            writer.addValue(x);
+    }
+
+    writer.addU32(doorInstances.size());
+    for (auto& doorInst : doorInstances) {
+        for (auto& x : doorInst.roomIndices)
+            writer.addValue(x);
+    }
+
+    writer.addValue(lastValue);
+
+    return writer.take();
 }

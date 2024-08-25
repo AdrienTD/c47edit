@@ -25,8 +25,11 @@ public:
 	}
 
 	template<typename V> void addValue(const V& val) {
-		static_assert(std::has_unique_object_representations_v<V>);
+		static_assert(std::is_trivially_copyable_v<V>);
 		addData(&val, sizeof(V));
+	}
+	template<typename ... Args> void addValues(const Args&... value) {
+		(addValue(value), ...);
 	}
 
 	void addU8(uint8_t val) { addData(&val, 1); }

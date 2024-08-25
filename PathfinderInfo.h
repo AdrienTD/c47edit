@@ -7,25 +7,25 @@
 
 struct PfLeafNode
 {
-	int edgeCount;
-	int firstEdgeIndex;
-	float centerX;
-	float centerZ;
-	float centerY;
-	int unk6;
+	int edgeCount = 0;
+	int firstEdgeIndex = 0;
+	float centerX = 0.0f;
+	float centerZ = 0.0f;
+	float centerY = 0.0f;
+	int unk6 = 0;
 };
 
 struct PfNode
 {
-	uint16_t value;
-	uint8_t comparison;
-	int leftNodeIndex;
-	int rightNodeIndex;
+	uint16_t value = 0;
+	uint8_t comparison = 0;
+	int leftNodeIndex = 0;
+	int rightNodeIndex = 0;
 };
 
 struct PfLayer
 {
-	int startNodeIndex;
+	int startNodeIndex = 0;
 };
 
 struct PfLeafEdge

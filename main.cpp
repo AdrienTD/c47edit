@@ -1576,10 +1576,70 @@ void IGPathfinderInfo()
 	ImGui::Checkbox("Render", &g_renderPfInfo);
 	ImGui::Separator();
 	if (GameObject* pathfinderObject = g_pathfinderObject.get()) {
+		if (ImGui::Button("Update")) {
+			pathfinderObject->dbl.entries.at(14).value = g_pfInfo.toBytes();
+		}
 		ImGui::Text("Num rooms: %zu", g_pfInfo.rooms.size());
 		ImGui::Text("Num room instances: %zu", g_pfInfo.roomInstances.size());
 		ImGui::Text("Num door instances: %zu", g_pfInfo.doorInstances.size());
 		ImGui::Text("Last value: %u", g_pfInfo.lastValue);
+		ImGui::Separator();
+		for (size_t i = 0; i < g_pfInfo.roomInstances.size(); ++i) {
+			auto& roomInst = g_pfInfo.roomInstances[i];
+			auto& room = g_pfInfo.rooms.at(roomInst.roomIndex);
+			if (ImGui::TreeNode((void*)i, "%s", roomInst.name.c_str())) {
+				IGStdStringInput("Name", roomInst.name);
+				Vector3 oldCoords = room.minCoords;
+				if (ImGui::DragFloat3("minCoords", &room.minCoords.x)) {
+					room.maxCoords += room.minCoords - oldCoords;
+				}
+				ImGui::TreePop();
+			}
+		}
+		if (ImGui::Button("New")) {
+			ImGui::OpenPopup("NewPfRoom");
+		}
+		if (ImGui::BeginPopup("NewPfRoom")) {
+			static Vector3 newResolution = Vector3(25.0f, 25.0f, 25.0f);
+			static std::array<int, 3> newBlockSize = { 100, 100, 100 };
+			ImGui::InputFloat3("Resolution", &newResolution.x);
+			ImGui::InputInt3("Blocks", newBlockSize.data());
+			if (ImGui::Button("Create")) {
+				PfNode node2;
+				node2.value = newBlockSize[0];
+				node2.comparison = 1;
+				node2.leftNodeIndex = 3;
+				node2.rightNodeIndex = 0;
+
+				PfNode node3;
+				node3.value = newBlockSize[2];
+				node3.comparison = 2;
+				node3.leftNodeIndex = -2;
+				node3.rightNodeIndex = 0;
+
+				PfLeafNode leaf2;
+				leaf2.centerX = (float)newBlockSize[0] / 2.0f;
+				leaf2.centerZ = (float)newBlockSize[2] / 2.0f;
+				leaf2.centerY = 1.0f;
+
+				int roomIndex = (int)g_pfInfo.rooms.size();
+
+				PfRoom& room = g_pfInfo.rooms.emplace_back();
+				room.leafNodes = { PfLeafNode(), PfLeafNode(), leaf2 };
+				room.nodes = { PfNode(), PfNode(), node2, node3 };
+				room.layers.resize(newBlockSize[1]);
+				room.layers[1].startNodeIndex = 2;
+				room.minCoords = Vector3(0.0f, 0.0f, 0.0f);
+				room.maxCoords = Vector3(newBlockSize[0], newBlockSize[1], newBlockSize[2]) * newResolution;
+				room.resolution = newResolution;
+				room.unkString = "huh";
+
+				PfRoomInstance& roomInst = g_pfInfo.roomInstances.emplace_back();
+				roomInst.name = "New room instance";
+				roomInst.roomIndex = roomIndex;
+			}
+			ImGui::EndPopup();
+		}
 	}
 	ImGui::End();
 }
@@ -1596,7 +1656,7 @@ void DrawBox(const Vector3& minCoords, const Vector3& maxCoords, bool filled = f
 	Vector3 box7(maxCoords.x, maxCoords.y, minCoords.z);
 	if (filled) {
 		glBegin(GL_QUADS);
-		glVertex3fv(&box3.x); glVertex3fv(&box2.x); glVertex3fv(&box1.x); glVertex3fv(&box0.x);
+		glVertex3fv(&box0.x); glVertex3fv(&box1.x); glVertex3fv(&box2.x); glVertex3fv(&box3.x);
 		glVertex3fv(&box7.x); glVertex3fv(&box6.x);	glVertex3fv(&box5.x); glVertex3fv(&box4.x);
 		glVertex3fv(&box4.x); glVertex3fv(&box5.x);	glVertex3fv(&box1.x); glVertex3fv(&box0.x);
 		glVertex3fv(&box5.x); glVertex3fv(&box6.x);	glVertex3fv(&box2.x); glVertex3fv(&box1.x);
@@ -1690,6 +1750,11 @@ void RenderPathfinderInfo()
 			}
 		}
 		glEnd();
+
+		glColor3f(1.0f, 1.0f, 0.0f);
+		for (const Vector3& kong : room.kongs) {
+			DrawBox(kong - adjustVec, kong + adjustVec);
+		}
 	}
 }
 
