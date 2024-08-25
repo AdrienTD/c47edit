@@ -1091,7 +1091,8 @@ void DBLList::load(uint8_t* dpbeg, const std::map<uint32_t, GameObject*>& idobjm
 	while (dp - dpbeg < ds)
 	{
 		if (*dp == 0xFF) {
-			assert(dp - dpbeg == ds - 1);
+			if (dp - dpbeg != ds - 1)
+				printf("Warning: DBL List has more bytes after the end.\n");
 			break;
 		}
 		DBLEntry& e = entries.emplace_back();
