@@ -156,6 +156,8 @@ struct GameObject
 	~GameObject() = default;
 
 	std::string getPath() const;
+	GameObject* findByPath(std::string_view path) const;
+	Matrix getGlobalTransform(GameObject* reference = nullptr) const;
 };
 
 inline void GORef::deref() noexcept { if (m_obj) { g_objRefCounts[m_obj]--; m_obj = nullptr; } }

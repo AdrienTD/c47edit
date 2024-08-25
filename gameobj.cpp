@@ -1230,6 +1230,31 @@ std::string GameObject::getPath() const
 {
 	std::string str = name;
 	for (const GameObject* obj = parent; obj; obj = obj->parent)
-		str = obj->name + '/' + std::move(str);
+		str = obj->name + '\\' + std::move(str);
 	return str;
+}
+
+GameObject* GameObject::findByPath(std::string_view path) const
+{
+	size_t sepPos = path.find_first_of('\\', 0);
+	std::string_view toFind = sepPos != path.npos ? path.substr(0, sepPos) : path;
+	std::string_view rest = sepPos != path.npos ? path.substr(sepPos + 1) : std::string_view();
+	for (GameObject* child : subobj) {
+		if (child->name == toFind) {
+			if (rest.empty())
+				return child;
+			else
+				return child->findByPath(rest);
+		}
+	}
+	return nullptr;
+}
+
+Matrix GameObject::getGlobalTransform(GameObject* reference) const
+{
+	Matrix mat = Matrix::getIdentity();
+	for (const GameObject* obj = this; obj && obj != reference; obj = obj->parent) {
+		mat = obj->matrix * mat;
+	}
+	return mat;
 }

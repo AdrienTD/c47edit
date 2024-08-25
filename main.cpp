@@ -1718,7 +1718,17 @@ void RenderPathfinderInfo()
 	glDisable(GL_TEXTURE_2D);
 	colorValueGenerator.seed();
 	colorValueDistribution.reset();
-	for (const auto& room : g_pfInfo.rooms) {
+	for (const auto& roomInst : g_pfInfo.roomInstances) {
+		auto& room = g_pfInfo.rooms.at(roomInst.roomIndex);
+
+		if (GameObject* roomObj = g_scene.rootobj->findByPath(roomInst.name)) {
+			Matrix mat = roomObj->getGlobalTransform(g_scene.rootobj);
+			glLoadMatrixf(mat.v);
+		}
+		else {
+			glLoadIdentity();
+		}
+
 		glColor3f(0.0f, 0.5f, 1.0f);
 		DrawBox(room.minCoords, room.maxCoords);
 		static const Vector3 adjustVec = Vector3(1.0f, 1.0f, 1.0f) * 10.0f;
@@ -1756,6 +1766,7 @@ void RenderPathfinderInfo()
 			DrawBox(kong - adjustVec, kong + adjustVec);
 		}
 	}
+	glLoadIdentity();
 }
 
 GameObject* FindObjectNamed(const char *name, GameObject *sup = g_scene.rootobj)
