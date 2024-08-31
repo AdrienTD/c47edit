@@ -862,10 +862,22 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 			break;
 		}
 		case ET::SCRIPT: {
+			DBLList& dbl = std::get<DBLList>(e->value);
+			
+			std::vector<ClassInfo::ClassMember> scriptBody;
+			static std::vector<ClassInfo::ObjectMember> oScriptBody;
+			oScriptBody.clear();
+			if (!dbl.entries.empty()) {
+				static const ClassInfo::ClassMember scriptHeader[2] = { {"", "ScriptFile"}, {"", "ScriptMembers"} };
+				oScriptBody = { {&scriptHeader[0]}, {&scriptHeader[1]} };
+
+				const auto& memberListString = std::get<std::string>(dbl.entries.at(1).value);
+				scriptBody = ClassInfo::ProcessClassMemberListString(memberListString);
+				ClassInfo::AddDBLMemberInfo(oScriptBody, scriptBody);
+			}
+
 			ImGui::Indent();
-			static const ClassInfo::ClassMember scriptHeader[2] = { {"", "ScriptFile"}, {"", "ScriptMembers"} };
-			static const std::vector<ClassInfo::ObjectMember> oScriptHeader = { {&scriptHeader[0]}, {&scriptHeader[1]} };
-			IGDBLList(std::get<DBLList>(e->value), oScriptHeader);
+			IGDBLList(dbl, oScriptBody);
 			ImGui::Unindent();
 			break;
 		}
