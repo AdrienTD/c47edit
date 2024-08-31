@@ -14,6 +14,9 @@
 #include "imgui/imgui.h"
 #include "classInfo.h"
 
+#include "ScriptParser.h"
+#include <fmt/format.h>
+
 // Keeps track of what bytes of a chunk (or any kind of data) has been covered.
 // E.g. did we read the entire chunk, didn't we forget to look at some bytes?
 struct DataCoverage {
@@ -148,6 +151,30 @@ void IGDebugMenus()
 				}
 			};
 			walkObj(g_scene.superroot, walkObj);
+		}
+		if (ImGui::MenuItem("Test ScriptParser")) {
+			ScriptParser parser(g_scene);
+			try {
+				parser.parseFile("Scripts\\C0_Training\\Personel01.sdl");
+
+				fmt::println("===== Type Alias Map =====");
+				for (auto& [key, val] : parser.typeAliasMap) {
+					fmt::println("{} -> {}", key, val);
+				}
+
+				fmt::println("===== Scripts =====");
+				for (auto& [name, script] : parser.scripts) {
+					fmt::println("  ----- {} -----", name);
+					for (auto& var : script.importedProperties)
+						fmt::println("    {} {} = {};", var.type, var.name, var.defaultValue);
+				}
+
+				fmt::println("===== Property list string =====");
+				fmt::println("{}", parser.getNativeImportPropertyList(parser.lastScript));
+			}
+			catch (const ScriptParserError& error) {
+				fmt::println("!! Script Parsing Error !!\n{}", error.message);
+			}
 		}
 		ImGui::EndMenu();
 	}

@@ -139,6 +139,7 @@
     <ClCompile Include="ModelImporter.cpp" />
     <ClCompile Include="ObjModel.cpp" />
     <ClCompile Include="PathfinderInfo.cpp" />
+    <ClCompile Include="ScriptParser.cpp" />
     <ClCompile Include="stb_implementations.cpp" />
     <ClCompile Include="texture.cpp" />
     <ClCompile Include="vecmat.cpp" />
@@ -163,6 +164,7 @@
     <ClInclude Include="ModelImporter.h" />
     <ClInclude Include="ObjModel.h" />
     <ClInclude Include="PathfinderInfo.h" />
+    <ClInclude Include="ScriptParser.h" />
     <ClInclude Include="texture.h" />
     <ClInclude Include="vecmat.h" />
     <ClInclude Include="video.h" />
