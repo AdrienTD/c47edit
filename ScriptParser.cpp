@@ -4,6 +4,14 @@
 #include <miniz/miniz.h>
 #include <regex>
 
+static std::string toLower(std::string str)
+{
+	for (char& c : str)
+		if (c >= 'A' && c <= 'Z')
+			c = c - 'A' + 'a';
+	return str;
+};
+
 struct Tokenizer
 {
 	const char* ptr;
@@ -226,9 +234,7 @@ void ScriptParser::parseFile(const std::string& scriptFilePath)
 			break;
 		}
 		std::string token(tokenView);
-		for (char& c : token)
-			if (c >= 'A' && c <= 'Z')
-				c = c - 'A' + 'a';
+		token = toLower(std::move(token));
 		if (token == "#include") {
 			auto includedFile = nextTokenAsType(Tokenizer::StringLiteral);
 			parseFile(folder + std::string(includedFile));
@@ -277,6 +283,7 @@ void ScriptParser::parseFile(const std::string& scriptFilePath)
 			std::tie(token, type) = tok.nextToken();
 			while (!token.empty() && token != "}") {
 				assert(type == Tokenizer::Identifier);
+				token = toLower(std::move(token));
 				std::string typeName(token);
 				auto nativeType = nextTokenAsType(Tokenizer::Identifier);
 				// NativeType or NativeObject
@@ -323,7 +330,7 @@ std::string ScriptParser::getNativeImportPropertyList(const std::string& scriptN
 		result = getNativeImportPropertyList(script.superScript);
 	}
 	for (const auto& var : script.importedProperties) {
-		auto aliasIt = typeAliasMap.find(var.type);
+		auto aliasIt = typeAliasMap.find(toLower(var.type));
 		if (aliasIt != typeAliasMap.end())
 			result += aliasIt->second;
 		else

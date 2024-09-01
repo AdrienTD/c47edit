@@ -25,6 +25,7 @@
 #include "debug.h"
 #include "ModelImporter.h"
 #include "PathfinderInfo.h"
+#include "ScriptParser.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -868,7 +869,68 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 			static std::vector<ClassInfo::ObjectMember> oScriptBody;
 			oScriptBody.clear();
 			if (!dbl.entries.empty()) {
-				static const ClassInfo::ClassMember scriptHeader[2] = { {"", "ScriptFile"}, {"", "ScriptMembers"} };
+				if (ImGui::Button("Update script")) {
+					try {
+						const auto& scriptFile = std::get<std::string>(dbl.entries.at(0).value);
+						const auto& scriptPropertiesString = std::get<std::string>(dbl.entries.at(1).value);
+						
+						ScriptParser parser(g_scene);
+						parser.parseFile(scriptFile);
+						auto newPropertiesString = parser.getNativeImportPropertyList(parser.lastScript);
+
+						auto oldPropertyList = ClassInfo::ProcessClassMemberListString(scriptPropertiesString);
+						auto newPropertyList = ClassInfo::ProcessClassMemberListString(newPropertiesString);
+						std::vector<ClassInfo::ObjectMember> oldObjectMembers;
+						std::vector<ClassInfo::ObjectMember> newObjectMembers;
+						ClassInfo::AddDBLMemberInfo(oldObjectMembers, oldPropertyList);
+						ClassInfo::AddDBLMemberInfo(newObjectMembers, newPropertyList);
+
+						std::vector<DBLEntry> newDblEntries;
+						newDblEntries.reserve(2 + newPropertyList.size());
+						DBLEntry newDbl0 = dbl.entries.at(0);
+						DBLEntry newDbl1 = dbl.entries.at(1);
+						newDbl1.value = newPropertiesString;
+
+						auto memberKey = [](const ClassInfo::ObjectMember& member)
+							{
+								return std::make_tuple(member.info->name, member.arrayIndex);
+							};
+						using MemberKeyType = std::invoke_result_t<decltype(memberKey), ClassInfo::ObjectMember>;
+						std::map<MemberKeyType, const DBLEntry*> originalDblEntries;
+						if (dbl.entries.size() != oldObjectMembers.size() + 2)
+							throw "Num of old props does not match count in member list string";
+						for (size_t i = 0; i < oldObjectMembers.size(); ++i) {
+							originalDblEntries[memberKey(oldObjectMembers[i])] = &dbl.entries[2 + i];
+						}
+
+						DBLList temp;
+						temp.flags = dbl.flags;
+						temp.entries.push_back(newDbl0);
+						temp.entries.push_back(newDbl1);
+						temp.addMembers(newObjectMembers);
+						assert(temp.entries.size() == newObjectMembers.size() + 2);
+
+						for (size_t i = 0; i < newObjectMembers.size(); ++i) {
+							auto& newEntry = temp.entries[2 + i];
+							auto newKey = memberKey(newObjectMembers[i]);
+							if (auto it = originalDblEntries.find(newKey); it != originalDblEntries.end()) {
+								// members coexist in old & new member list -> keep old value
+								if (newEntry.type == it->second->type)
+									newEntry.value = it->second->value;
+							}
+						}
+
+						dbl = std::move(temp);
+					}
+					catch (const ScriptParserError& error) {
+						MessageBoxA(hWindow, error.message.c_str(), "Script parser error", 16);
+					}
+					catch (const char* error) {
+						MessageBoxA(hWindow, error, "Script parser error", 16);
+					}
+				}
+
+				static const ClassInfo::ClassMember scriptHeader[2] = { {"", "ScriptFile"}, {"", "ScriptMembers", {}, {}, 1, true} };
 				oScriptBody = { {&scriptHeader[0]}, {&scriptHeader[1]} };
 
 				const auto& memberListString = std::get<std::string>(dbl.entries.at(1).value);
