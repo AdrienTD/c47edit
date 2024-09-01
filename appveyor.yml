@@ -1,0 +1,30 @@
+version: v0.0.{build}
+pull_requests:
+  do_not_increment_build_number: true
+branches:
+  only:
+  - master
+skip_tags: true
+image: Visual Studio 2022
+configuration: Release
+install:
+- cmd: >-
+    cd c:\tools\vcpkg
+
+    vcpkg install miniz nlohmann-json stb libsquish glew assimp fmt
+
+    vcpkg integrate install
+cache: c:\tools\vcpkg\installed\
+before_build:
+- cmd: set CL=/DAPPVEYOR /DAPP_VERSION#\"%APPVEYOR_BUILD_VERSION%\"
+build:
+  project: c47edit.vcxproj
+  verbosity: minimal
+after_build:
+- cmd: >-
+    cd C:\projects\c47edit\%CONFIGURATION%
+
+    7z a c47edit.zip c47edit.exe *.dll ..\classes.json
+artifacts:
+- path: '%CONFIGURATION%\c47edit.zip'
+  name: c47edit.zip

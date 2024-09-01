@@ -20,7 +20,7 @@ The program requires Visual Studio 2017 (with latest update) or a more recent ve
 
 * First you need to have [vcpkg](https://vcpkg.io) installed.
 * Ensure you have Visual Studio integration enabled with: `vcpkg integrate install`
-* Then install the necessary packages with: `vcpkg install miniz nlohmann-json stb libsquish glew assimp`
+* Then install the necessary packages with: `vcpkg install miniz nlohmann-json stb libsquish glew assimp fmt`
 * Now you can open the project file in Visual Studio and compile the program.
 
 ## Libraries used
@@ -33,3 +33,4 @@ The program requires Visual Studio 2017 (with latest update) or a more recent ve
 * [glew](https://github.com/nigels-com/glew) (BSD3 license) for access to OpenGL APIs
 * [assimp](https://github.com/assimp/assimp) (BSD3 license) for 3D model import from and export to various file formats
 * [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) (MIT license) for the Transform Gizmo
+* [\{fmt\}](https://github.com/fmtlib/fmt) (MIT license) for modern string formatting
