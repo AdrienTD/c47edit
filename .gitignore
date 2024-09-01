@@ -43,3 +43,4 @@ Release/
 x64/
 imgui.ini
 Repeat.*
+*.vcxproj.user
