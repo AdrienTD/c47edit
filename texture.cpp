@@ -105,21 +105,21 @@ std::tuple<uint32_t, Chunk*, Chunk*> AddUninitializedTexture(Scene& scene)
 
 uint32_t AddTexture(Scene& scene, uint8_t* pixels, int width, int height, std::string_view name)
 {
-	auto& [id, chk, dxtchk] = AddUninitializedTexture(scene);
+	auto [id, chk, dxtchk] = AddUninitializedTexture(scene);
 	ImportTexture(pixels, width, height, name, *chk, *dxtchk, id);
 	return id;
 }
 
 uint32_t AddTexture(Scene& scene, const std::filesystem::path& filepath)
 {
-	auto& [id, chk, dxtchk] = AddUninitializedTexture(scene);
+	auto [id, chk, dxtchk] = AddUninitializedTexture(scene);
 	ImportTexture(filepath, *chk, *dxtchk, id);
 	return id;
 }
 
 uint32_t AddTexture(Scene& scene, const void* mem, size_t memSize, std::string_view name)
 {
-	auto& [id, chk, dxtchk] = AddUninitializedTexture(scene);
+	auto [id, chk, dxtchk] = AddUninitializedTexture(scene);
 	ImportTexture(mem, memSize, name, *chk, *dxtchk, id);
 	return id;
 }
