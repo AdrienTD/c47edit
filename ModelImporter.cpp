@@ -17,7 +17,6 @@
 #include <assimp/DefaultLogger.hpp>
 
 #define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <Windows.h>
 extern HWND hWindow;
 
