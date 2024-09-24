@@ -9,6 +9,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#include <algorithm>
 #include "gameobj.h"
 #include "imgui/imgui.h"
 #include "classInfo.h"

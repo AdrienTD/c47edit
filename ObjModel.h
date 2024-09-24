@@ -1,15 +1,12 @@
 #pragma once
 
 #include <array>
+#include <filesystem>
 #include <map>
 #include <string>
 #include <string_view>
 #include <vector>
 #include "vecmat.h"
-
-namespace std::filesystem {
-	class path;
-}
 
 struct StringSplitter {
 	const char* currentChar;

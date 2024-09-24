@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
 #include <tuple>
 #include <type_traits>
 #include "vecmat.h"
