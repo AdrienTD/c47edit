@@ -709,7 +709,7 @@ Chunk Scene::ConstructSPK()
 	auto fillMaindata = [](uint32_t tag, Chunk *nthg, const auto& buf) {
 		using T = std::remove_reference_t<decltype(buf)>;
 		nthg->tag = tag;
-		nthg->maindata.resize(buf.size() * sizeof(T::value_type));
+		nthg->maindata.resize(buf.size() * sizeof(typename T::value_type));
 		memcpy(nthg->maindata.data(), buf.data(), nthg->maindata.size());
 	};
 
