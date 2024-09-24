@@ -7,7 +7,7 @@
 #include <vector>
 
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include <windows.h>
 
 #include "gameobj.h"
 #include "imgui/imgui.h"

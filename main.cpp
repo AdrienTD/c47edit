@@ -28,9 +28,9 @@
 #include "ScriptParser.h"
 
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <gl/GL.h>
-#include <gl/GLU.h>
+#include <windows.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
 #include <commdlg.h>
 #include <mmsystem.h>
 #include <shellapi.h>

@@ -11,8 +11,8 @@
 #include "ByteWriter.h"
 
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <GL/GL.h>
+#include <windows.h>
+#include <GL/gl.h>
 
 #include <stb_image.h>
 #include <stb_image_write.h>

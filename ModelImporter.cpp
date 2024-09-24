@@ -17,7 +17,7 @@
 #include <assimp/DefaultLogger.hpp>
 
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include <windows.h>
 extern HWND hWindow;
 
 #pragma pack(push, 1)
