@@ -8,7 +8,7 @@
 #include "video.h"
 
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include <windows.h>
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
 

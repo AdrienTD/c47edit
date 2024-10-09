@@ -10,14 +10,14 @@ static void mdcReadTo(const Chunk::DataBuffer*& chkDataIt, T& val)
 }
 
 template <>
-static void mdcReadTo(const Chunk::DataBuffer*& chkDataIt, std::string& val)
+void mdcReadTo(const Chunk::DataBuffer*& chkDataIt, std::string& val)
 {
 	val = (const char*)chkDataIt->data();
 	++chkDataIt;
 }
 
 template <>
-static void mdcReadTo(const Chunk::DataBuffer*& chkDataIt, AudioRef& val)
+void mdcReadTo(const Chunk::DataBuffer*& chkDataIt, AudioRef& val)
 {
 	val.id = *(const uint32_t*)chkDataIt->data();
 	++chkDataIt;
@@ -33,7 +33,7 @@ static void mdcWrite(Chunk& chunk, const T& val)
 }
 
 template <>
-static void mdcWrite(Chunk& chunk, const std::string& val)
+void mdcWrite(Chunk& chunk, const std::string& val)
 {
 	auto& buf = chunk.multidata.emplace_back();
 	buf.resize(val.size() + 1);
@@ -41,7 +41,7 @@ static void mdcWrite(Chunk& chunk, const std::string& val)
 }
 
 template <>
-static void mdcWrite(Chunk& chunk, const AudioRef& val)
+void mdcWrite(Chunk& chunk, const AudioRef& val)
 {
 	auto& buf = chunk.multidata.emplace_back();
 	buf.resize(4);

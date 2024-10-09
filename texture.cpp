@@ -11,9 +11,8 @@
 #include "ByteWriter.h"
 
 #define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-#include <GL/GL.h>
+#include <windows.h>
+#include <GL/gl.h>
 
 #include <stb_image.h>
 #include <stb_image_write.h>
@@ -106,21 +105,21 @@ std::tuple<uint32_t, Chunk*, Chunk*> AddUninitializedTexture(Scene& scene)
 
 uint32_t AddTexture(Scene& scene, uint8_t* pixels, int width, int height, std::string_view name)
 {
-	auto& [id, chk, dxtchk] = AddUninitializedTexture(scene);
+	auto [id, chk, dxtchk] = AddUninitializedTexture(scene);
 	ImportTexture(pixels, width, height, name, *chk, *dxtchk, id);
 	return id;
 }
 
 uint32_t AddTexture(Scene& scene, const std::filesystem::path& filepath)
 {
-	auto& [id, chk, dxtchk] = AddUninitializedTexture(scene);
+	auto [id, chk, dxtchk] = AddUninitializedTexture(scene);
 	ImportTexture(filepath, *chk, *dxtchk, id);
 	return id;
 }
 
 uint32_t AddTexture(Scene& scene, const void* mem, size_t memSize, std::string_view name)
 {
-	auto& [id, chk, dxtchk] = AddUninitializedTexture(scene);
+	auto [id, chk, dxtchk] = AddUninitializedTexture(scene);
 	ImportTexture(mem, memSize, name, *chk, *dxtchk, id);
 	return id;
 }
