@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstring>
 
 template <class T> class DynArray {
 private:
