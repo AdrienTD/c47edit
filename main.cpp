@@ -2080,7 +2080,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 				}
 				else {
 					selobj = bestpickobj;
-					if (io.MouseDoubleClicked[0] || io.MouseDoubleClicked[1])
+					if (selobj && (io.MouseDoubleClicked[0] || io.MouseDoubleClicked[1]))
 						selobj = selobj->parent;
 				}
 				cursorpos = bestpickintersectionpnt;
