@@ -818,10 +818,11 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 		case ET::ZGEOMREFTAB: {
 			auto& vec = std::get<std::vector<GORef>>(e->value);
 			if (ImGui::BeginListBox("##Objlist", ImVec2(0, 64))) {
-				int id = 0;
+				int index = 0;
+				int removingIndex = -1;
 				for (auto& obj : vec)
 				{
-					ImGui::PushID(id++);
+					ImGui::PushID(index);
 					if (obj.valid())
 						ImGui::Text("%s", obj->name.c_str());
 					else
@@ -829,8 +830,10 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 						nextobjtosel = obj.get();
 					if (ImGui::BeginPopupContextItem("ObjRefMenu")) {
-						if (ImGui::MenuItem("Clear"))
+						if (ImGui::MenuItem("Nullify"))
 							obj.deref();
+						if (ImGui::MenuItem("Remove"))
+							removingIndex = index;
 						ImGui::EndPopup();
 					}
 					if (ImGui::BeginDragDropTarget())
@@ -842,6 +845,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 						ImGui::EndDragDropTarget();
 					}
 					ImGui::PopID();
+					index += 1;
 				}
 				ImGui::EndListBox();
 				ImGui::SameLine();
@@ -852,6 +856,10 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 				if (ImGui::InputScalar("##ListLabel", ImGuiDataType_U32, &listCount, nullptr, nullptr, nullptr, ImGuiInputTextFlags_EnterReturnsTrue))
 					vec.resize(listCount);
 				ImGui::EndGroup();
+
+				if (removingIndex >= 0) {
+					vec.erase(vec.begin() + removingIndex);
+			}
 			}
 			break;
 		}
