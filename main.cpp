@@ -859,7 +859,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 
 				if (removingIndex >= 0) {
 					vec.erase(vec.begin() + removingIndex);
-			}
+				}
 			}
 			break;
 		}
@@ -1266,6 +1266,34 @@ void IGObjectInfo()
 				}
 			};
 			walkChunk(selobj->excChunk.get(), walkChunk);
+		}
+		if (ImGui::CollapsingHeader("Referenced by")) {
+			auto inspectDbl = [](const DBLList& dbl, const GameObject* obj, const auto& rec) -> void {
+				for (const auto& entry : dbl.entries) {
+					if (const GORef* ref = std::get_if<GORef>(&entry.value)) {
+						if (ref->get() == selobj) {
+							ImGui::BulletText("%s", obj->getPath().c_str());
+						}
+					}
+					else if (const auto* list = std::get_if<std::vector<GORef>>(&entry.value)) {
+						for (const GORef& ref : *list) {
+							if (ref.get() == selobj) {
+								ImGui::BulletText("%s", obj->getPath().c_str());
+							}
+						}
+					}
+					else if (const auto* inception = std::get_if<DBLList>(&entry.value)) {
+						rec(*inception, obj, rec);
+					}
+				}
+				};
+			auto walk = [&](const GameObject* obj, const auto& rec) -> void {
+				inspectDbl(obj->dbl, obj, inspectDbl);
+				for (const auto* child : obj->subobj) {
+					rec(child, rec);
+				}
+				};
+			walk(g_scene.superroot, walk);
 		}
 		if (wannadel)
 		{
