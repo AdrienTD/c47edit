@@ -1151,7 +1151,7 @@ void IGObjectInfo()
 			ImGui::Text("Weird: 0x%X", selobj->mesh->weird);
 			if (selobj->mesh->extension) {
 				ImGui::TextUnformatted("--- EXTENSION ---");
-				ImGui::Text("Unk: %u", selobj->mesh->extension->extUnk2);
+				ImGui::Text("Type: %u", selobj->mesh->extension->type);
 				ImGui::Text("Frames size: %zu", selobj->mesh->extension->frames.size());
 				ImGui::Text("Name: %s", selobj->mesh->extension->name.c_str());
 			}

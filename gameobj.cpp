@@ -310,7 +310,7 @@ void Scene::LoadSceneSPK(const char *fn)
 					uint32_t* dat1 = (uint32_t*)(pdat->maindata.data() + (p[9] & 0x7FFFFFFF));
 					ftxo = dat1[0];
 					m->extension = std::make_unique<Mesh::Extension>();
-					m->extension->extUnk2 = dat1[1];
+					m->extension->type = dat1[1];
 					uint8_t* dat2 = pdat->maindata.data() + dat1[2];
 					uint8_t* ptr2 = dat2;
 					uint32_t numDings = *(uint32_t*)ptr2; ptr2 += 4;
@@ -584,7 +584,7 @@ struct SceneSaver {
 				}
 				sb.addStringNT(o->mesh->extension->name);
 				uint32_t ext2off = datPackBuf.add(sb.take());
-				std::array<uint32_t, 3> ext1 = { realftxoff, o->mesh->extension->extUnk2, ext2off };
+				std::array<uint32_t, 3> ext1 = { realftxoff, o->mesh->extension->type, ext2off };
 				uint32_t ext1off = datPackBuf.add(std::string{ (char*)ext1.data(), 12 });
 				ftxoff = ext1off | 0x80000000;
 			}

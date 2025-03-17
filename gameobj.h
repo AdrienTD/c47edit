@@ -64,7 +64,7 @@ struct Mesh
 	std::vector<FTXFace> ftxFaces;
 
 	struct Extension {
-		uint32_t extUnk2;
+		uint32_t type;
 		std::vector<std::pair<uint32_t, uint32_t>> frames;
 		std::string name;
 	};
