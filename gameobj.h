@@ -65,8 +65,11 @@ struct Mesh
 
 	struct Extension {
 		uint32_t type;
-		std::vector<std::pair<uint32_t, uint32_t>> frames;
-		std::string name;
+		struct TextureAnimation {
+			std::vector<std::pair<uint32_t, uint32_t>> frames;
+			std::string name;
+		};
+		std::array<TextureAnimation, 2> texAnims;
 	};
 	std::shared_ptr<Extension> extension; // TODO deep copy would be better
 

@@ -1152,8 +1152,12 @@ void IGObjectInfo()
 			if (selobj->mesh->extension) {
 				ImGui::TextUnformatted("--- EXTENSION ---");
 				ImGui::Text("Type: %u", selobj->mesh->extension->type);
-				ImGui::Text("Frames size: %zu", selobj->mesh->extension->frames.size());
-				ImGui::Text("Name: %s", selobj->mesh->extension->name.c_str());
+				const int numTexAnims = (selobj->mesh->extension->type == 4) ? 2 : 1;
+				for (int i = 0; i < numTexAnims; ++i) {
+					const auto& texAnim = selobj->mesh->extension->texAnims[i];
+					ImGui::Text("TexAnim%i Frames size: %zu", i, texAnim.frames.size());
+					ImGui::Text("TexAnim%i Name: %s", i, texAnim.name.c_str());
+				}
 			}
 		}
 		if (selobj->line && ImGui::CollapsingHeader("Line")) {

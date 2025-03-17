@@ -311,13 +311,18 @@ void Scene::LoadSceneSPK(const char *fn)
 					ftxo = dat1[0];
 					m->extension = std::make_unique<Mesh::Extension>();
 					m->extension->type = dat1[1];
-					uint8_t* dat2 = pdat->maindata.data() + dat1[2];
-					uint8_t* ptr2 = dat2;
-					uint32_t numDings = *(uint32_t*)ptr2; ptr2 += 4;
-					m->extension->frames.resize(numDings);
-					memcpy(m->extension->frames.data(), ptr2, 8 * numDings);
-					ptr2 += numDings * 8;
-					m->extension->name = (const char*)ptr2;
+					assert(m->extension->type == 3 || m->extension->type == 4);
+					const int numTexAnims = (m->extension->type == 4) ? 2 : 1;
+					for (int i = 0; i < numTexAnims; ++i) {
+						auto& texAnim = m->extension->texAnims[i];
+						const uint8_t* dat2 = pdat->maindata.data() + dat1[2 + i];
+						const uint8_t* ptr2 = dat2;
+						const uint32_t numDings = *(const uint32_t*)ptr2; ptr2 += 4;
+						texAnim.frames.resize(numDings);
+						memcpy(texAnim.frames.data(), ptr2, 8 * numDings);
+						ptr2 += numDings * 8;
+						texAnim.name = (const char*)ptr2;
+					}
 				}
 				else {
 					ftxo = p[9];
@@ -575,17 +580,23 @@ struct SceneSaver {
 				realftxoff = ftxPackBuf.add(sb.take()) + 1;
 			}
 			if (o->mesh->extension) {
-				ByteWriter<std::string> sb;
-				uint32_t numFrames = o->mesh->extension->frames.size();
-				sb.addU32(numFrames);
-				for (auto& [p1, p2] : o->mesh->extension->frames) {
-					sb.addU32(p1);
-					sb.addU32(p2);
+				std::array<uint32_t, 4> ext1 = { realftxoff, o->mesh->extension->type, 0, 0 };
+				const int numTexAnims = (o->mesh->extension->type == 4) ? 2 : 1;
+				for (int i = 0; i < numTexAnims; ++i) {
+					const auto& texAnim = o->mesh->extension->texAnims[i];
+
+					ByteWriter<std::string> sb;
+					sb.addU32((uint32_t)texAnim.frames.size());
+					for (auto& [p1, p2] : texAnim.frames) {
+						sb.addU32(p1);
+						sb.addU32(p2);
+					}
+					sb.addStringNT(texAnim.name);
+
+					const uint32_t datFramesOffset = datPackBuf.add(sb.take());
+					ext1[2 + i] = datFramesOffset;
 				}
-				sb.addStringNT(o->mesh->extension->name);
-				uint32_t ext2off = datPackBuf.add(sb.take());
-				std::array<uint32_t, 3> ext1 = { realftxoff, o->mesh->extension->type, ext2off };
-				uint32_t ext1off = datPackBuf.add(std::string{ (char*)ext1.data(), 12 });
+				uint32_t ext1off = datPackBuf.add(std::string{ (const char*)ext1.data(), 8u + 4 * numTexAnims });
 				ftxoff = ext1off | 0x80000000;
 			}
 			else {
