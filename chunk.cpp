@@ -6,6 +6,7 @@
 #include "chunk.h"
 #include <map>
 #include <cassert>
+#include <cstring>
 #include "ByteWriter.h"
 
 Chunk::~Chunk() = default;

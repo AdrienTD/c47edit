@@ -1,15 +1,13 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <map>
 #include <string_view>
 #include <vector>
 
 struct Chunk;
 struct Scene;
-namespace std::filesystem {
-	class path;
-}
 
 struct TexInfo {
 	uint32_t id;

@@ -28,10 +28,9 @@
 #include "ScriptParser.h"
 
 #define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-#include <gl/GL.h>
-#include <gl/GLU.h>
+#include <windows.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
 #include <commdlg.h>
 #include <mmsystem.h>
 #include <shellapi.h>
@@ -214,8 +213,12 @@ void VisitAudioObject(AudioObject* obj, const F& lambda) {
 struct AudioRefReflector {
 	std::function<void(AudioRef&)>& cloner;
 	template <typename T> void member(T& val, const char* name) {}
-	template <> void member(AudioRef& val, const char* name) { cloner(val); }
 };
+
+template <>
+void AudioRefReflector::member(AudioRef& val, const char* name) {
+    cloner(val);
+}
 
 void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogObject)
 {
