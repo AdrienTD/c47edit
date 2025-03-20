@@ -488,13 +488,31 @@ struct PackBuffer {
 	std::map<Unit, uint32_t> offmap;
 
 	[[nodiscard]] uint32_t addByteOffset(const Unit& elem) {
-		auto [it, inserted] = offmap.try_emplace(elem, (uint32_t)buffer.size());
+		auto [it, inserted] = offmap.try_emplace(elem, static_cast<uint32_t>(buffer.size()));
 		if (inserted) {
-			uint8_t* ptr = (uint8_t*)std::data(elem);
-			size_t len = sizeof(Elem) * (std::size(elem) + (IncludeStringNullTerminator ? 1 : 0));
+			const uint8_t* ptr = reinterpret_cast<const uint8_t*>(std::data(elem));
+			const size_t len = sizeof(Elem) * (std::size(elem) + (IncludeStringNullTerminator ? 1 : 0));
 			buffer.insert(buffer.end(), ptr, ptr + len);
 		}
 		return it->second;
+	}
+	[[nodiscard]] uint32_t add(const Unit& elem) {
+		return addByteOffset(elem) / OffsetUnit;
+	}
+};
+
+template<typename Unit, uint32_t OffsetUnit>
+struct NonsharingPackBuffer {
+	using Elem = typename Unit::value_type;
+
+	std::vector<uint8_t> buffer;
+
+	[[nodiscard]] uint32_t addByteOffset(const Unit& elem) {
+		const uint32_t offset = static_cast<uint32_t>(buffer.size());
+		const uint8_t* ptr = reinterpret_cast<const uint8_t*>(std::data(elem));
+		const size_t len = sizeof(Elem) * std::size(elem);
+		buffer.insert(buffer.end(), ptr, ptr + len);
+		return offset;
 	}
 	[[nodiscard]] uint32_t add(const Unit& elem) {
 		return addByteOffset(elem) / OffsetUnit;
@@ -514,7 +532,7 @@ struct SceneSaver {
 	PackBuffer<std::vector<float>, 4> verPackBuf;
 	PackBuffer<std::vector<uint16_t>, 2> facPackBuf;
 	PackBuffer<std::string, 1> datPackBuf;
-	PackBuffer<std::string, 1> ftxPackBuf;
+	NonsharingPackBuffer<std::string, 1> ftxPackBuf; // see https://github.com/AdrienTD/c47edit/issues/14
 	PackBuffer<std::vector<float>, 4> uvcPackBuf;
 	PackBuffer<std::string, 1> excPackBuf;
 
