@@ -137,6 +137,8 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 
 		// Faces (indices + UVs)
 		bool hasTextureCoords = amesh->HasTextureCoords(0) && texId != 0xFFFF;
+		bool isTwoSided = false;
+		mat->Get(AI_MATKEY_TWOSIDED, isTwoSided);
 		uint16_t faceFlags = 0;
 		if (hasTextureCoords) faceFlags |= 0x20;
 		if (hasAlpha) faceFlags |= 0x200;
@@ -155,6 +157,13 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 
 			std::array<uint16_t, 6> ftx = { faceFlags, 0, texId, 0, 0, 0 };
 			gmesh.ftxFaces.push_back(ftx);
+
+			if (isTwoSided) {
+				std::swap(inds[1], inds[2]);
+				gmesh.triindices.insert(gmesh.triindices.end(), inds.begin(), inds.end());
+				gmesh.ftxFaces.push_back(ftx);
+			}
+
 			if (hasTextureCoords) {
 				std::array<float, 8> uvs;
 				uvs.fill(0.0f);
@@ -164,6 +173,11 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 					uvs[2 * i + 1] = coord.y;
 				}
 				gmesh.textureCoords.insert(gmesh.textureCoords.end(), uvs.begin(), uvs.end());
+				if (isTwoSided) {
+					std::swap(uvs[2], uvs[4]);
+					std::swap(uvs[3], uvs[5]);
+					gmesh.textureCoords.insert(gmesh.textureCoords.end(), uvs.begin(), uvs.end());
+				}
 			}
 		}
 
