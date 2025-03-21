@@ -82,6 +82,7 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 		// Find the texture, and import it if possible
 		auto& mat = ais->mMaterials[amesh->mMaterialIndex];
 		uint16_t texId = 0xFFFF;
+		bool hasAlpha = false;
 		aiString aiTexName;
 		aiReturn ret = mat->GetTexture(aiTextureType_DIFFUSE, 0, &aiTexName);
 		if (ret == aiReturn_FAILURE)
@@ -116,6 +117,10 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 					texId = (uint16_t)AddTexture(g_scene, texpath);
 				}
 			}
+
+			if (texId != 0xFFFF) {
+				hasAlpha = IsTextureUsingTransparency(FindTextureChunk(g_scene, texId).first);
+			}
 		}
 
 		// Vertices
@@ -132,6 +137,9 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 
 		// Faces (indices + UVs)
 		bool hasTextureCoords = amesh->HasTextureCoords(0) && texId != 0xFFFF;
+		uint16_t faceFlags = 0;
+		if (hasTextureCoords) faceFlags |= 0x20;
+		if (hasAlpha) faceFlags |= 0x200;
 		for (unsigned int f = 0; f < amesh->mNumFaces; ++f) {
 			auto& face = amesh->mFaces[f];
 			if (face.mNumIndices < 3)
@@ -145,7 +153,7 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 			};
 			gmesh.triindices.insert(gmesh.triindices.end(), inds.begin(), inds.end());
 
-			std::array<uint16_t, 6> ftx = { (uint16_t)(hasTextureCoords ? 0x20 : 0), 0, texId, 0, 0, 0 };
+			std::array<uint16_t, 6> ftx = { faceFlags, 0, texId, 0, 0, 0 };
 			gmesh.ftxFaces.push_back(ftx);
 			if (hasTextureCoords) {
 				std::array<float, 8> uvs;

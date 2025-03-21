@@ -265,3 +265,38 @@ std::pair<Chunk*, Chunk*> FindTextureChunkByName(Scene& scene, std::string_view 
 	}
 	return { nullptr, nullptr };
 }
+
+bool IsTextureUsingTransparency(const Chunk* texChunk)
+{
+	const TexInfo* ti = (const TexInfo*)texChunk->maindata.data();
+	const uint8_t* firstbmp = texChunk->maindata.data() + 20;
+	while (*(firstbmp++)); // skip name
+
+	if (texChunk->tag == 'PALN')
+	{
+		uint32_t pal[256];
+		const uint8_t* pnt = firstbmp;
+		for (int m = 0; m < (int)ti->numMipmaps; m++)
+			pnt += *(const uint32_t*)pnt + 4;
+		uint32_t npalentries = *(const uint32_t*)pnt; pnt += 4;
+		if (npalentries > 256)
+			npalentries = 256;
+		memcpy(pal, pnt, 4 * npalentries);
+
+		pnt = firstbmp;
+		const uint32_t mmsize = *(const uint32_t*)pnt; pnt += 4;
+		for (uint32_t p = 0; p < mmsize; p++)
+			if ((pal[pnt[p]] & 0xFF000000) != 0xFF000000)
+				return true;
+	}
+	else if (texChunk->tag == 'RGBA') {
+		const uint8_t* pnt = firstbmp;
+		const uint32_t mmsize = *(const uint32_t*)pnt; pnt += 4;
+		const uint32_t* pixels = reinterpret_cast<const uint32_t*>(pnt);
+		for (size_t i = 0; i < mmsize / 4; ++i) {
+			if ((pixels[i] & 0xFF000000) != 0xFF000000)
+				return true;
+		}
+	}
+	return false;
+}

@@ -38,3 +38,4 @@ void ExportTexture(Chunk* texChunk, const std::filesystem::path& filepath);
 std::vector<uint8_t> ExportTextureToPNGInMemory(Chunk* texChunk);
 std::pair<Chunk*, Chunk*> FindTextureChunk(Scene& scene, uint32_t id);
 std::pair<Chunk*, Chunk*> FindTextureChunkByName(Scene& scene, std::string_view name);
+bool IsTextureUsingTransparency(const Chunk* texChunk);
