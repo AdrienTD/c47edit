@@ -188,8 +188,10 @@ struct ProMesh {
 	};
 	struct PartKey {
 		uint16_t flags, texId, lgtId; bool invisible;
+
+		static const uint16_t importantFlags = FTXFlag::opac | FTXFlag::wire | FTXFlag::add;
 		PartKey(uint16_t texId, uint16_t lgtId, uint16_t flags) :
-			flags(flags & 0x020A), texId(texId), lgtId(lgtId), invisible(!(flags & 0x0020)) {}
+			flags(flags & importantFlags), texId(texId), lgtId(lgtId), invisible(!(flags & FTXFlag::textureBilinear)) {}
 		auto asRefTuple() const { return std::tie(flags, texId, lgtId, invisible); }
 		bool operator<(const PartKey& other) const { return asRefTuple() < other.asRefTuple(); }
 		bool operator==(const PartKey& other) const { return asRefTuple() == other.asRefTuple(); }
@@ -241,8 +243,8 @@ struct ProMesh {
 		}
 
 		auto nextFace = [&](int shape, ProMesh::IndexType* indices) {
-			bool isTextured = hasFtx && (ftxFace[0] & 0x20);
-			bool isLit = hasFtx && (ftxFace[0] & 0x80);
+			bool isTextured = hasFtx && (ftxFace[0] & FTXFlag::textureBilinear);
+			bool isLit = hasFtx && (ftxFace[0] & FTXFlag::lightMapBilinear);
 			uint16_t texid = isTextured ? ftxFace[2] : 0xFFFF;
 			uint16_t lgtid = isLit ? ftxFace[3] : 0xFFFF;
 			auto& part = pro.parts[PartKey(texid, lgtid, ftxFace[0])];
@@ -324,14 +326,14 @@ void RenderMeshLists()
 		glBindTexture(GL_TEXTURE_2D, gltex);
 		glActiveTextureARB(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, gllgt);
-		if (enableAlphaTest && (mat.flags & 0x0200)) {
+		if (enableAlphaTest && (mat.flags & FTXFlag::opac)) {
 			glEnable(GL_ALPHA_TEST);
 			glAlphaFunc(GL_GEQUAL, 0.1f);
 		}
 		else {
 			glDisable(GL_ALPHA_TEST);
 		}
-		//if (flags & 0x0002) {
+		//if (flags & FTXFlag::add) {
 		//	glEnable(GL_BLEND);
 		//	glBlendFunc(GL_ONE, GL_ONE);
 		//}

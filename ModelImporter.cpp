@@ -140,8 +140,8 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 		bool isTwoSided = false;
 		mat->Get(AI_MATKEY_TWOSIDED, isTwoSided);
 		uint16_t faceFlags = 0;
-		if (hasTextureCoords) faceFlags |= 0x20;
-		if (hasAlpha) faceFlags |= 0x200;
+		if (hasTextureCoords) faceFlags |= FTXFlag::textureBilinear;
+		if (hasAlpha) faceFlags |= FTXFlag::opac;
 		for (unsigned int f = 0; f < amesh->mNumFaces; ++f) {
 			auto& face = amesh->mFaces[f];
 			if (face.mNumIndices < 3)
@@ -464,7 +464,7 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 		size_t numFaces = indvec->size() / shape;
 		for (size_t f = 0; f < numFaces; ++f) {
 			auto& ftx = *ftxptr;
-			uint16_t texid = (ftx[0] & 0x20) ? ftx[2] : 0xFFFF;
+			uint16_t texid = (ftx[0] & FTXFlag::textureBilinear) ? ftx[2] : 0xFFFF;
 			auto& part = parts[texid];
 
 			unsigned int facesFirstVertexIndex = (unsigned int)part.vertices.size();
@@ -479,7 +479,7 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 			for (unsigned int i = 0; i < shape; ++i)
 				face.mIndices[i] = facesFirstVertexIndex + i;
 
-			if (ftx[0] & 0x20) {
+			if (ftx[0] & FTXFlag::textureBilinear) {
 				for (unsigned int i = 0; i < shape; ++i) {
 					part.texCoords.emplace_back(uvptr[2 * i], uvptr[2 * i + 1], 0.0f);
 				}

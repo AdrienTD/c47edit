@@ -339,9 +339,9 @@ void Scene::LoadSceneSPK(const char *fn)
 					memcpy(m->ftxFaces.data(), ftx + 12, numFaces * 12);
 					uint32_t numTexturedFaces = 0, numLitFaces = 0;
 					for (auto& face : m->ftxFaces) {
-						if (face[0] & 0x20)
+						if (face[0] & FTXFlag::textureBilinear)
 							numTexturedFaces += 1;
-						if (face[0] & 0x80)
+						if (face[0] & FTXFlag::lightMapBilinear)
 							numLitFaces += 1;
 					}
 					m->textureCoords.resize(numTexturedFaces * 8);
