@@ -46,7 +46,7 @@
 GameObject* selobj = 0;
 Vector3 campos(0, 0, -50), camori(0,0,0);
 float camNearDist = 1.0f, camFarDist = 10000.0f;
-float camspeed = 32;
+float camspeed = 1920.0f;
 bool wireframe = false;
 bool findsel = false;
 uint32_t framesincursec = 0, framespersec = 0, lastfpscheck;
@@ -1335,7 +1335,7 @@ void IGMain()
 	}
 	ImGui::SameLine();
 	ImGui::Text("%4u FPS", framespersec);
-	ImGui::DragFloat("Cam speed", &camspeed, 0.1f);
+	ImGui::DragFloat("Cam speed", &camspeed, 4.0f, 0.0f, FLT_MAX, "%.f /sec");
 	ImGui::DragFloat3("Cam pos", &campos.x, 1.0f);
 	ImGui::DragFloat2("Cam ori", &camori.x, 0.1f);
 	ImGui::DragFloat2("Cam dist", &camNearDist, 1.0f);
@@ -2050,7 +2050,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	ImGui_ImplWin32_Init((void*)hWindow);
 	ImGui_ImplOpenGL2_Init();
-	lastfpscheck = GetTickCount();
+
+	uint32_t previousFrameTime = GetTickCount();
+	lastfpscheck = previousFrameTime;
 
 	if (!CmdOpenScene())
 		g_scene.LoadEmpty();
@@ -2061,6 +2063,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			Sleep(100);
 		else
 		{
+			const uint32_t currentFrameTime = GetTickCount();
+			const uint32_t deltaTimeMsec = currentFrameTime - previousFrameTime;
+			const float deltaTimeSec = (float)deltaTimeMsec / 1000.0f;
+			previousFrameTime = currentFrameTime;
+
 			Vector3 cd(0, 0, 1), ncd;
 			Matrix m1 = Matrix::getRotationXMatrix(camori.x);
 			Matrix m2 = Matrix::getRotationYMatrix(camori.y);
@@ -2092,7 +2099,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 				if (ImGui::IsKeyPressed((ImGuiKey)'T'))
 					rendertextures = !rendertextures;
 			}
-			campos += cammove * camspeed * (io.KeyShift ? 2.0f : 1.0f);
+			campos += cammove * camspeed * deltaTimeSec * (io.KeyShift ? 2.0f : 1.0f);
 			if (io.MouseDown[0] && !io.WantCaptureMouse && !(io.KeyAlt || io.KeyCtrl))
 			{
 				camori.y += io.MouseDelta.x * 0.01f;
