@@ -331,7 +331,7 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 			clone->mesh = std::make_shared<Mesh>(*clone->mesh);
 			for (auto& face : clone->mesh->ftxFaces) {
 				static const std::array<std::pair<int, int>, 2> textureTypes{
-					{ {FTXFlag::textureBilinear, 2}, { FTXFlag::lightMapBilinear, 3 } }
+					{ {FTXFlag::textureMask, 2}, { FTXFlag::lightMapMask, 3 } }
 				};
 				for (auto& [flag, index] : textureTypes) {
 					if ((face[0] & flag) && !(face[index] & 0x8000)) {
@@ -1207,8 +1207,8 @@ void IGObjectInfo()
 				size_t numFaces = selobj->mesh->getNumQuads() + selobj->mesh->getNumTris();
 				size_t numTexFaces = 0, numLitFaces = 0;
 				for (auto& ftxFace : selobj->mesh->ftxFaces) {
-					if (ftxFace[0] & FTXFlag::textureBilinear) ++numTexFaces;
-					if (ftxFace[0] & FTXFlag::lightMapBilinear) ++numLitFaces;
+					if (ftxFace[0] & FTXFlag::textureMask) ++numTexFaces;
+					if (ftxFace[0] & FTXFlag::lightMapMask) ++numLitFaces;
 				}
 				ImGui::Text("Num     Faces:  %zu (%zu)", selobj->mesh->ftxFaces.size(), numFaces);
 				ImGui::Text("Num Tex Faces:  %zu (%zu)", selobj->mesh->textureCoords.size() / 8, numTexFaces);
@@ -1216,11 +1216,11 @@ void IGObjectInfo()
 				ImGui::Separator();
 				for (size_t i = 0; i < numFaces; ++i) {
 					ImGui::Text("%04X %04X %04X %04X %04X %04X", ftxFace[0], ftxFace[1], ftxFace[2], ftxFace[3], ftxFace[4], ftxFace[5]);
-					if (ftxFace[0] & FTXFlag::textureBilinear) {
+					if (ftxFace[0] & FTXFlag::textureMask) {
 						ImGui::Text(" t (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f)", uvCoords[0], uvCoords[1], uvCoords[2], uvCoords[3], uvCoords[4], uvCoords[5], uvCoords[6], uvCoords[7]);
 						uvCoords += 8;
 					}
-					if (ftxFace[0] & FTXFlag::lightMapBilinear) {
+					if (ftxFace[0] & FTXFlag::lightMapMask) {
 						ImGui::Text(" l (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f)", uvCoords2[0], uvCoords2[1], uvCoords2[2], uvCoords2[3], uvCoords2[4], uvCoords2[5], uvCoords2[6], uvCoords2[7]);
 						uvCoords2 += 8;
 					}

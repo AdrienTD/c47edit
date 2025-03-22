@@ -464,7 +464,7 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 		size_t numFaces = indvec->size() / shape;
 		for (size_t f = 0; f < numFaces; ++f) {
 			auto& ftx = *ftxptr;
-			uint16_t texid = (ftx[0] & FTXFlag::textureBilinear) ? ftx[2] : 0xFFFF;
+			uint16_t texid = (ftx[0] & FTXFlag::textureMask) ? ftx[2] : 0xFFFF;
 			auto& part = parts[texid];
 
 			unsigned int facesFirstVertexIndex = (unsigned int)part.vertices.size();
@@ -479,7 +479,7 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 			for (unsigned int i = 0; i < shape; ++i)
 				face.mIndices[i] = facesFirstVertexIndex + i;
 
-			if (ftx[0] & FTXFlag::textureBilinear) {
+			if (ftx[0] & FTXFlag::textureMask) {
 				for (unsigned int i = 0; i < shape; ++i) {
 					part.texCoords.emplace_back(uvptr[2 * i], uvptr[2 * i + 1], 0.0f);
 				}

@@ -191,7 +191,7 @@ struct ProMesh {
 
 		static const uint16_t importantFlags = FTXFlag::opac | FTXFlag::wire | FTXFlag::add;
 		PartKey(uint16_t texId, uint16_t lgtId, uint16_t flags) :
-			flags(flags & importantFlags), texId(texId), lgtId(lgtId), invisible(!(flags & FTXFlag::textureBilinear)) {}
+			flags(flags & importantFlags), texId(texId), lgtId(lgtId), invisible(!(flags & FTXFlag::textureMask)) {}
 		auto asRefTuple() const { return std::tie(flags, texId, lgtId, invisible); }
 		bool operator<(const PartKey& other) const { return asRefTuple() < other.asRefTuple(); }
 		bool operator==(const PartKey& other) const { return asRefTuple() == other.asRefTuple(); }
@@ -243,8 +243,8 @@ struct ProMesh {
 		}
 
 		auto nextFace = [&](int shape, ProMesh::IndexType* indices) {
-			bool isTextured = hasFtx && (ftxFace[0] & FTXFlag::textureBilinear);
-			bool isLit = hasFtx && (ftxFace[0] & FTXFlag::lightMapBilinear);
+			bool isTextured = hasFtx && (ftxFace[0] & FTXFlag::textureMask);
+			bool isLit = hasFtx && (ftxFace[0] & FTXFlag::lightMapMask);
 			uint16_t texid = isTextured ? ftxFace[2] : 0xFFFF;
 			uint16_t lgtid = isLit ? ftxFace[3] : 0xFFFF;
 			auto& part = pro.parts[PartKey(texid, lgtid, ftxFace[0])];
