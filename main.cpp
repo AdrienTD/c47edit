@@ -363,6 +363,9 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 	}
 }
 
+GameObject* uiDragChildObject = nullptr;
+GameObject* uiDragParentObject = nullptr;
+
 void IGOTNode(GameObject *o)
 {
 	bool op, colorpushed = 0;
@@ -393,12 +396,22 @@ void IGOTNode(GameObject *o)
 			cursorpos = selobj->matrix.getTranslationVector();
 		}
 	}
-	if (ImGui::IsItemActive())
+	if (o != g_scene.superroot && o != g_scene.rootobj && o != g_scene.cliprootobj && ImGui::IsItemActive()) {
 		if (ImGui::BeginDragDropSource()) {
 			ImGui::SetDragDropPayload("GameObject", &o, sizeof(GameObject*));
 			ImGui::Text("GameObject: %s", o->name.c_str());
 			ImGui::EndDragDropSource();
 		}
+	}
+	if ((o->flags & 0x10 || o == g_scene.rootobj || o == g_scene.cliprootobj) && o != g_scene.superroot) { // is it a group
+		if (ImGui::GetIO().KeyCtrl && ImGui::BeginDragDropTarget()) {
+			if (const auto* payload = ImGui::AcceptDragDropPayload("GameObject")) {
+				uiDragChildObject = *(GameObject**)payload->Data;
+				uiDragParentObject = o;
+			}
+			ImGui::EndDragDropTarget();
+		}
+	}
 	ImGui::PushID(o);
 	if (ImGui::BeginPopupContextItem("ObjectRightClickMenu", ImGuiPopupFlags_MouseButtonRight)) {
 		auto it = objVisibilityMap.find(o);
@@ -463,6 +476,11 @@ void IGObjectTree()
 	IGOTNode(g_scene.superroot);
 	findsel = false;
 	ImGui::End();
+
+	if (uiDragChildObject && uiDragParentObject) {
+		g_scene.GiveObject(uiDragChildObject, uiDragParentObject);
+		uiDragChildObject = uiDragParentObject = nullptr;
+	}
 }
 
 Vector3 GetYXZRotVecFromMatrix(Matrix *m)
