@@ -522,6 +522,7 @@ struct NonsharingPackBuffer {
 // Struct with all variables used when saving a Scene.
 struct SceneSaver {
 	uint32_t moc_objcount;
+	uint32_t numTotalFtxFaces = 0;
 	std::map<GameObject*, uint32_t> objidmap;
 
 	ByteWriter<std::vector<uint8_t>> heabuf;
@@ -596,6 +597,7 @@ struct SceneSaver {
 				sb.addData(header.data(), 12);
 				sb.addData(o->mesh->ftxFaces.data(), numFaces * 12);
 				realftxoff = ftxPackBuf.add(sb.take()) + 1;
+				numTotalFtxFaces += numFaces;
 			}
 			if (o->mesh->extension) {
 				std::array<uint32_t, 4> ext1 = { realftxoff, o->mesh->extension->type, 0, 0 };
@@ -800,7 +802,7 @@ Chunk Scene::ConstructSPK()
 
 	newSpkChunk.maindata.resize(8);
 	((uint32_t*)newSpkChunk.maindata.data())[0] = 10;
-	((uint32_t*)newSpkChunk.maindata.data())[1] = 0x40000;
+	((uint32_t*)newSpkChunk.maindata.data())[1] = saver.numTotalFtxFaces;
 
 	// Audio stuff
 	auto [andsNew, sndrNew] = audioMgr.save();
