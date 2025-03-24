@@ -2226,6 +2226,20 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 					ImGui::MenuItem("Audio objects", nullptr, &wndShowAudioObjects);
 					ImGui::MenuItem("ZDefines", nullptr, &wndShowZDefines);
 					ImGui::MenuItem("Pathfinder info", nullptr, &wndShowPathfinderInfo);
+
+					ImGui::Separator();
+					auto& chunks = g_scene.remainingChunks;
+					auto pscrIt = std::find_if(chunks.begin(), chunks.end(), [](const Chunk& chunk) {return chunk.tag == 'RCSP'; });
+					ImGui::BeginDisabled(pscrIt == chunks.end());
+					if (ImGui::MenuItem("Remove PSCR")) {
+						if (pscrIt != chunks.end()) {
+							chunks.erase(pscrIt);
+						}
+					}
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("Removes the precompiled scripts, forcing the game to recompile when loading the scene.");
+					}
+					ImGui::EndDisabled();
 					ImGui::EndMenu();
 				}
 				if (ImGui::BeginMenu("Help")) {
