@@ -4,6 +4,7 @@
 // See LICENSE file for more details.
 
 #define _USE_MATH_DEFINES
+#include <charconv>
 #include <cmath>
 #include <ctime>
 #include <filesystem>
@@ -359,6 +360,78 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 					}
 				}
 			}
+		}
+	}
+}
+
+void DuplicateObjectAndAdapt(GameObject* obj)
+{
+	if (!obj->root || !obj->parent || obj->parent == g_scene.superroot)
+		return;
+
+	std::unordered_map<GameObject*, GameObject*> cloneMap;
+	
+	auto duplicate = [&](GameObject* og, GameObject* parent, const auto& rec) -> GameObject*
+		{
+			GameObject* clone = new GameObject(*og);
+			clone->subobj.clear();
+			clone->parent = parent;
+			cloneMap[og] = clone;
+			for (GameObject* child : og->subobj) {
+				GameObject* clonedChild = rec(child, clone, rec);
+				clone->subobj.push_back(clonedChild);
+			}
+			return clone;
+		};
+	GameObject* clone = duplicate(obj, obj->parent, duplicate);
+	auto it = std::find(obj->parent->subobj.begin(), obj->parent->subobj.end(), obj);
+	if (it != obj->parent->subobj.end())
+		it += 1;
+	obj->parent->subobj.insert(it, clone);
+
+	// update references to original objects with clones in the cloned objects
+	auto updateDbl = [&cloneMap](DBLList& dbl, const auto& rec) -> void
+		{
+			for (auto& entry : dbl.entries) {
+				if (GORef* ref = std::get_if<GORef>(&entry.value)) {
+					auto it = cloneMap.find(ref->get());
+					if (it != cloneMap.end())
+						*ref = it->second;
+				}
+				else if (auto* list = std::get_if<std::vector<GORef>>(&entry.value)) {
+					for (GORef& ref : *list) {
+						auto it = cloneMap.find(ref.get());
+						if (it != cloneMap.end())
+							ref = it->second;
+					}
+				}
+				else if (auto* inception = std::get_if<DBLList>(&entry.value)) {
+					rec(*inception, rec);
+				}
+			}
+		};
+
+	for (const auto& [_, clone] : cloneMap) {
+		updateDbl(clone->dbl, updateDbl);
+	}
+
+	// update name by increasing number suffix if present, or add one
+	auto numPosition = obj->name.find_last_not_of("0123456789");
+	numPosition = numPosition == std::string::npos ? 0 : numPosition + 1;
+	auto nameLeft = obj->name.substr(0, numPosition);
+	auto digits = obj->name.substr(numPosition);
+	unsigned int number = 0;
+	std::from_chars(digits.data(), digits.data() + digits.size(), number);
+	for (int attempt = 0; attempt < 1'000'000; ++attempt) {
+		number += 1;
+		auto newDigits = std::to_string(number);
+		if (newDigits.size() < digits.size()) {
+			newDigits.insert(0, digits.size() - newDigits.size(), '0');
+		}
+		std::string newName = nameLeft + std::move(newDigits);
+		if (!obj->parent->findByPath(newName)) {
+			clone->name = std::move(newName);
+			break;
 		}
 	}
 }
@@ -992,7 +1065,7 @@ void IGObjectInfo()
 	else {
 		if (ImGui::Button("Duplicate"))
 			if(selobj->root)
-				g_scene.DuplicateObject(selobj, selobj->root);
+				DuplicateObjectAndAdapt(selobj);
 		ImGui::SameLine();
 		bool wannadel = 0;
 		if (ImGui::Button("Delete"))
