@@ -459,9 +459,6 @@ void CmdDeleteObjectSafely(GameObject* obj)
 	g_scene.RemoveObject(obj);
 }
 
-GameObject* uiDragChildObject = nullptr;
-GameObject* uiDragParentObject = nullptr;
-
 void IGOTNode(GameObject *o)
 {
 	bool op, colorpushed = 0;
@@ -502,8 +499,7 @@ void IGOTNode(GameObject *o)
 	if ((o->flags & 0x10 || o == g_scene.rootobj || o == g_scene.cliprootobj) && o != g_scene.superroot) { // is it a group
 		if (ImGui::GetIO().KeyCtrl && ImGui::BeginDragDropTarget()) {
 			if (const auto* payload = ImGui::AcceptDragDropPayload("GameObject")) {
-				uiDragChildObject = *(GameObject**)payload->Data;
-				uiDragParentObject = o;
+				deferredCommand = std::bind(&Scene::GiveObject, &g_scene, *(GameObject**)payload->Data, o);
 			}
 			ImGui::EndDragDropTarget();
 		}
@@ -585,11 +581,6 @@ void IGObjectTree()
 	IGOTNode(g_scene.superroot);
 	findsel = false;
 	ImGui::End();
-
-	if (uiDragChildObject && uiDragParentObject) {
-		g_scene.GiveObject(uiDragChildObject, uiDragParentObject);
-		uiDragChildObject = uiDragParentObject = nullptr;
-	}
 }
 
 Vector3 GetYXZRotVecFromMatrix(Matrix *m)
