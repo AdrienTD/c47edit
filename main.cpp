@@ -789,21 +789,68 @@ GLuint GetDblImageTexture(GameObject* obj, void* data, int type, int width, int 
 
 static GameObject* nextobjtosel = 0;
 
-void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members)
+void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members, const std::vector<ClassInfo::ObjectComponent>* components = nullptr)
 {
 	size_t memberIndex = 0;
+	std::optional<int> nextComponentIndex = (components && !components->empty()) ? std::make_optional(0) : std::nullopt;
 	ImGui::InputScalar("DBL Flags", ImGuiDataType_U32, &dbl.flags);
-	int i = 0;
 	for (auto e = dbl.entries.begin(); e != dbl.entries.end(); e++)
 	{
 		static const ClassInfo::ClassMember oobClassMember = { "", "OOB" };
 		static const ClassInfo::ObjectMember oobObjMember = { &oobClassMember };
-		const auto& [mem, arrayIndex] = (memberIndex < members.size()) ? members[memberIndex++] : oobObjMember;
+		const auto& [mem, arrayIndex] = (memberIndex < members.size()) ? members[memberIndex] : oobObjMember;
 		std::string nameIndexed;
 		if (arrayIndex != -1)
 			nameIndexed = mem->name + '[' + std::to_string(arrayIndex) + ']';
 		const std::string& name = (arrayIndex != -1) ? nameIndexed : mem->name;
-		ImGui::PushID(i++);
+		ImGui::PushID(memberIndex);
+
+		if (nextComponentIndex && memberIndex == components->at(*nextComponentIndex).startIndex) {
+			const auto& component = components->at(*nextComponentIndex);
+			int componentIndex = *nextComponentIndex;
+			ImGui::SeparatorText(component.name.c_str());
+			ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.0f);
+			nextComponentIndex = (componentIndex + 1 == components->size()) ? std::nullopt : std::make_optional(componentIndex + 1);
+			if(ImGui::Button("X")) {
+				const int startIndex = component.startIndex;
+				const int numElements = component.numElements;
+				deferredCommand = [&dbl, startIndex, numElements, componentIndex]()
+					{
+						auto it = dbl.entries.begin() + startIndex;
+						dbl.entries.erase(it, it + numElements);
+
+						std::string& routstr = std::get<std::string>(dbl.entries[0].value);
+						int c = 0;
+						if (componentIndex != 0) {
+							int strCurrentCpnt = 0;
+							for (; c < routstr.size(); ++c) {
+								if (routstr[c] == ',') {
+									strCurrentCpnt += 1;
+									if (strCurrentCpnt == componentIndex) {
+										c += 1;
+										break;
+									}
+								}
+							}
+						}
+						const int start = c;
+						for (; c < routstr.size(); ++c) {
+							if (routstr[c] == ',') {
+								c += 1;
+								break;
+							}
+						}
+						const int end = c;
+						routstr.erase(start, end - start);
+						if (!routstr.empty() && routstr.back() == ',')
+							routstr.pop_back();
+					};
+			}
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("Remove routine");
+			}
+		}
+
 		if (mem->isProtected)
 			ImGui::BeginDisabled();
 		ImGui::Text("%1X", e->flags >> 4);
@@ -1078,6 +1125,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 		if (mem->isProtected)
 			ImGui::EndDisabled();
 		ImGui::PopID();
+		memberIndex += 1;
 	}
 }
 
@@ -1156,8 +1204,9 @@ void IGObjectInfo()
 				}
 				ImGui::EndPopup();
 			}
-			auto members = ClassInfo::GetMemberNames(selobj);
-			IGDBLList(selobj->dbl, members);
+			std::vector<ClassInfo::ObjectComponent> components;
+			auto members = ClassInfo::GetMemberNames(selobj, &components);
+			IGDBLList(selobj->dbl, members, &components);
 		}
 		if (selobj->mesh && ImGui::CollapsingHeader("Mesh"))
 		{

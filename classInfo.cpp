@@ -161,7 +161,7 @@ void ClassInfo::AddDBLMemberInfo(std::vector<ClassInfo::ObjectMember>& members, 
 }
 
 // Return a list of names of all DBL members of the object
-std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj)
+std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj, std::vector<ObjectComponent>* outComponents)
 {
 	static const ClassMember emptyMember = { "", "" };
 	static const ClassMember initialMembers[3] = { {"CHAR*", "Routs"}, {"ENUM", "Create", "", {"ROOT", "CLIP"}}, {"SCRIPT", "ZGeomScript"}}; // some objects might have less or more initial members...
@@ -191,8 +191,13 @@ std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj)
 			nextElem();
 			skipWhitespace();
 
+			const int startIndex = (int)members.size();
 			const auto& memlist = g_classMemberLists.at(std::string(cpntName));
 			AddDBLMemberInfo(members, memlist);
+			const int endIndex = (int)members.size();
+			if (outComponents) {
+				outComponents->push_back(ObjectComponent{ std::string(cpntName), startIndex, endIndex - startIndex });
+			}
 		}
 	}
 
