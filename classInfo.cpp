@@ -23,8 +23,9 @@ struct MemberDecoder {
 	bool next() {
 		const char* ptr = _string;
 		auto skipWhitespace = [&ptr]() {while (*ptr && *ptr == ' ') ++ptr; };
+		auto skipWhitespaceAndSemicolon = [&ptr]() {while (*ptr && (*ptr == ' ' || *ptr == ';')) ++ptr; };
 		auto skipWord = [&ptr]() {while (*ptr && *ptr != ' ' && *ptr != ';' && *ptr != '=' && *ptr != '[') ++ptr; };
-		skipWhitespace();
+		skipWhitespaceAndSemicolon();
 		if (!*ptr)
 			return false;
 		const char* b_type = ptr;
