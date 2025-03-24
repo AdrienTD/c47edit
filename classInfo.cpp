@@ -165,7 +165,11 @@ void ClassInfo::AddDBLMemberInfo(std::vector<ClassInfo::ObjectMember>& members, 
 std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj, std::vector<ObjectComponent>* outComponents)
 {
 	static const ClassMember emptyMember = { "", "" };
-	static const ClassMember initialMembers[3] = { {"CHAR*", "Routs"}, {"ENUM", "Create", "", {"ROOT", "CLIP"}}, {"SCRIPT", "ZGeomScript"}}; // some objects might have less or more initial members...
+	static const ClassMember initialMembers[3] = {
+		{"CHAR*", "Routs", {}, {}, 1, true},
+		{"ENUM", "Create", "", {"ROOT", "CLIP"}},
+		{"SCRIPT", "ZGeomScript"}
+	}; // some objects might have less or more initial members...
 	std::vector<ClassInfo::ObjectMember> members = { {&initialMembers[0]}, {&initialMembers[1]}, {&initialMembers[2]}, {&emptyMember} };
 	auto onClass = [&members](const auto& rec, const nlohmann::json& cl) -> void {
 		if (cl.at("name") == "ZGEOM")
@@ -189,6 +193,10 @@ std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj, 
 			beg = ptr;
 			skipWord();
 			auto cpntName = std::string_view(beg, (size_t)(ptr - beg));
+			skipWhitespace();
+			beg = ptr;
+			skipWord();
+			auto cpntNumber = std::string_view(beg, (size_t)(ptr - beg));
 			nextElem();
 			skipWhitespace();
 
@@ -197,7 +205,9 @@ std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj, 
 			AddDBLMemberInfo(members, memlist);
 			const int endIndex = (int)members.size();
 			if (outComponents) {
-				outComponents->push_back(ObjectComponent{ std::string(cpntName), startIndex, endIndex - startIndex });
+				int num = 0;
+				std::from_chars(cpntNumber.data(), cpntNumber.data() + cpntNumber.size(), num);
+				outComponents->push_back(ObjectComponent{ std::string(cpntName), num, startIndex, endIndex - startIndex });
 			}
 		}
 	}

@@ -41,6 +41,7 @@ namespace ClassInfo {
 
 	struct ObjectComponent {
 		std::string name;
+		int number;
 		int startIndex;
 		int numElements;
 	};

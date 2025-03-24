@@ -181,7 +181,7 @@ void IGMessageValue(const char* name, uint32_t& ref)
 			return std::to_string(id) + ": " + it->second.first;
 		}
 		return "(empty)";
-	};
+		};
 
 	if (ImGui::BeginCombo(name, getName(ref).c_str())) {
 		if (ImGui::Selectable("(empty)", ref == 0))
@@ -227,13 +227,13 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 			if (name_desc_pair.first == name)
 				return id;
 		return 0;
-	};
+		};
 	auto getSoundId = [](Scene& scene, const std::string& name) -> uint32_t {
 		for (size_t i = 1; i < scene.audioMgr.audioNames.size(); ++i)
 			if (scene.audioMgr.audioNames[i] == name)
 				return (uint32_t)i;
 		return 0;
-	};
+		};
 
 	std::map<GameObject*, GameObject*> cloneMap;
 	auto walkObj = [&cloneMap,&destScene](GameObject* obj, GameObject* parent, auto& rec) -> void {
@@ -245,7 +245,7 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 		cloneMap[obj] = clone;
 		for (GameObject* child : obj->subobj)
 			rec(child, clone, rec);
-	};
+		};
 	walkObj(ogObject, destScene.rootobj, walkObj);
 
 	if (!srcScene.lgtPack.subchunks.empty() && destScene.lgtPack.subchunks.empty()) // TODO: Improve
@@ -258,7 +258,7 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 				throw c47editException("Reference to object outside of the subscene");
 			ref = it->second;
 		}
-	};
+		};
 	for (const auto& [obj, clone] : cloneMap) {
 		for (auto& de : clone->dbl.entries) {
 			if (de.type == DBLEntry::EType::ZGEOMREF)
@@ -312,7 +312,7 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 						}
 					}
 					aref.id = destId;
-				};
+					};
 				AudioRef& aref = std::get<AudioRef>(de.value);
 				fixAudioRef(aref);
 			}
@@ -377,7 +377,7 @@ void CmdDuplicateObjectAndAdapt(GameObject* obj)
 		return;
 
 	std::unordered_map<GameObject*, GameObject*> cloneMap;
-	
+
 	auto duplicate = [&](GameObject* og, GameObject* parent, const auto& rec) -> GameObject*
 		{
 			GameObject* clone = new GameObject(*og);
@@ -719,7 +719,7 @@ std::vector<uint8_t> SplitDblImage(uint32_t* image, int width, int height) {
 			}
 		}
 		return 0u;
-	};
+		};
 
 	static constexpr int MAX_LENGTH = 256;
 	int numQuadsX = width / MAX_LENGTH + ((width % MAX_LENGTH) ? 1 : 0);
@@ -805,45 +805,51 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 		const std::string& name = (arrayIndex != -1) ? nameIndexed : mem->name;
 		ImGui::PushID(memberIndex);
 
+		// component / routine header
 		if (nextComponentIndex && memberIndex == components->at(*nextComponentIndex).startIndex) {
 			const auto& component = components->at(*nextComponentIndex);
 			int componentIndex = *nextComponentIndex;
 			ImGui::SeparatorText(component.name.c_str());
-			ImGui::SameLine(ImGui::GetContentRegionMax().x - 16.0f);
+			ImGui::SameLine(ImGui::GetContentRegionMax().x - 56.0f);
 			nextComponentIndex = (componentIndex + 1 == components->size()) ? std::nullopt : std::make_optional(componentIndex + 1);
-			if(ImGui::Button("X")) {
+			int newCpntNumber = components->at(componentIndex).number;
+			ImGui::SetNextItemWidth(28.0f);
+			if (ImGui::InputInt("##CpntNum", &newCpntNumber, 0)) {
+				std::string updatedRouteString;
+				bool firstTime = true;
+				for (int cpnt = 0; cpnt < components->size(); ++cpnt) {
+					if (!firstTime)
+						updatedRouteString.push_back(',');
+					firstTime = false;
+					updatedRouteString += components->at(cpnt).name;
+					updatedRouteString += ' ';
+					updatedRouteString += std::to_string((cpnt == componentIndex) ? newCpntNumber : components->at(cpnt).number);
+				}
+				std::string& routstr = std::get<std::string>(dbl.entries[0].value);
+				routstr = std::move(updatedRouteString);
+			}
+			ImGui::SameLine(0.0);
+			if (ImGui::Button("X")) {
 				const int startIndex = component.startIndex;
 				const int numElements = component.numElements;
-				deferredCommand = [&dbl, startIndex, numElements, componentIndex]()
+				std::string updatedRouteString;
+				bool firstTime = true;
+				for (int cpnt = 0; cpnt < components->size(); ++cpnt) {
+					if (cpnt == componentIndex)
+						continue;
+					if (!firstTime)
+						updatedRouteString.push_back(',');
+					firstTime = false;
+					updatedRouteString += components->at(cpnt).name;
+					updatedRouteString += ' ';
+					updatedRouteString += std::to_string(components->at(cpnt).number);
+				}
+				std::string& routstr = std::get<std::string>(dbl.entries[0].value);
+				routstr = std::move(updatedRouteString);
+				deferredCommand = [&dbl, startIndex, numElements]()
 					{
 						auto it = dbl.entries.begin() + startIndex;
 						dbl.entries.erase(it, it + numElements);
-
-						std::string& routstr = std::get<std::string>(dbl.entries[0].value);
-						int c = 0;
-						if (componentIndex != 0) {
-							int strCurrentCpnt = 0;
-							for (; c < routstr.size(); ++c) {
-								if (routstr[c] == ',') {
-									strCurrentCpnt += 1;
-									if (strCurrentCpnt == componentIndex) {
-										c += 1;
-										break;
-									}
-								}
-							}
-						}
-						const int start = c;
-						for (; c < routstr.size(); ++c) {
-							if (routstr[c] == ',') {
-								c += 1;
-								break;
-							}
-						}
-						const int end = c;
-						routstr.erase(start, end - start);
-						if (!routstr.empty() && routstr.back() == ',')
-							routstr.pop_back();
 					};
 			}
 			if (ImGui::IsItemHovered()) {
@@ -1040,7 +1046,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 		}
 		case ET::SCRIPT: {
 			DBLList& dbl = std::get<DBLList>(e->value);
-			
+
 			std::vector<ClassInfo::ClassMember> scriptBody;
 			static std::vector<ClassInfo::ObjectMember> oScriptBody;
 			oScriptBody.clear();
@@ -1049,7 +1055,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 					try {
 						const auto& scriptFile = std::get<std::string>(dbl.entries.at(0).value);
 						const auto& scriptPropertiesString = std::get<std::string>(dbl.entries.at(1).value);
-						
+
 						ScriptParser parser(g_scene);
 						parser.parseFile(scriptFile);
 						auto newPropertiesString = parser.getNativeImportPropertyList(parser.lastScript);
@@ -1144,7 +1150,7 @@ void IGObjectInfo()
 		ImGui::SameLine();
 		if (ImGui::Button("Delete"))
 			deferredCommand = std::bind(CmdDeleteObjectSafely, selobj);
-		
+
 		if (ImGui::Button("Set to be given"))
 			objtogive = selobj;
 		ImGui::EndDisabled();
@@ -1152,7 +1158,7 @@ void IGObjectInfo()
 		if (ImGui::Button("Give it here!"))
 			if(objtogive)
 				g_scene.GiveObject(objtogive, selobj);
-		
+
 		if (ImGui::Button("Find in graph"))
 			findsel = true;
 		if (selobj->parent)
@@ -1234,7 +1240,7 @@ void IGObjectInfo()
 									obj->excChunk = std::make_shared<Chunk>(*selobj->excChunk);
 								for (GameObject* child : obj->subobj)
 									rec(child, rec);
-							};
+								};
 							walkObj(g_scene.superroot, walkObj);
 						}
 						//else
@@ -1438,7 +1444,7 @@ void IGObjectInfo()
 						rec(&sub, rec);
 					ImGui::TreePop();
 				}
-			};
+				};
 			walkChunk(selobj->excChunk.get(), walkChunk);
 		}
 		if (ImGui::CollapsingHeader("Referenced by")) {
@@ -1596,7 +1602,7 @@ void IGTextures()
 			return 1;
 		// otherwise -> green/white
 		return 0;
-	};
+		};
 
 	if (ImGui::BeginTable("TextureColumnsa", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoHostExtendY | ImGuiTableFlags_NoHostExtendX, ImGui::GetContentRegionAvail())) {
 		ImGui::TableSetupColumn("TexListCol", ImGuiTableColumnFlags_WidthFixed, 256.0f);
@@ -1650,7 +1656,7 @@ void IGSounds()
 			}
 		}
 		return -1;
-	};
+		};
 	WaveAudioObject* selectedWave = g_scene.audioMgr.getObjectAs<WaveAudioObject>(selectedSoundId);
 	int selectedWaveIndex = getWaveDataIndex(selectedWave);
 
@@ -1768,7 +1774,7 @@ void IGAudioObjects()
 					}
 				}
 			}
-		};
+			};
 		ImGui::BeginChild("AudioListWnd");
 		listType(SoundAudioObject::TYPEID, "Sounds");
 		listType(SetAudioObject::TYPEID, "Sets");
@@ -2267,32 +2273,32 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 				camori.x += io.MouseDelta.y * 0.01f;
 			}
 			if (!io.WantCaptureMouse)
-			if (io.MouseClicked[1] || (io.MouseClicked[0] && (io.KeyAlt || io.KeyCtrl)))
-			{
-				Vector3 raystart, raydir;
-				float ys = 1.0f / tan(60.0f * (float)M_PI / 180.0f / 2.0f);
-				float xs = ys / ((float)screen_width / (float)screen_height);
-				ImVec2 mspos = ImGui::GetMousePos();
-				float msx = mspos.x * 2.0f / (float)screen_width - 1.0f;
-				float msy = mspos.y * 2.0f / (float)screen_height - 1.0f;
-				Vector3 hi = ncd.cross(crab);
-				raystart = campos + ncd + crab * (msx / xs) - hi * (msy / ys);
-				raydir = raystart - campos;
+				if (io.MouseClicked[1] || (io.MouseClicked[0] && (io.KeyAlt || io.KeyCtrl)))
+				{
+					Vector3 raystart, raydir;
+					float ys = 1.0f / tan(60.0f * (float)M_PI / 180.0f / 2.0f);
+					float xs = ys / ((float)screen_width / (float)screen_height);
+					ImVec2 mspos = ImGui::GetMousePos();
+					float msx = mspos.x * 2.0f / (float)screen_width - 1.0f;
+					float msy = mspos.y * 2.0f / (float)screen_height - 1.0f;
+					Vector3 hi = ncd.cross(crab);
+					raystart = campos + ncd + crab * (msx / xs) - hi * (msy / ys);
+					raydir = raystart - campos;
 
-				bestpickobj = 0;
-				bestpickdist = std::numeric_limits<float>::infinity();
-				IsRayIntersectingObject(raystart, raydir, g_scene.superroot, Matrix::getIdentity());
-				if (io.KeyAlt) {
-					if (bestpickobj && selobj)
-						selobj->matrix.setTranslationVector(bestpickintersectionpnt);
+					bestpickobj = 0;
+					bestpickdist = std::numeric_limits<float>::infinity();
+					IsRayIntersectingObject(raystart, raydir, g_scene.superroot, Matrix::getIdentity());
+					if (io.KeyAlt) {
+						if (bestpickobj && selobj)
+							selobj->matrix.setTranslationVector(bestpickintersectionpnt);
+					}
+					else {
+						selobj = bestpickobj;
+						if (selobj && (io.MouseDoubleClicked[0] || io.MouseDoubleClicked[1]))
+							selobj = selobj->parent;
+					}
+					cursorpos = bestpickintersectionpnt;
 				}
-				else {
-					selobj = bestpickobj;
-					if (selobj && (io.MouseDoubleClicked[0] || io.MouseDoubleClicked[1]))
-						selobj = selobj->parent;
-				}
-				cursorpos = bestpickintersectionpnt;
-			}
 
 			Matrix persp = Matrix::getLHPerspectiveMatrix(60.0f * (float)M_PI / 180.0f, (float)screen_width / (float)screen_height, camNearDist, camFarDist);
 			Matrix lookat = Matrix::getLHLookAtViewMatrix(campos, campos + ncd, Vector3(0.0f, 1.0f, 0.0f));
@@ -2456,7 +2462,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 					for (auto& child : obj->subobj) {
 						rec(rec, child, mat);
 					}
-				};
+					};
 				renderAnim(renderAnim, g_scene.superroot, Matrix::getIdentity());
 				glEnd();
 				glPointSize(1.0f);
@@ -2476,7 +2482,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 			EndDrawing();
 			//_sleep(16);
-			
+
 			framesincursec++;
 			uint32_t newtime = GetTickCount();
 			if ((uint32_t)(newtime - lastfpscheck) >= 1000) {
