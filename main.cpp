@@ -94,6 +94,8 @@ bool wndShowAudioObjects = false;
 bool wndShowZDefines = false;
 bool wndShowPathfinderInfo = false;
 
+std::function<void()> deferredCommand;
+
 extern HWND hWindow;
 
 void ferr(const char *str)
@@ -364,9 +366,14 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 	}
 }
 
-void DuplicateObjectAndAdapt(GameObject* obj)
+bool isRootObject(GameObject* obj)
 {
-	if (!obj->root || !obj->parent || obj->parent == g_scene.superroot)
+	return !obj->root || !obj->parent || obj->parent == g_scene.superroot;
+}
+
+void CmdDuplicateObjectAndAdapt(GameObject* obj)
+{
+	if (isRootObject(obj))
 		return;
 
 	std::unordered_map<GameObject*, GameObject*> cloneMap;
@@ -436,6 +443,22 @@ void DuplicateObjectAndAdapt(GameObject* obj)
 	}
 }
 
+void CmdDeleteObjectSafely(GameObject* obj)
+{
+	if (isRootObject(obj))
+		return;
+
+	if (obj->getRefCount() > 0u) {
+		warn("It's not possible to remove an object that is referenced by other objects!");
+		return;
+	}
+
+	if (selobj == obj)
+		selobj = nullptr;
+
+	g_scene.RemoveObject(obj);
+}
+
 GameObject* uiDragChildObject = nullptr;
 GameObject* uiDragParentObject = nullptr;
 
@@ -493,7 +516,17 @@ void IGOTNode(GameObject *o)
 		if (ImGui::MenuItem("Show", nullptr, vis == ObjVisibility::Show)) objVisibilityMap[o] = ObjVisibility::Show;
 		if (ImGui::MenuItem("Hide", nullptr, vis == ObjVisibility::Hide)) objVisibilityMap[o] = ObjVisibility::Hide;
 		ImGui::Separator();
-		if (ImGui::MenuItem("Import subscene here")) {
+		auto menuItemWhen = [](const char* name, bool enabled)
+			{
+				ImGui::BeginDisabled(!enabled);
+				const bool res = ImGui::MenuItem(name);
+				ImGui::EndDisabled();
+				return enabled && res;
+			};
+		if (menuItemWhen("Duplicate", !isRootObject(o))) {
+			deferredCommand = std::bind(CmdDuplicateObjectAndAdapt, o);
+		}
+		if (menuItemWhen("Import subscene here", o != g_scene.superroot)) {
 			auto fpath = GuiUtils::OpenDialogBox("Scene (*.zip)\0*.zip\0\0\0\0\0", "zip");
 			if (!fpath.empty()) {
 				Scene subscene;
@@ -510,7 +543,7 @@ void IGOTNode(GameObject *o)
 				}
 			}
 		}
-		if (ImGui::MenuItem("Extract subscene")) {
+		if (menuItemWhen("Extract subscene", !isRootObject(o))) {
 			std::string fname = o->name;
 			for (char& c : fname)
 				if (c == '/' || c == '\\')
@@ -529,6 +562,9 @@ void IGOTNode(GameObject *o)
 					MessageBoxA(hWindow, msg.c_str(), "c47edit", 16);
 				}
 			}
+		}
+		if (menuItemWhen("Delete", !isRootObject(o))) {
+			deferredCommand = std::bind(CmdDeleteObjectSafely, o);
 		}
 		ImGui::EndPopup();
 	}
@@ -1063,16 +1099,16 @@ void IGObjectInfo()
 	if (!selobj)
 		ImGui::Text("No object selected.");
 	else {
+		ImGui::BeginDisabled(isRootObject(selobj));
 		if (ImGui::Button("Duplicate"))
-			if(selobj->root)
-				DuplicateObjectAndAdapt(selobj);
+			CmdDuplicateObjectAndAdapt(selobj);
 		ImGui::SameLine();
-		bool wannadel = 0;
 		if (ImGui::Button("Delete"))
-			wannadel = 1;
+			deferredCommand = std::bind(CmdDeleteObjectSafely, selobj);
 		
 		if (ImGui::Button("Set to be given"))
 			objtogive = selobj;
+		ImGui::EndDisabled();
 		ImGui::SameLine();
 		if (ImGui::Button("Give it here!"))
 			if(objtogive)
@@ -1392,15 +1428,6 @@ void IGObjectInfo()
 				}
 				};
 			walk(g_scene.superroot, walk);
-		}
-		if (wannadel)
-		{
-			if (selobj->getRefCount() > 0u)
-				warn("It's not possible to remove an object that is referenced by other objects!");
-			else {
-				g_scene.RemoveObject(selobj);
-				selobj = 0;
-			}
 		}
 	}
 	ImGui::End();
@@ -2416,6 +2443,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 				framespersec = framesincursec;
 				framesincursec = 0;
 				lastfpscheck = newtime;
+			}
+
+			if (deferredCommand) {
+				deferredCommand();
+				deferredCommand = nullptr;
 			}
 		}
 	}
