@@ -24,6 +24,9 @@ namespace ClassInfo {
 	// Get class category flags
 	uint16_t GetObjTypeCategory(int typeId);
 
+	// Get class parent class ID
+	int GetObjTypeParentType(int typeId);
+
 	struct ClassMember {
 		std::string type;
 		std::string name;

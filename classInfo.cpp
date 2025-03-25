@@ -114,6 +114,13 @@ uint16_t ClassInfo::GetObjTypeCategory(int typeId)
 	return g_classInfo_idJsonMap.at(typeId)->at("num2").get<uint32_t>() >> 16;
 }
 
+int ClassInfo::GetObjTypeParentType(int typeId)
+{
+	const auto& parentName = g_classInfo_idJsonMap.at(typeId)->at("type").get_ref<const std::string&>();
+	const auto it = g_classInfo_stringIdMap.find(parentName);
+	return it != g_classInfo_stringIdMap.end() ? it->second : -1;
+}
+
 // Parse a string containing a list of class members
 std::vector<ClassInfo::ClassMember> ClassInfo::ProcessClassMemberListString(const std::string& membersString)
 {

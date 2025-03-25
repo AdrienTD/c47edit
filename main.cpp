@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <random>
+#include <unordered_set>
 
 #include "chunk.h"
 #include "classInfo.h"
@@ -1194,18 +1195,31 @@ void IGObjectInfo()
 				ImGui::OpenPopup("AddRoutineMenu");
 			}
 			if (ImGui::BeginPopup("AddRoutineMenu")) {
-				for (auto& [name, memlist] : g_classMemberLists) {
-					if (name.find('_') != name.npos) {
-						if (ImGui::MenuItem(name.c_str())) {
-							std::string& routstr = std::get<std::string>(selobj->dbl.entries[0].value);
-							if (!routstr.empty())
-								routstr += ',';
-							routstr += name;
-							routstr += " 0";
-							std::vector<ClassInfo::ObjectMember> objmems;
-							ClassInfo::AddDBLMemberInfo(objmems, memlist);
-							selobj->dbl.addMembers(objmems);
-						}
+				static ImGuiTextFilter filter;
+				filter.Draw();
+				std::unordered_set<std::string> allowedTypes;
+				for (int clid = selobj->type; clid != -1; clid = ClassInfo::GetObjTypeParentType(clid)) {
+					allowedTypes.insert(ClassInfo::GetObjTypeString(clid));
+				}
+				for (const auto& [name, memlist] : g_classMemberLists) {
+					const auto underscorePos = name.find('_');
+					if (underscorePos == name.npos)
+						continue;
+					const auto cpntTargetClass = name.substr(0, underscorePos);
+					if (!allowedTypes.count(cpntTargetClass))
+						continue;
+					if (!filter.PassFilter(name.c_str()))
+						continue;
+
+					if (ImGui::MenuItem(name.c_str())) {
+						std::string& routstr = std::get<std::string>(selobj->dbl.entries[0].value);
+						if (!routstr.empty())
+							routstr += ',';
+						routstr += name;
+						routstr += " 0";
+						std::vector<ClassInfo::ObjectMember> objmems;
+						ClassInfo::AddDBLMemberInfo(objmems, memlist);
+						selobj->dbl.addMembers(objmems);
 					}
 				}
 				ImGui::EndPopup();
