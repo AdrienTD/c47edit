@@ -1622,9 +1622,13 @@ void IGTextures()
 		ImGui::TableSetupColumn("TexListCol", ImGuiTableColumnFlags_WidthFixed, 256.0f);
 		ImGui::TableNextRow();
 		ImGui::TableNextColumn();
+		static ImGuiTextFilter filter;
+		filter.Draw();
 		ImGui::BeginChild("TextureList");
 		for (Chunk& chk : pack.subchunks) {
 			TexInfo* ti = (TexInfo*)chk.maindata.data();
+			if (!filter.PassFilter(ti->getName()))
+				continue;
 			ImGui::PushID(ti);
 			static const float imgsize = ImGui::GetTextLineHeightWithSpacing() * 2.0f;
 			if (ImGui::Selectable("##texture", curtexid == ti->id, 0, ImVec2(0.0f, imgsize)))
@@ -1730,26 +1734,32 @@ void IGSounds()
 			}
 		}
 	}
+	ImGui::SameLine();
+	static ImGuiTextFilter filter;
+	filter.Draw("Filter (inc,-exc)", 128.0f);
 	ImGui::BeginChild("SoundList");
 	for (size_t id = 1; id < g_scene.audioMgr.audioObjects.size(); ++id) {
 		auto& ptr = g_scene.audioMgr.audioObjects[id];
 		auto& name = g_scene.audioMgr.audioNames[id];
-		if (ptr && ptr->getType() == WaveAudioObject::TYPEID) {
-			WaveAudioObject* wave = (WaveAudioObject*)ptr.get();
-			Chunk& chk = g_scene.wavPack.subchunks[getWaveDataIndex(wave)];
-			ImGui::PushID(id);
-			if (ImGui::Selectable("##Sound", selectedSoundId == id)) {
-				selectedSoundId = id;
-				PlaySoundA(nullptr, nullptr, 0);
-				// copy for playing, to prevent sound corruption when sound is replaced/deleted while being played
-				static Chunk::DataBuffer playingWav;
-				playingWav = chk.maindata;
-				PlaySoundA((const char*)playingWav.data(), nullptr, SND_MEMORY | SND_ASYNC);
-			}
-			ImGui::SameLine();
-			ImGui::Text("%3i: %s", id, name.c_str());
-			ImGui::PopID();
+		if (!ptr || ptr->getType() != WaveAudioObject::TYPEID)
+			continue;
+		if (!filter.PassFilter(name.c_str()))
+			continue;
+
+		WaveAudioObject* wave = (WaveAudioObject*)ptr.get();
+		Chunk& chk = g_scene.wavPack.subchunks[getWaveDataIndex(wave)];
+		ImGui::PushID(id);
+		if (ImGui::Selectable("##Sound", selectedSoundId == id)) {
+			selectedSoundId = id;
+			PlaySoundA(nullptr, nullptr, 0);
+			// copy for playing, to prevent sound corruption when sound is replaced/deleted while being played
+			static Chunk::DataBuffer playingWav;
+			playingWav = chk.maindata;
+			PlaySoundA((const char*)playingWav.data(), nullptr, SND_MEMORY | SND_ASYNC);
 		}
+		ImGui::SameLine();
+		ImGui::Text("%3i: %s", id, name.c_str());
+		ImGui::PopID();
 	}
 	ImGui::EndChild();
 	ImGui::End();
