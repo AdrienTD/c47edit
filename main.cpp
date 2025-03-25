@@ -1680,7 +1680,35 @@ void IGSounds()
 
 	ImGui::SetNextWindowSize(ImVec2(512.0f, 350.0f), ImGuiCond_FirstUseEver);
 	ImGui::Begin("Waves", &wndShowSounds);
+	if (ImGui::Button("Add")) {
+		auto filePaths = GuiUtils::MultiOpenDialogBox("Sound Wave file (*.wav)\0*.WAV\0\0\0", "wav");
+		if (!filePaths.empty()) {
+			for (const auto& fpath : filePaths) {
+				FILE* file = nullptr;
+				_wfopen_s(&file, fpath.c_str(), L"rb");
+				if (file) {
+					int wavObjId = (int)g_scene.audioMgr.audioObjects.size();
+					g_scene.audioMgr.allocateSlot(wavObjId);
+
+					auto& wavObj = g_scene.audioMgr.audioObjects[wavObjId];
+					wavObj = std::make_shared<WaveAudioObject>();
+					g_scene.audioMgr.audioNames[wavObjId] = fpath.filename().string(); // TODO: should it be ANSI or UTF-8 ???
+
+					Chunk& chk = g_scene.wavPack.subchunks.emplace_back();
+					chk.tag = 'WPCM';
+
+					fseek(file, 0, SEEK_END);
+					size_t len = ftell(file);
+					fseek(file, 0, SEEK_SET);
+					chk.maindata.resize(len);
+					fread(chk.maindata.data(), len, 1, file);
+					fclose(file);
+				}
+			}
+		}
+	}
 	ImGui::BeginDisabled(!selectedWave);
+	ImGui::SameLine();
 	if (ImGui::Button("Replace")) {
 		auto fpath = GuiUtils::OpenDialogBox("Sound Wave file (*.wav)\0*.WAV\0\0\0", "wav");
 		if (!fpath.empty()) {
@@ -1757,6 +1785,12 @@ void IGSounds()
 			playingWav = chk.maindata;
 			PlaySoundA((const char*)playingWav.data(), nullptr, SND_MEMORY | SND_ASYNC);
 		}
+		if (ImGui::BeginDragDropSource()) {
+			ImGui::SetDragDropPayload("AudioRef", &id, 4);
+			std::string preview = std::to_string(id) + ": " + name;
+			ImGui::TextUnformatted(preview.c_str());
+			ImGui::EndDragDropSource();
+		}
 		ImGui::SameLine();
 		ImGui::Text("%3i: %s", id, name.c_str());
 		ImGui::PopID();
@@ -1778,6 +1812,7 @@ void IGAudioObjects()
 
 		auto listType = [](int typeId, const char* typeName) {
 			if (ImGui::CollapsingHeader(typeName)) {
+				ImGui::PushID(typeId);
 				for (uint32_t id = 1; id < g_scene.audioMgr.audioObjects.size(); ++id) {
 					auto& ptr = g_scene.audioMgr.audioObjects[id];
 					auto& name = g_scene.audioMgr.audioNames[id];
@@ -1797,6 +1832,19 @@ void IGAudioObjects()
 						ImGui::PopID();
 					}
 				}
+				if (ImGui::Button("New")) {
+					int wavObjId = (int)g_scene.audioMgr.audioObjects.size();
+					g_scene.audioMgr.allocateSlot(wavObjId);
+
+					auto& wavObj = g_scene.audioMgr.audioObjects[wavObjId];
+					if (typeId == SoundAudioObject::TYPEID) wavObj = std::make_shared<SoundAudioObject>();
+					if (typeId == SetAudioObject::TYPEID) wavObj = std::make_shared<SetAudioObject>();
+					if (typeId == MaterialAudioObject::TYPEID) wavObj = std::make_shared<MaterialAudioObject>();
+					if (typeId == ImpactAudioObject::TYPEID) wavObj = std::make_shared<ImpactAudioObject>();
+					if (typeId == RoomAudioObject::TYPEID) wavObj = std::make_shared<RoomAudioObject>();
+					g_scene.audioMgr.audioNames[wavObjId] = "Unnamed";
+				}
+				ImGui::PopID();
 			}
 			};
 		ImGui::BeginChild("AudioListWnd");
@@ -1818,6 +1866,8 @@ void IGAudioObjects()
 		};
 		ImGuiListener iglisten;
 		if (obj) {
+			IGStdStringInput("Name", g_scene.audioMgr.audioNames[selectedAudioObjId]);
+
 			if (obj->getType() == SoundAudioObject::TYPEID) ((SoundAudioObject*)obj)->reflect(iglisten);
 			else if (obj->getType() == MaterialAudioObject::TYPEID) ((MaterialAudioObject*)obj)->reflect(iglisten);
 			else if (obj->getType() == ImpactAudioObject::TYPEID) ((ImpactAudioObject*)obj)->reflect(iglisten);
