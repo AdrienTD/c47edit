@@ -24,7 +24,7 @@ typedef BOOL(APIENTRY *gli_wglSwapIntervalEXT)(int n);
 HDC whdc; HGLRC glrc;
 int drawframes = 0;
 extern HWND hWindow;
-bool rendertextures = false;
+bool rendertextures = true;
 bool renderColorTextures = true, renderLightmaps = true;
 bool enableAlphaTest = true;
 bool renderUntexturedFaces = false;
