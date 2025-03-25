@@ -2344,6 +2344,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 					ImGui::EndMenu();
 				}
 				if (ImGui::BeginMenu("Create")) {
+					static const uint16_t quickAccess[] = {
+						2, // ZSTDOBJ
+						1, // ZGROUP
+					};
+					for (auto id : quickAccess) {
+						if (ImGui::MenuItem(ClassInfo::GetObjTypeString(id))) {
+							g_scene.CreateObject(id, g_scene.rootobj);
+						}
+					}
+					ImGui::Separator();
 					static const std::pair<uint16_t, const char*> categories[] = {
 						{0x0010, "Group"},
 						{0x0020, "Mesh"},
