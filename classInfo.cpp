@@ -23,8 +23,9 @@ struct MemberDecoder {
 	bool next() {
 		const char* ptr = _string;
 		auto skipWhitespace = [&ptr]() {while (*ptr && *ptr == ' ') ++ptr; };
+		auto skipWhitespaceAndSemicolon = [&ptr]() {while (*ptr && (*ptr == ' ' || *ptr == ';')) ++ptr; };
 		auto skipWord = [&ptr]() {while (*ptr && *ptr != ' ' && *ptr != ';' && *ptr != '=' && *ptr != '[') ++ptr; };
-		skipWhitespace();
+		skipWhitespaceAndSemicolon();
 		if (!*ptr)
 			return false;
 		const char* b_type = ptr;
@@ -113,6 +114,13 @@ uint16_t ClassInfo::GetObjTypeCategory(int typeId)
 	return g_classInfo_idJsonMap.at(typeId)->at("num2").get<uint32_t>() >> 16;
 }
 
+int ClassInfo::GetObjTypeParentType(int typeId)
+{
+	const auto& parentName = g_classInfo_idJsonMap.at(typeId)->at("type").get_ref<const std::string&>();
+	const auto it = g_classInfo_stringIdMap.find(parentName);
+	return it != g_classInfo_stringIdMap.end() ? it->second : -1;
+}
+
 // Parse a string containing a list of class members
 std::vector<ClassInfo::ClassMember> ClassInfo::ProcessClassMemberListString(const std::string& membersString)
 {
@@ -161,10 +169,14 @@ void ClassInfo::AddDBLMemberInfo(std::vector<ClassInfo::ObjectMember>& members, 
 }
 
 // Return a list of names of all DBL members of the object
-std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj)
+std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj, std::vector<ObjectComponent>* outComponents)
 {
 	static const ClassMember emptyMember = { "", "" };
-	static const ClassMember initialMembers[3] = { {"CHAR*", "Routs"}, {"ENUM", "Create", "", {"ROOT", "CLIP"}}, {"SCRIPT", "ZGeomScript"}}; // some objects might have less or more initial members...
+	static const ClassMember initialMembers[3] = {
+		{"CHAR*", "Routs", {}, {}, 1, true},
+		{"ENUM", "Create", "", {"ROOT", "CLIP"}},
+		{"SCRIPT", "ZGeomScript"}
+	}; // some objects might have less or more initial members...
 	std::vector<ClassInfo::ObjectMember> members = { {&initialMembers[0]}, {&initialMembers[1]}, {&initialMembers[2]}, {&emptyMember} };
 	auto onClass = [&members](const auto& rec, const nlohmann::json& cl) -> void {
 		if (cl.at("name") == "ZGEOM")
@@ -188,11 +200,22 @@ std::vector<ClassInfo::ObjectMember> ClassInfo::GetMemberNames(GameObject* obj)
 			beg = ptr;
 			skipWord();
 			auto cpntName = std::string_view(beg, (size_t)(ptr - beg));
+			skipWhitespace();
+			beg = ptr;
+			skipWord();
+			auto cpntNumber = std::string_view(beg, (size_t)(ptr - beg));
 			nextElem();
 			skipWhitespace();
 
+			const int startIndex = (int)members.size();
 			const auto& memlist = g_classMemberLists.at(std::string(cpntName));
 			AddDBLMemberInfo(members, memlist);
+			const int endIndex = (int)members.size();
+			if (outComponents) {
+				int num = 0;
+				std::from_chars(cpntNumber.data(), cpntNumber.data() + cpntNumber.size(), num);
+				outComponents->push_back(ObjectComponent{ std::string(cpntName), num, startIndex, endIndex - startIndex });
+			}
 		}
 	}
 

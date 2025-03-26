@@ -4,6 +4,7 @@
 // See LICENSE file for more details.
 
 #define _USE_MATH_DEFINES
+#include <charconv>
 #include <cmath>
 #include <ctime>
 #include <filesystem>
@@ -11,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <random>
+#include <unordered_set>
 
 #include "chunk.h"
 #include "classInfo.h"
@@ -45,7 +47,7 @@
 GameObject* selobj = 0;
 Vector3 campos(0, 0, -50), camori(0,0,0);
 float camNearDist = 1.0f, camFarDist = 10000.0f;
-float camspeed = 32;
+float camspeed = 1920.0f;
 bool wireframe = false;
 bool findsel = false;
 uint32_t framesincursec = 0, framespersec = 0, lastfpscheck;
@@ -91,6 +93,8 @@ bool wndShowSounds = false;
 bool wndShowAudioObjects = false;
 bool wndShowZDefines = false;
 bool wndShowPathfinderInfo = false;
+
+std::function<void()> deferredCommand;
 
 extern HWND hWindow;
 
@@ -177,7 +181,7 @@ void IGMessageValue(const char* name, uint32_t& ref)
 			return std::to_string(id) + ": " + it->second.first;
 		}
 		return "(empty)";
-	};
+		};
 
 	if (ImGui::BeginCombo(name, getName(ref).c_str())) {
 		if (ImGui::Selectable("(empty)", ref == 0))
@@ -227,13 +231,13 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 			if (name_desc_pair.first == name)
 				return id;
 		return 0;
-	};
+		};
 	auto getSoundId = [](Scene& scene, const std::string& name) -> uint32_t {
 		for (size_t i = 1; i < scene.audioMgr.audioNames.size(); ++i)
 			if (scene.audioMgr.audioNames[i] == name)
 				return (uint32_t)i;
 		return 0;
-	};
+		};
 
 	std::map<GameObject*, GameObject*> cloneMap;
 	auto walkObj = [&cloneMap,&destScene](GameObject* obj, GameObject* parent, auto& rec) -> void {
@@ -245,7 +249,7 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 		cloneMap[obj] = clone;
 		for (GameObject* child : obj->subobj)
 			rec(child, clone, rec);
-	};
+		};
 	walkObj(ogObject, destScene.rootobj, walkObj);
 
 	if (!srcScene.lgtPack.subchunks.empty() && destScene.lgtPack.subchunks.empty()) // TODO: Improve
@@ -258,7 +262,7 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 				throw c47editException("Reference to object outside of the subscene");
 			ref = it->second;
 		}
-	};
+		};
 	for (const auto& [obj, clone] : cloneMap) {
 		for (auto& de : clone->dbl.entries) {
 			if (de.type == DBLEntry::EType::ZGEOMREF)
@@ -312,7 +316,7 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 						}
 					}
 					aref.id = destId;
-				};
+					};
 				AudioRef& aref = std::get<AudioRef>(de.value);
 				fixAudioRef(aref);
 			}
@@ -333,7 +337,10 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 		if (clone->mesh) {
 			clone->mesh = std::make_shared<Mesh>(*clone->mesh);
 			for (auto& face : clone->mesh->ftxFaces) {
-				for (auto& [flag, index] : std::array<std::pair<int, int>, 2>{ { {0x20, 2}, { 0x80, 3 } }}) {
+				static const std::array<std::pair<int, int>, 2> textureTypes{
+					{ {FTXFlag::textureMask, 2}, { FTXFlag::lightMapMask, 3 } }
+				};
+				for (auto& [flag, index] : textureTypes) {
 					if ((face[0] & flag) && !(face[index] & 0x8000)) {
 						int ogTexId = face[index];
 						auto it = textureMap.find(ogTexId);
@@ -361,6 +368,99 @@ void CopyObjectToAnotherScene(Scene& srcScene, Scene& destScene, GameObject* ogO
 			}
 		}
 	}
+}
+
+bool isRootObject(GameObject* obj)
+{
+	return !obj->root || !obj->parent || obj->parent == g_scene.superroot;
+}
+
+void CmdDuplicateObjectAndAdapt(GameObject* obj)
+{
+	if (isRootObject(obj))
+		return;
+
+	std::unordered_map<GameObject*, GameObject*> cloneMap;
+
+	auto duplicate = [&](GameObject* og, GameObject* parent, const auto& rec) -> GameObject*
+		{
+			GameObject* clone = new GameObject(*og);
+			clone->subobj.clear();
+			clone->parent = parent;
+			cloneMap[og] = clone;
+			for (GameObject* child : og->subobj) {
+				GameObject* clonedChild = rec(child, clone, rec);
+				clone->subobj.push_back(clonedChild);
+			}
+			return clone;
+		};
+	GameObject* clone = duplicate(obj, obj->parent, duplicate);
+	auto it = std::find(obj->parent->subobj.begin(), obj->parent->subobj.end(), obj);
+	if (it != obj->parent->subobj.end())
+		it += 1;
+	obj->parent->subobj.insert(it, clone);
+
+	// update references to original objects with clones in the cloned objects
+	auto updateDbl = [&cloneMap](DBLList& dbl, const auto& rec) -> void
+		{
+			for (auto& entry : dbl.entries) {
+				if (GORef* ref = std::get_if<GORef>(&entry.value)) {
+					auto it = cloneMap.find(ref->get());
+					if (it != cloneMap.end())
+						*ref = it->second;
+				}
+				else if (auto* list = std::get_if<std::vector<GORef>>(&entry.value)) {
+					for (GORef& ref : *list) {
+						auto it = cloneMap.find(ref.get());
+						if (it != cloneMap.end())
+							ref = it->second;
+					}
+				}
+				else if (auto* inception = std::get_if<DBLList>(&entry.value)) {
+					rec(*inception, rec);
+				}
+			}
+		};
+
+	for (const auto& [_, clone] : cloneMap) {
+		updateDbl(clone->dbl, updateDbl);
+	}
+
+	// update name by increasing number suffix if present, or add one
+	auto numPosition = obj->name.find_last_not_of("0123456789");
+	numPosition = numPosition == std::string::npos ? 0 : numPosition + 1;
+	auto nameLeft = obj->name.substr(0, numPosition);
+	auto digits = obj->name.substr(numPosition);
+	unsigned int number = 0;
+	std::from_chars(digits.data(), digits.data() + digits.size(), number);
+	for (int attempt = 0; attempt < 1'000'000; ++attempt) {
+		number += 1;
+		auto newDigits = std::to_string(number);
+		if (newDigits.size() < digits.size()) {
+			newDigits.insert(0, digits.size() - newDigits.size(), '0');
+		}
+		std::string newName = nameLeft + std::move(newDigits);
+		if (!obj->parent->findByPath(newName)) {
+			clone->name = std::move(newName);
+			break;
+		}
+	}
+}
+
+void CmdDeleteObjectSafely(GameObject* obj)
+{
+	if (isRootObject(obj))
+		return;
+
+	if (obj->getRefCount() > 0u) {
+		warn("It's not possible to remove an object that is referenced by other objects!");
+		return;
+	}
+
+	if (selobj == obj)
+		selobj = nullptr;
+
+	g_scene.RemoveObject(obj);
 }
 
 void IGOTNode(GameObject *o)
@@ -393,12 +493,21 @@ void IGOTNode(GameObject *o)
 			cursorpos = selobj->matrix.getTranslationVector();
 		}
 	}
-	if (ImGui::IsItemActive())
+	if (o != g_scene.superroot && o != g_scene.rootobj && o != g_scene.cliprootobj && ImGui::IsItemActive()) {
 		if (ImGui::BeginDragDropSource()) {
 			ImGui::SetDragDropPayload("GameObject", &o, sizeof(GameObject*));
 			ImGui::Text("GameObject: %s", o->name.c_str());
 			ImGui::EndDragDropSource();
 		}
+	}
+	if ((o->flags & 0x10 || o == g_scene.rootobj || o == g_scene.cliprootobj) && o != g_scene.superroot) { // is it a group
+		if (ImGui::GetIO().KeyCtrl && ImGui::BeginDragDropTarget()) {
+			if (const auto* payload = ImGui::AcceptDragDropPayload("GameObject")) {
+				deferredCommand = std::bind(&Scene::GiveObject, &g_scene, *(GameObject**)payload->Data, o);
+			}
+			ImGui::EndDragDropTarget();
+		}
+	}
 	ImGui::PushID(o);
 	if (ImGui::BeginPopupContextItem("ObjectRightClickMenu", ImGuiPopupFlags_MouseButtonRight)) {
 		auto it = objVisibilityMap.find(o);
@@ -407,7 +516,17 @@ void IGOTNode(GameObject *o)
 		if (ImGui::MenuItem("Show", nullptr, vis == ObjVisibility::Show)) objVisibilityMap[o] = ObjVisibility::Show;
 		if (ImGui::MenuItem("Hide", nullptr, vis == ObjVisibility::Hide)) objVisibilityMap[o] = ObjVisibility::Hide;
 		ImGui::Separator();
-		if (ImGui::MenuItem("Import subscene here")) {
+		auto menuItemWhen = [](const char* name, bool enabled)
+			{
+				ImGui::BeginDisabled(!enabled);
+				const bool res = ImGui::MenuItem(name);
+				ImGui::EndDisabled();
+				return enabled && res;
+			};
+		if (menuItemWhen("Duplicate", !isRootObject(o))) {
+			deferredCommand = std::bind(CmdDuplicateObjectAndAdapt, o);
+		}
+		if (menuItemWhen("Import subscene here", o != g_scene.superroot)) {
 			auto fpath = GuiUtils::OpenDialogBox("Scene (*.zip)\0*.zip\0\0\0\0\0", "zip");
 			if (!fpath.empty()) {
 				Scene subscene;
@@ -424,7 +543,7 @@ void IGOTNode(GameObject *o)
 				}
 			}
 		}
-		if (ImGui::MenuItem("Extract subscene")) {
+		if (menuItemWhen("Extract subscene", !isRootObject(o))) {
 			std::string fname = o->name;
 			for (char& c : fname)
 				if (c == '/' || c == '\\')
@@ -443,6 +562,9 @@ void IGOTNode(GameObject *o)
 					MessageBoxA(hWindow, msg.c_str(), "c47edit", 16);
 				}
 			}
+		}
+		if (menuItemWhen("Delete", !isRootObject(o))) {
+			deferredCommand = std::bind(CmdDeleteObjectSafely, o);
 		}
 		ImGui::EndPopup();
 	}
@@ -601,7 +723,7 @@ std::vector<uint8_t> SplitDblImage(uint32_t* image, int width, int height) {
 			}
 		}
 		return 0u;
-	};
+		};
 
 	static constexpr int MAX_LENGTH = 256;
 	int numQuadsX = width / MAX_LENGTH + ((width % MAX_LENGTH) ? 1 : 0);
@@ -671,21 +793,74 @@ GLuint GetDblImageTexture(GameObject* obj, void* data, int type, int width, int 
 
 static GameObject* nextobjtosel = 0;
 
-void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members)
+void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members, const std::vector<ClassInfo::ObjectComponent>* components = nullptr)
 {
 	size_t memberIndex = 0;
+	std::optional<int> nextComponentIndex = (components && !components->empty()) ? std::make_optional(0) : std::nullopt;
 	ImGui::InputScalar("DBL Flags", ImGuiDataType_U32, &dbl.flags);
-	int i = 0;
 	for (auto e = dbl.entries.begin(); e != dbl.entries.end(); e++)
 	{
 		static const ClassInfo::ClassMember oobClassMember = { "", "OOB" };
 		static const ClassInfo::ObjectMember oobObjMember = { &oobClassMember };
-		const auto& [mem, arrayIndex] = (memberIndex < members.size()) ? members[memberIndex++] : oobObjMember;
+		const auto& [mem, arrayIndex] = (memberIndex < members.size()) ? members[memberIndex] : oobObjMember;
 		std::string nameIndexed;
 		if (arrayIndex != -1)
 			nameIndexed = mem->name + '[' + std::to_string(arrayIndex) + ']';
 		const std::string& name = (arrayIndex != -1) ? nameIndexed : mem->name;
-		ImGui::PushID(i++);
+		ImGui::PushID(memberIndex);
+
+		// component / routine header
+		if (nextComponentIndex && memberIndex == components->at(*nextComponentIndex).startIndex) {
+			const auto& component = components->at(*nextComponentIndex);
+			int componentIndex = *nextComponentIndex;
+			ImGui::SeparatorText(component.name.c_str());
+			ImGui::SameLine(ImGui::GetContentRegionMax().x - 56.0f);
+			nextComponentIndex = (componentIndex + 1 == components->size()) ? std::nullopt : std::make_optional(componentIndex + 1);
+			int newCpntNumber = components->at(componentIndex).number;
+			ImGui::SetNextItemWidth(28.0f);
+			if (ImGui::InputInt("##CpntNum", &newCpntNumber, 0)) {
+				std::string updatedRouteString;
+				bool firstTime = true;
+				for (int cpnt = 0; cpnt < components->size(); ++cpnt) {
+					if (!firstTime)
+						updatedRouteString.push_back(',');
+					firstTime = false;
+					updatedRouteString += components->at(cpnt).name;
+					updatedRouteString += ' ';
+					updatedRouteString += std::to_string((cpnt == componentIndex) ? newCpntNumber : components->at(cpnt).number);
+				}
+				std::string& routstr = std::get<std::string>(dbl.entries[0].value);
+				routstr = std::move(updatedRouteString);
+			}
+			ImGui::SameLine(0.0);
+			if (ImGui::Button("X")) {
+				const int startIndex = component.startIndex;
+				const int numElements = component.numElements;
+				std::string updatedRouteString;
+				bool firstTime = true;
+				for (int cpnt = 0; cpnt < components->size(); ++cpnt) {
+					if (cpnt == componentIndex)
+						continue;
+					if (!firstTime)
+						updatedRouteString.push_back(',');
+					firstTime = false;
+					updatedRouteString += components->at(cpnt).name;
+					updatedRouteString += ' ';
+					updatedRouteString += std::to_string(components->at(cpnt).number);
+				}
+				std::string& routstr = std::get<std::string>(dbl.entries[0].value);
+				routstr = std::move(updatedRouteString);
+				deferredCommand = [&dbl, startIndex, numElements]()
+					{
+						auto it = dbl.entries.begin() + startIndex;
+						dbl.entries.erase(it, it + numElements);
+					};
+			}
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("Remove routine");
+			}
+		}
+
 		if (mem->isProtected)
 			ImGui::BeginDisabled();
 		ImGui::Text("%1X", e->flags >> 4);
@@ -821,10 +996,11 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 		case ET::ZGEOMREFTAB: {
 			auto& vec = std::get<std::vector<GORef>>(e->value);
 			if (ImGui::BeginListBox("##Objlist", ImVec2(0, 64))) {
-				int id = 0;
+				int index = 0;
+				int removingIndex = -1;
 				for (auto& obj : vec)
 				{
-					ImGui::PushID(id++);
+					ImGui::PushID(index);
 					if (obj.valid())
 						ImGui::Text("%s", obj->name.c_str());
 					else
@@ -832,8 +1008,10 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 						nextobjtosel = obj.get();
 					if (ImGui::BeginPopupContextItem("ObjRefMenu")) {
-						if (ImGui::MenuItem("Clear"))
+						if (ImGui::MenuItem("Nullify"))
 							obj.deref();
+						if (ImGui::MenuItem("Remove"))
+							removingIndex = index;
 						ImGui::EndPopup();
 					}
 					if (ImGui::BeginDragDropTarget())
@@ -845,6 +1023,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 						ImGui::EndDragDropTarget();
 					}
 					ImGui::PopID();
+					index += 1;
 				}
 				ImGui::EndListBox();
 				ImGui::SameLine();
@@ -855,6 +1034,10 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 				if (ImGui::InputScalar("##ListLabel", ImGuiDataType_U32, &listCount, nullptr, nullptr, nullptr, ImGuiInputTextFlags_EnterReturnsTrue))
 					vec.resize(listCount);
 				ImGui::EndGroup();
+
+				if (removingIndex >= 0) {
+					vec.erase(vec.begin() + removingIndex);
+				}
 			}
 			break;
 		}
@@ -867,7 +1050,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 		}
 		case ET::SCRIPT: {
 			DBLList& dbl = std::get<DBLList>(e->value);
-			
+
 			std::vector<ClassInfo::ClassMember> scriptBody;
 			static std::vector<ClassInfo::ObjectMember> oScriptBody;
 			oScriptBody.clear();
@@ -876,7 +1059,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 					try {
 						const auto& scriptFile = std::get<std::string>(dbl.entries.at(0).value);
 						const auto& scriptPropertiesString = std::get<std::string>(dbl.entries.at(1).value);
-						
+
 						ScriptParser parser(g_scene);
 						parser.parseFile(scriptFile);
 						auto newPropertiesString = parser.getNativeImportPropertyList(parser.lastScript);
@@ -952,6 +1135,7 @@ void IGDBLList(DBLList& dbl, const std::vector<ClassInfo::ObjectMember>& members
 		if (mem->isProtected)
 			ImGui::EndDisabled();
 		ImGui::PopID();
+		memberIndex += 1;
 	}
 }
 
@@ -964,21 +1148,21 @@ void IGObjectInfo()
 	if (!selobj)
 		ImGui::Text("No object selected.");
 	else {
+		ImGui::BeginDisabled(isRootObject(selobj));
 		if (ImGui::Button("Duplicate"))
-			if(selobj->root)
-				g_scene.DuplicateObject(selobj, selobj->root);
+			CmdDuplicateObjectAndAdapt(selobj);
 		ImGui::SameLine();
-		bool wannadel = 0;
 		if (ImGui::Button("Delete"))
-			wannadel = 1;
-		
+			deferredCommand = std::bind(CmdDeleteObjectSafely, selobj);
+
 		if (ImGui::Button("Set to be given"))
 			objtogive = selobj;
+		ImGui::EndDisabled();
 		ImGui::SameLine();
 		if (ImGui::Button("Give it here!"))
 			if(objtogive)
 				g_scene.GiveObject(objtogive, selobj);
-		
+
 		if (ImGui::Button("Find in graph"))
 			findsel = true;
 		if (selobj->parent)
@@ -1014,24 +1198,38 @@ void IGObjectInfo()
 				ImGui::OpenPopup("AddRoutineMenu");
 			}
 			if (ImGui::BeginPopup("AddRoutineMenu")) {
-				for (auto& [name, memlist] : g_classMemberLists) {
-					if (name.find('_') != name.npos) {
-						if (ImGui::MenuItem(name.c_str())) {
-							std::string& routstr = std::get<std::string>(selobj->dbl.entries[0].value);
-							if (!routstr.empty())
-								routstr += ',';
-							routstr += name;
-							routstr += " 0";
-							std::vector<ClassInfo::ObjectMember> objmems;
-							ClassInfo::AddDBLMemberInfo(objmems, memlist);
-							selobj->dbl.addMembers(objmems);
-						}
+				static ImGuiTextFilter filter;
+				filter.Draw();
+				std::unordered_set<std::string> allowedTypes;
+				for (int clid = selobj->type; clid != -1; clid = ClassInfo::GetObjTypeParentType(clid)) {
+					allowedTypes.insert(ClassInfo::GetObjTypeString(clid));
+				}
+				for (const auto& [name, memlist] : g_classMemberLists) {
+					const auto underscorePos = name.find('_');
+					if (underscorePos == name.npos)
+						continue;
+					const auto cpntTargetClass = name.substr(0, underscorePos);
+					if (!allowedTypes.count(cpntTargetClass))
+						continue;
+					if (!filter.PassFilter(name.c_str()))
+						continue;
+
+					if (ImGui::MenuItem(name.c_str())) {
+						std::string& routstr = std::get<std::string>(selobj->dbl.entries[0].value);
+						if (!routstr.empty())
+							routstr += ',';
+						routstr += name;
+						routstr += " 0";
+						std::vector<ClassInfo::ObjectMember> objmems;
+						ClassInfo::AddDBLMemberInfo(objmems, memlist);
+						selobj->dbl.addMembers(objmems);
 					}
 				}
 				ImGui::EndPopup();
 			}
-			auto members = ClassInfo::GetMemberNames(selobj);
-			IGDBLList(selobj->dbl, members);
+			std::vector<ClassInfo::ObjectComponent> components;
+			auto members = ClassInfo::GetMemberNames(selobj, &components);
+			IGDBLList(selobj->dbl, members, &components);
 		}
 		if (selobj->mesh && ImGui::CollapsingHeader("Mesh"))
 		{
@@ -1059,7 +1257,7 @@ void IGObjectInfo()
 									obj->excChunk = std::make_shared<Chunk>(*selobj->excChunk);
 								for (GameObject* child : obj->subobj)
 									rec(child, rec);
-							};
+								};
 							walkObj(g_scene.superroot, walkObj);
 						}
 						//else
@@ -1146,9 +1344,13 @@ void IGObjectInfo()
 			ImGui::Text("Weird: 0x%X", selobj->mesh->weird);
 			if (selobj->mesh->extension) {
 				ImGui::TextUnformatted("--- EXTENSION ---");
-				ImGui::Text("Unk: %u", selobj->mesh->extension->extUnk2);
-				ImGui::Text("Frames size: %zu", selobj->mesh->extension->frames.size());
-				ImGui::Text("Name: %s", selobj->mesh->extension->name.c_str());
+				ImGui::Text("Type: %u", selobj->mesh->extension->type);
+				const int numTexAnims = (selobj->mesh->extension->type == 4) ? 2 : 1;
+				for (int i = 0; i < numTexAnims; ++i) {
+					const auto& texAnim = selobj->mesh->extension->texAnims[i];
+					ImGui::Text("TexAnim%i Frames size: %zu", i, texAnim.frames.size());
+					ImGui::Text("TexAnim%i Name: %s", i, texAnim.name.c_str());
+				}
 			}
 		}
 		if (selobj->line && ImGui::CollapsingHeader("Line")) {
@@ -1195,8 +1397,8 @@ void IGObjectInfo()
 				size_t numFaces = selobj->mesh->getNumQuads() + selobj->mesh->getNumTris();
 				size_t numTexFaces = 0, numLitFaces = 0;
 				for (auto& ftxFace : selobj->mesh->ftxFaces) {
-					if (ftxFace[0] & 0x20) ++numTexFaces;
-					if (ftxFace[0] & 0x80) ++numLitFaces;
+					if (ftxFace[0] & FTXFlag::textureMask) ++numTexFaces;
+					if (ftxFace[0] & FTXFlag::lightMapMask) ++numLitFaces;
 				}
 				ImGui::Text("Num     Faces:  %zu (%zu)", selobj->mesh->ftxFaces.size(), numFaces);
 				ImGui::Text("Num Tex Faces:  %zu (%zu)", selobj->mesh->textureCoords.size() / 8, numTexFaces);
@@ -1204,11 +1406,11 @@ void IGObjectInfo()
 				ImGui::Separator();
 				for (size_t i = 0; i < numFaces; ++i) {
 					ImGui::Text("%04X %04X %04X %04X %04X %04X", ftxFace[0], ftxFace[1], ftxFace[2], ftxFace[3], ftxFace[4], ftxFace[5]);
-					if (ftxFace[0] & 0x20) {
+					if (ftxFace[0] & FTXFlag::textureMask) {
 						ImGui::Text(" t (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f)", uvCoords[0], uvCoords[1], uvCoords[2], uvCoords[3], uvCoords[4], uvCoords[5], uvCoords[6], uvCoords[7]);
 						uvCoords += 8;
 					}
-					if (ftxFace[0] & 0x80) {
+					if (ftxFace[0] & FTXFlag::lightMapMask) {
 						ImGui::Text(" l (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f)", uvCoords2[0], uvCoords2[1], uvCoords2[2], uvCoords2[3], uvCoords2[4], uvCoords2[5], uvCoords2[6], uvCoords2[7]);
 						uvCoords2 += 8;
 					}
@@ -1259,17 +1461,36 @@ void IGObjectInfo()
 						rec(&sub, rec);
 					ImGui::TreePop();
 				}
-			};
+				};
 			walkChunk(selobj->excChunk.get(), walkChunk);
 		}
-		if (wannadel)
-		{
-			if (selobj->getRefCount() > 0u)
-				warn("It's not possible to remove an object that is referenced by other objects!");
-			else {
-				g_scene.RemoveObject(selobj);
-				selobj = 0;
-			}
+		if (ImGui::CollapsingHeader("Referenced by")) {
+			auto inspectDbl = [](const DBLList& dbl, const GameObject* obj, const auto& rec) -> void {
+				for (const auto& entry : dbl.entries) {
+					if (const GORef* ref = std::get_if<GORef>(&entry.value)) {
+						if (ref->get() == selobj) {
+							ImGui::BulletText("%s", obj->getPath().c_str());
+						}
+					}
+					else if (const auto* list = std::get_if<std::vector<GORef>>(&entry.value)) {
+						for (const GORef& ref : *list) {
+							if (ref.get() == selobj) {
+								ImGui::BulletText("%s", obj->getPath().c_str());
+							}
+						}
+					}
+					else if (const auto* inception = std::get_if<DBLList>(&entry.value)) {
+						rec(*inception, obj, rec);
+					}
+				}
+				};
+			auto walk = [&](const GameObject* obj, const auto& rec) -> void {
+				inspectDbl(obj->dbl, obj, inspectDbl);
+				for (const auto* child : obj->subobj) {
+					rec(child, rec);
+				}
+				};
+			walk(g_scene.superroot, walk);
 		}
 	}
 	ImGui::End();
@@ -1298,7 +1519,7 @@ void IGMain()
 	}
 	ImGui::SameLine();
 	ImGui::Text("%4u FPS", framespersec);
-	ImGui::DragFloat("Cam speed", &camspeed, 0.1f);
+	ImGui::DragFloat("Cam speed", &camspeed, 4.0f, 0.0f, FLT_MAX, "%.f /sec");
 	ImGui::DragFloat3("Cam pos", &campos.x, 1.0f);
 	ImGui::DragFloat2("Cam ori", &camori.x, 0.1f);
 	ImGui::DragFloat2("Cam dist", &camNearDist, 1.0f);
@@ -1398,15 +1619,19 @@ void IGTextures()
 			return 1;
 		// otherwise -> green/white
 		return 0;
-	};
+		};
 
 	if (ImGui::BeginTable("TextureColumnsa", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoHostExtendY | ImGuiTableFlags_NoHostExtendX, ImGui::GetContentRegionAvail())) {
 		ImGui::TableSetupColumn("TexListCol", ImGuiTableColumnFlags_WidthFixed, 256.0f);
 		ImGui::TableNextRow();
 		ImGui::TableNextColumn();
+		static ImGuiTextFilter filter;
+		filter.Draw();
 		ImGui::BeginChild("TextureList");
 		for (Chunk& chk : pack.subchunks) {
 			TexInfo* ti = (TexInfo*)chk.maindata.data();
+			if (!filter.PassFilter(ti->getName()))
+				continue;
 			ImGui::PushID(ti);
 			static const float imgsize = ImGui::GetTextLineHeightWithSpacing() * 2.0f;
 			if (ImGui::Selectable("##texture", curtexid == ti->id, 0, ImVec2(0.0f, imgsize)))
@@ -1452,13 +1677,41 @@ void IGSounds()
 			}
 		}
 		return -1;
-	};
+		};
 	WaveAudioObject* selectedWave = g_scene.audioMgr.getObjectAs<WaveAudioObject>(selectedSoundId);
 	int selectedWaveIndex = getWaveDataIndex(selectedWave);
 
 	ImGui::SetNextWindowSize(ImVec2(512.0f, 350.0f), ImGuiCond_FirstUseEver);
 	ImGui::Begin("Waves", &wndShowSounds);
+	if (ImGui::Button("Add")) {
+		auto filePaths = GuiUtils::MultiOpenDialogBox("Sound Wave file (*.wav)\0*.WAV\0\0\0", "wav");
+		if (!filePaths.empty()) {
+			for (const auto& fpath : filePaths) {
+				FILE* file = nullptr;
+				_wfopen_s(&file, fpath.c_str(), L"rb");
+				if (file) {
+					int wavObjId = (int)g_scene.audioMgr.audioObjects.size();
+					g_scene.audioMgr.allocateSlot(wavObjId);
+
+					auto& wavObj = g_scene.audioMgr.audioObjects[wavObjId];
+					wavObj = std::make_shared<WaveAudioObject>();
+					g_scene.audioMgr.audioNames[wavObjId] = fpath.filename().string(); // TODO: should it be ANSI or UTF-8 ???
+
+					Chunk& chk = g_scene.wavPack.subchunks.emplace_back();
+					chk.tag = 'WPCM';
+
+					fseek(file, 0, SEEK_END);
+					size_t len = ftell(file);
+					fseek(file, 0, SEEK_SET);
+					chk.maindata.resize(len);
+					fread(chk.maindata.data(), len, 1, file);
+					fclose(file);
+				}
+			}
+		}
+	}
 	ImGui::BeginDisabled(!selectedWave);
+	ImGui::SameLine();
 	if (ImGui::Button("Replace")) {
 		auto fpath = GuiUtils::OpenDialogBox("Sound Wave file (*.wav)\0*.WAV\0\0\0", "wav");
 		if (!fpath.empty()) {
@@ -1512,26 +1765,38 @@ void IGSounds()
 			}
 		}
 	}
+	ImGui::SameLine();
+	static ImGuiTextFilter filter;
+	filter.Draw("Filter (inc,-exc)", 128.0f);
 	ImGui::BeginChild("SoundList");
 	for (size_t id = 1; id < g_scene.audioMgr.audioObjects.size(); ++id) {
 		auto& ptr = g_scene.audioMgr.audioObjects[id];
 		auto& name = g_scene.audioMgr.audioNames[id];
-		if (ptr && ptr->getType() == WaveAudioObject::TYPEID) {
-			WaveAudioObject* wave = (WaveAudioObject*)ptr.get();
-			Chunk& chk = g_scene.wavPack.subchunks[getWaveDataIndex(wave)];
-			ImGui::PushID(id);
-			if (ImGui::Selectable("##Sound", selectedSoundId == id)) {
-				selectedSoundId = id;
-				PlaySoundA(nullptr, nullptr, 0);
-				// copy for playing, to prevent sound corruption when sound is replaced/deleted while being played
-				static Chunk::DataBuffer playingWav;
-				playingWav = chk.maindata;
-				PlaySoundA((const char*)playingWav.data(), nullptr, SND_MEMORY | SND_ASYNC);
-			}
-			ImGui::SameLine();
-			ImGui::Text("%3i: %s", id, name.c_str());
-			ImGui::PopID();
+		if (!ptr || ptr->getType() != WaveAudioObject::TYPEID)
+			continue;
+		if (!filter.PassFilter(name.c_str()))
+			continue;
+
+		WaveAudioObject* wave = (WaveAudioObject*)ptr.get();
+		Chunk& chk = g_scene.wavPack.subchunks[getWaveDataIndex(wave)];
+		ImGui::PushID(id);
+		if (ImGui::Selectable("##Sound", selectedSoundId == id)) {
+			selectedSoundId = id;
+			PlaySoundA(nullptr, nullptr, 0);
+			// copy for playing, to prevent sound corruption when sound is replaced/deleted while being played
+			static Chunk::DataBuffer playingWav;
+			playingWav = chk.maindata;
+			PlaySoundA((const char*)playingWav.data(), nullptr, SND_MEMORY | SND_ASYNC);
 		}
+		if (ImGui::BeginDragDropSource()) {
+			ImGui::SetDragDropPayload("AudioRef", &id, 4);
+			std::string preview = std::to_string(id) + ": " + name;
+			ImGui::TextUnformatted(preview.c_str());
+			ImGui::EndDragDropSource();
+		}
+		ImGui::SameLine();
+		ImGui::Text("%3i: %s", id, name.c_str());
+		ImGui::PopID();
 	}
 	ImGui::EndChild();
 	ImGui::End();
@@ -1550,6 +1815,7 @@ void IGAudioObjects()
 
 		auto listType = [](int typeId, const char* typeName) {
 			if (ImGui::CollapsingHeader(typeName)) {
+				ImGui::PushID(typeId);
 				for (uint32_t id = 1; id < g_scene.audioMgr.audioObjects.size(); ++id) {
 					auto& ptr = g_scene.audioMgr.audioObjects[id];
 					auto& name = g_scene.audioMgr.audioNames[id];
@@ -1569,8 +1835,21 @@ void IGAudioObjects()
 						ImGui::PopID();
 					}
 				}
+				if (ImGui::Button("New")) {
+					int wavObjId = (int)g_scene.audioMgr.audioObjects.size();
+					g_scene.audioMgr.allocateSlot(wavObjId);
+
+					auto& wavObj = g_scene.audioMgr.audioObjects[wavObjId];
+					if (typeId == SoundAudioObject::TYPEID) wavObj = std::make_shared<SoundAudioObject>();
+					if (typeId == SetAudioObject::TYPEID) wavObj = std::make_shared<SetAudioObject>();
+					if (typeId == MaterialAudioObject::TYPEID) wavObj = std::make_shared<MaterialAudioObject>();
+					if (typeId == ImpactAudioObject::TYPEID) wavObj = std::make_shared<ImpactAudioObject>();
+					if (typeId == RoomAudioObject::TYPEID) wavObj = std::make_shared<RoomAudioObject>();
+					g_scene.audioMgr.audioNames[wavObjId] = "Unnamed";
+				}
+				ImGui::PopID();
 			}
-		};
+			};
 		ImGui::BeginChild("AudioListWnd");
 		listType(SoundAudioObject::TYPEID, "Sounds");
 		listType(SetAudioObject::TYPEID, "Sets");
@@ -1590,6 +1869,8 @@ void IGAudioObjects()
 		};
 		ImGuiListener iglisten;
 		if (obj) {
+			IGStdStringInput("Name", g_scene.audioMgr.audioNames[selectedAudioObjId]);
+
 			if (obj->getType() == SoundAudioObject::TYPEID) ((SoundAudioObject*)obj)->reflect(iglisten);
 			else if (obj->getType() == MaterialAudioObject::TYPEID) ((MaterialAudioObject*)obj)->reflect(iglisten);
 			else if (obj->getType() == ImpactAudioObject::TYPEID) ((ImpactAudioObject*)obj)->reflect(iglisten);
@@ -2013,7 +2294,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	ImGui_ImplWin32_Init((void*)hWindow);
 	ImGui_ImplOpenGL2_Init();
-	lastfpscheck = GetTickCount();
+
+	uint32_t previousFrameTime = GetTickCount();
+	lastfpscheck = previousFrameTime;
 
 	if (!CmdOpenScene())
 		g_scene.LoadEmpty();
@@ -2024,6 +2307,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			Sleep(100);
 		else
 		{
+			const uint32_t currentFrameTime = GetTickCount();
+			const uint32_t deltaTimeMsec = currentFrameTime - previousFrameTime;
+			const float deltaTimeSec = (float)deltaTimeMsec / 1000.0f;
+			previousFrameTime = currentFrameTime;
+
 			Vector3 cd(0, 0, 1), ncd;
 			Matrix m1 = Matrix::getRotationXMatrix(camori.x);
 			Matrix m2 = Matrix::getRotationYMatrix(camori.y);
@@ -2055,39 +2343,39 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 				if (ImGui::IsKeyPressed((ImGuiKey)'T'))
 					rendertextures = !rendertextures;
 			}
-			campos += cammove * camspeed * (io.KeyShift ? 2.0f : 1.0f);
+			campos += cammove * camspeed * deltaTimeSec * (io.KeyShift ? 2.0f : 1.0f);
 			if (io.MouseDown[0] && !io.WantCaptureMouse && !(io.KeyAlt || io.KeyCtrl))
 			{
 				camori.y += io.MouseDelta.x * 0.01f;
 				camori.x += io.MouseDelta.y * 0.01f;
 			}
 			if (!io.WantCaptureMouse)
-			if (io.MouseClicked[1] || (io.MouseClicked[0] && (io.KeyAlt || io.KeyCtrl)))
-			{
-				Vector3 raystart, raydir;
-				float ys = 1.0f / tan(60.0f * (float)M_PI / 180.0f / 2.0f);
-				float xs = ys / ((float)screen_width / (float)screen_height);
-				ImVec2 mspos = ImGui::GetMousePos();
-				float msx = mspos.x * 2.0f / (float)screen_width - 1.0f;
-				float msy = mspos.y * 2.0f / (float)screen_height - 1.0f;
-				Vector3 hi = ncd.cross(crab);
-				raystart = campos + ncd + crab * (msx / xs) - hi * (msy / ys);
-				raydir = raystart - campos;
+				if (io.MouseClicked[1] || (io.MouseClicked[0] && (io.KeyAlt || io.KeyCtrl)))
+				{
+					Vector3 raystart, raydir;
+					float ys = 1.0f / tan(60.0f * (float)M_PI / 180.0f / 2.0f);
+					float xs = ys / ((float)screen_width / (float)screen_height);
+					ImVec2 mspos = ImGui::GetMousePos();
+					float msx = mspos.x * 2.0f / (float)screen_width - 1.0f;
+					float msy = mspos.y * 2.0f / (float)screen_height - 1.0f;
+					Vector3 hi = ncd.cross(crab);
+					raystart = campos + ncd + crab * (msx / xs) - hi * (msy / ys);
+					raydir = raystart - campos;
 
-				bestpickobj = 0;
-				bestpickdist = std::numeric_limits<float>::infinity();
-				IsRayIntersectingObject(raystart, raydir, g_scene.superroot, Matrix::getIdentity());
-				if (io.KeyAlt) {
-					if (bestpickobj && selobj)
-						selobj->matrix.setTranslationVector(bestpickintersectionpnt);
+					bestpickobj = 0;
+					bestpickdist = std::numeric_limits<float>::infinity();
+					IsRayIntersectingObject(raystart, raydir, g_scene.superroot, Matrix::getIdentity());
+					if (io.KeyAlt) {
+						if (bestpickobj && selobj)
+							selobj->matrix.setTranslationVector(bestpickintersectionpnt);
+					}
+					else {
+						selobj = bestpickobj;
+						if (selobj && (io.MouseDoubleClicked[0] || io.MouseDoubleClicked[1]))
+							selobj = selobj->parent;
+					}
+					cursorpos = bestpickintersectionpnt;
 				}
-				else {
-					selobj = bestpickobj;
-					if (io.MouseDoubleClicked[0] || io.MouseDoubleClicked[1])
-						selobj = selobj->parent;
-				}
-				cursorpos = bestpickintersectionpnt;
-			}
 
 			Matrix persp = Matrix::getLHPerspectiveMatrix(60.0f * (float)M_PI / 180.0f, (float)screen_width / (float)screen_height, camNearDist, camFarDist);
 			Matrix lookat = Matrix::getLHLookAtViewMatrix(campos, campos + ncd, Vector3(0.0f, 1.0f, 0.0f));
@@ -2133,6 +2421,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 					ImGui::EndMenu();
 				}
 				if (ImGui::BeginMenu("Create")) {
+					static const uint16_t quickAccess[] = {
+						2, // ZSTDOBJ
+						1, // ZGROUP
+					};
+					for (auto id : quickAccess) {
+						if (ImGui::MenuItem(ClassInfo::GetObjTypeString(id))) {
+							g_scene.CreateObject(id, g_scene.rootobj);
+						}
+					}
+					ImGui::Separator();
 					static const std::pair<uint16_t, const char*> categories[] = {
 						{0x0010, "Group"},
 						{0x0020, "Mesh"},
@@ -2161,6 +2459,20 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 					ImGui::MenuItem("Audio objects", nullptr, &wndShowAudioObjects);
 					ImGui::MenuItem("ZDefines", nullptr, &wndShowZDefines);
 					ImGui::MenuItem("Pathfinder info", nullptr, &wndShowPathfinderInfo);
+
+					ImGui::Separator();
+					auto& chunks = g_scene.remainingChunks;
+					auto pscrIt = std::find_if(chunks.begin(), chunks.end(), [](const Chunk& chunk) {return chunk.tag == 'RCSP'; });
+					ImGui::BeginDisabled(pscrIt == chunks.end());
+					if (ImGui::MenuItem("Remove PSCR")) {
+						if (pscrIt != chunks.end()) {
+							chunks.erase(pscrIt);
+						}
+					}
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("Removes the precompiled scripts, forcing the game to recompile when loading the scene.");
+					}
+					ImGui::EndDisabled();
 					ImGui::EndMenu();
 				}
 				if (ImGui::BeginMenu("Help")) {
@@ -2237,7 +2549,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 					for (auto& child : obj->subobj) {
 						rec(rec, child, mat);
 					}
-				};
+					};
 				renderAnim(renderAnim, g_scene.superroot, Matrix::getIdentity());
 				glEnd();
 				glPointSize(1.0f);
@@ -2257,13 +2569,18 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, char *args, int winmode
 			ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 			EndDrawing();
 			//_sleep(16);
-			
+
 			framesincursec++;
 			uint32_t newtime = GetTickCount();
 			if ((uint32_t)(newtime - lastfpscheck) >= 1000) {
 				framespersec = framesincursec;
 				framesincursec = 0;
 				lastfpscheck = newtime;
+			}
+
+			if (deferredCommand) {
+				deferredCommand();
+				deferredCommand = nullptr;
 			}
 		}
 	}

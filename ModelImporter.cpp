@@ -81,6 +81,7 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 		// Find the texture, and import it if possible
 		auto& mat = ais->mMaterials[amesh->mMaterialIndex];
 		uint16_t texId = 0xFFFF;
+		bool hasAlpha = false;
 		aiString aiTexName;
 		aiReturn ret = mat->GetTexture(aiTextureType_DIFFUSE, 0, &aiTexName);
 		if (ret == aiReturn_FAILURE)
@@ -115,6 +116,10 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 					texId = (uint16_t)AddTexture(g_scene, texpath);
 				}
 			}
+
+			if (texId != 0xFFFF) {
+				hasAlpha = IsTextureUsingTransparency(FindTextureChunk(g_scene, texId).first);
+			}
 		}
 
 		// Vertices
@@ -131,6 +136,11 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 
 		// Faces (indices + UVs)
 		bool hasTextureCoords = amesh->HasTextureCoords(0) && texId != 0xFFFF;
+		bool isTwoSided = false;
+		mat->Get(AI_MATKEY_TWOSIDED, isTwoSided);
+		uint16_t faceFlags = 0;
+		if (hasTextureCoords) faceFlags |= FTXFlag::textureBilinear;
+		if (hasAlpha) faceFlags |= FTXFlag::opac;
 		for (unsigned int f = 0; f < amesh->mNumFaces; ++f) {
 			auto& face = amesh->mFaces[f];
 			if (face.mNumIndices < 3)
@@ -144,8 +154,15 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 			};
 			gmesh.triindices.insert(gmesh.triindices.end(), inds.begin(), inds.end());
 
-			std::array<uint16_t, 6> ftx = { (uint16_t)(hasTextureCoords ? 0x20 : 0), 0, texId, 0, 0, 0 };
+			std::array<uint16_t, 6> ftx = { faceFlags, 0, texId, 0, 0, 0 };
 			gmesh.ftxFaces.push_back(ftx);
+
+			if (isTwoSided) {
+				std::swap(inds[1], inds[2]);
+				gmesh.triindices.insert(gmesh.triindices.end(), inds.begin(), inds.end());
+				gmesh.ftxFaces.push_back(ftx);
+			}
+
 			if (hasTextureCoords) {
 				std::array<float, 8> uvs;
 				uvs.fill(0.0f);
@@ -155,6 +172,11 @@ std::optional<std::pair<Mesh, std::optional<Chunk>>> ImportWithAssimp(const std:
 					uvs[2 * i + 1] = coord.y;
 				}
 				gmesh.textureCoords.insert(gmesh.textureCoords.end(), uvs.begin(), uvs.end());
+				if (isTwoSided) {
+					std::swap(uvs[2], uvs[4]);
+					std::swap(uvs[3], uvs[5]);
+					gmesh.textureCoords.insert(gmesh.textureCoords.end(), uvs.begin(), uvs.end());
+				}
 			}
 		}
 
@@ -441,7 +463,7 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 		size_t numFaces = indvec->size() / shape;
 		for (size_t f = 0; f < numFaces; ++f) {
 			auto& ftx = *ftxptr;
-			uint16_t texid = (ftx[0] & 0x20) ? ftx[2] : 0xFFFF;
+			uint16_t texid = (ftx[0] & FTXFlag::textureMask) ? ftx[2] : 0xFFFF;
 			auto& part = parts[texid];
 
 			unsigned int facesFirstVertexIndex = (unsigned int)part.vertices.size();
@@ -456,7 +478,7 @@ void ExportWithAssimp(const Mesh& gmesh, const std::filesystem::path& filename, 
 			for (unsigned int i = 0; i < shape; ++i)
 				face.mIndices[i] = facesFirstVertexIndex + i;
 
-			if (ftx[0] & 0x20) {
+			if (ftx[0] & FTXFlag::textureMask) {
 				for (unsigned int i = 0; i < shape; ++i) {
 					part.texCoords.emplace_back(uvptr[2 * i], uvptr[2 * i + 1], 0.0f);
 				}

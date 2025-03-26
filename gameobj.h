@@ -51,6 +51,27 @@ public:
 	~GORef() noexcept { deref(); }
 };
 
+namespace FTXFlag
+{
+	static const int trans = 0x0001;
+	static const int add = 0x0002;
+	static const int sub = 0x0004;
+	static const int wire = 0x0008;
+	static const int texturePoint = 0x0010;
+	static const int textureBilinear = 0x0020;
+	static const int textureMask = texturePoint | textureBilinear;
+	static const int lightMapPoint = 0x0040;
+	static const int lightMapBilinear = 0x0080;
+	static const int lightMapMask = lightMapPoint | lightMapBilinear;
+	static const int gouraud = 0x0100;
+	static const int opac = 0x0200;
+	static const int opac2 = 0x0400;
+	static const int mirror = 0x0800;
+	static const int refl = 0x1000;
+	static const int shadow = 0x2000;
+	static const int refrac = 0x4000;
+};
+
 struct Mesh
 {
 	std::vector<float> vertices;
@@ -64,9 +85,12 @@ struct Mesh
 	std::vector<FTXFace> ftxFaces;
 
 	struct Extension {
-		uint32_t extUnk2;
-		std::vector<std::pair<uint32_t, uint32_t>> frames;
-		std::string name;
+		uint32_t type;
+		struct TextureAnimation {
+			std::vector<std::pair<uint32_t, uint32_t>> frames;
+			std::string name;
+		};
+		std::array<TextureAnimation, 2> texAnims;
 	};
 	std::shared_ptr<Extension> extension; // TODO deep copy would be better
 
