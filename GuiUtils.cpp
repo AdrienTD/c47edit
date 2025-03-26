@@ -1,10 +1,9 @@
 #include "GuiUtils.h"
 #include <filesystem>
 #define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
+#include <windows.h>
 #include <commdlg.h>
-#include <shlobj_core.h>
+#include <shlobj.h>
 
 extern HWND hWindow;
 

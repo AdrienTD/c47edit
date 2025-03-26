@@ -6,12 +6,21 @@ branches:
   - master
 skip_tags: true
 image: Visual Studio 2022
+platform: x64
 configuration: Release
 install:
 - cmd: >-
     cd c:\tools\vcpkg
 
-    vcpkg install miniz nlohmann-json stb libsquish glew assimp fmt
+    set triplet=x64-windows-release
+    vcpkg install                 ^
+      miniz:%triplet%             ^
+      nlohmann-json:%triplet%     ^
+      stb:%triplet%               ^
+      libsquish:%triplet%         ^
+      glew:%triplet%              ^
+      assimp:%triplet%            ^
+      fmt:%triplet%
 
     vcpkg integrate install
 cache: c:\tools\vcpkg\installed\

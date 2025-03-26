@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
 #include <tuple>
 #include <type_traits>
 #include "vecmat.h"
@@ -21,12 +22,6 @@ public:
 		static_assert(std::is_arithmetic_v<T>, "cannot read to this type, only integers and floats");
 		val = *reinterpret_cast<std::add_const_t<T>*>(m_ptr);
 		m_ptr += sizeof(T);
-	}
-	template<>
-	void readTo<Vector3>(Vector3& val) {
-		readTo(val.x);
-		readTo(val.y);
-		readTo(val.z);
 	}
 
 	template<typename T, typename ... Rest>
@@ -53,3 +48,10 @@ public:
 private:
 	const uint8_t* m_ptr;
 };
+
+template<>
+void ByteReader::readTo<Vector3>(Vector3& val) {
+    readTo(val.x);
+    readTo(val.y);
+    readTo(val.z);
+}
