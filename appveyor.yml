@@ -14,6 +14,8 @@ install:
 
     set triplet=x64-windows
 
+    set APP_OUTPUT_RELATIVE_PATH=%PLATFORM%\%CONFIGURATION%
+
     vcpkg install
     miniz:%triplet%
     nlohmann-json:%triplet%
@@ -31,9 +33,9 @@ build:
   verbosity: minimal
 after_build:
 - cmd: >-
-    cd C:\projects\c47edit\%CONFIGURATION%
+    cd C:\projects\c47edit\%APP_OUTPUT_RELATIVE_PATH%
 
-    7z a c47edit.zip c47edit.exe *.dll ..\classes.json
+    7z a c47edit.zip c47edit.exe *.dll C:\projects\c47edit\classes.json
 artifacts:
-- path: '%CONFIGURATION%\c47edit.zip'
+- path: '%APP_OUTPUT_RELATIVE_PATH%\c47edit.zip'
   name: c47edit.zip
