@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <string>
@@ -190,7 +191,7 @@ inline void GORef::set(GameObject * obj) noexcept { deref(); m_obj = obj; if (m_
 struct Scene {
 	Chunk oldSpkChunk;
 	GameObject* rootobj = nullptr, * cliprootobj = nullptr, * superroot = nullptr;
-	std::string lastspkfn;
+	std::filesystem::path lastSpkFilepath;
 	std::vector<uint8_t> zipmem;
 	Chunk palPack, dxtPack, lgtPack, anmPack, wavPack;
 	bool hasAnmPack = false;
@@ -212,9 +213,9 @@ struct Scene {
 	std::vector<Chunk> remainingChunks; // such as PSCR
 
 	void LoadEmpty();
-	void LoadSceneSPK(const char *fn);
+	void LoadSceneSPK(const std::filesystem::path& fn);
 	Chunk ConstructSPK();
-	void SaveSceneSPK(const char *fn);
+	void SaveSceneSPK(const std::filesystem::path& fn);
 	void Close();
 	~Scene() { Close(); }
 	

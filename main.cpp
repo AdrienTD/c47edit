@@ -530,7 +530,7 @@ void IGOTNode(GameObject *o)
 			auto fpath = GuiUtils::OpenDialogBox("Scene (*.zip)\0*.zip\0\0\0\0\0", "zip");
 			if (!fpath.empty()) {
 				Scene subscene;
-				subscene.LoadSceneSPK(fpath.string().c_str());
+				subscene.LoadSceneSPK(fpath);
 				try {
 					CopyObjectToAnotherScene(subscene, g_scene, subscene.rootobj->subobj.at(0));
 					UncacheAllTextures();
@@ -554,7 +554,7 @@ void IGOTNode(GameObject *o)
 				subscene.LoadEmpty();
 				try {
 					CopyObjectToAnotherScene(g_scene, subscene, o);
-					subscene.SaveSceneSPK(fpath.string().c_str());
+					subscene.SaveSceneSPK(fpath);
 				}
 				catch (const std::exception& exc) {
 					std::string msg = "Failed to extract subscene!\nReason: ";
@@ -1499,14 +1499,14 @@ void IGObjectInfo()
 
 void CmdSaveScene()
 {
-	auto newfn = std::filesystem::path(g_scene.lastspkfn).filename().string();
+	auto newfn = g_scene.lastSpkFilepath.filename().u8string();
 	size_t atpos = newfn.rfind('@');
 	if (atpos != newfn.npos)
 		newfn = newfn.substr(atpos + 1);
 
-	auto zipPath = GuiUtils::SaveDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", newfn, "Save Scene ZIP archive as...");
+	auto zipPath = GuiUtils::SaveDialogBox("Scene ZIP archive\0*.zip\0\0\0", "zip", std::filesystem::u8path(newfn), "Save Scene ZIP archive as...");
 	if (!zipPath.empty())
-		g_scene.SaveSceneSPK(zipPath.string().c_str());
+		g_scene.SaveSceneSPK(zipPath);
 }
 
 void IGMain()
@@ -2255,7 +2255,7 @@ bool CmdOpenScene()
 	if (zipPath.empty())
 		return false;
 	UIClean();
-	g_scene.LoadSceneSPK(zipPath.string().c_str());
+	g_scene.LoadSceneSPK(zipPath);
 	GlifyAllTextures();
 	return true;
 }

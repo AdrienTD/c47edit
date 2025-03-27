@@ -3,8 +3,9 @@
 // Licensed under the GPL3+.
 // See LICENSE file for more details.
 
-#include <functional>
 #include <array>
+#include <filesystem>
+#include <functional>
 #include <map>
 #include <unordered_map>
 
@@ -81,9 +82,10 @@ uint32_t ComputeBytesum(void* data, size_t length) {
 
 static void ReadAssetPacks(Scene* scene, mz_zip_archive* zip)
 {
-	static const auto readFile = [](const char* filename) {
+	static const auto readFile = [](const std::filesystem::path& filename) {
 		void* repmem; size_t repsize;
-		FILE* repfile = fopen(filename, "rb");
+		FILE* repfile = nullptr;
+		_wfopen_s(&repfile, filename.c_str(), L"rb");
 		if (!repfile) ferr("Could not open Repeat.* file.\nBe sure you copied all the 4 files named \"Repeat\" (with .ANM, .DXT, .PAL, .WAV extensions) from the Hitman C47 game's folder into the editor's folder (where c47edit.exe is).");
 		fseek(repfile, 0, SEEK_END);
 		repsize = ftell(repfile);
@@ -102,7 +104,7 @@ static void ReadAssetPacks(Scene* scene, mz_zip_archive* zip)
 		packmem = mz_zip_reader_extract_file_to_heap(zip, fnPackRepeat.c_str(), &packsize, 0);
 		if (packmem)
 		{
-			auto [repmem, repsize] = readFile(fnRepeat.c_str());
+			auto [repmem, repsize] = readFile(fnRepeat);
 			pack = Chunk::reconstructPackFromRepeat(packmem, packsize, repmem);
 			free(repmem);
 		}
@@ -161,11 +163,12 @@ void Scene::LoadEmpty()
 	ready = true;
 }
 
-void Scene::LoadSceneSPK(const char *fn)
+void Scene::LoadSceneSPK(const std::filesystem::path& fn)
 {
 	Close();
 
-	FILE *zipfile = fopen(fn, "rb");
+	FILE* zipfile = nullptr;
+	_wfopen_s(&zipfile, fn.c_str(), L"rb");
 	if (!zipfile) ferr("Could not open the ZIP file.");
 	fseek(zipfile, 0, SEEK_END);
 	size_t zipsize = ftell(zipfile);
@@ -185,7 +188,7 @@ void Scene::LoadSceneSPK(const char *fn)
 	Chunk spkchk;
 	spkchk.load(spkmem);
 	free(spkmem);
-	lastspkfn = fn;
+	lastSpkFilepath = fn;
 
 	Chunk* prot = spkchk.findSubchunk('TORP');
 	Chunk* pclp = spkchk.findSubchunk('PLCP');
@@ -889,13 +892,26 @@ Chunk Scene::ConstructSPK()
 	return newSpkChunk;
 }
 
-void Scene::SaveSceneSPK(const char *fn)
+void Scene::SaveSceneSPK(const std::filesystem::path& fn)
 {
 	mz_zip_archive outzip;
 	mz_zip_zero_struct(&outzip);
 	mz_bool mzr;
-	mzr = mz_zip_writer_init_file(&outzip, fn, 0);
-	if (!mzr) { warn("Couldn't create the new scene ZIP file for saving."); return; }
+
+	FILE* outputZipFile = nullptr;
+	_wfopen_s(&outputZipFile, fn.c_str(), L"wb");
+	if (!outputZipFile) { warn("Couldn't create the new scene ZIP file for saving."); return; }
+
+	// TEMP
+	struct FileDestructor {
+		FILE* file;
+		FileDestructor(FILE* file) : file(file) {}
+		~FileDestructor() { fclose(file); }
+	};
+	auto _ = FileDestructor(outputZipFile);
+	
+	mzr = mz_zip_writer_init_cfile(&outzip, outputZipFile, 0);
+	if (!mzr) { warn("Could not initialize the ZIP writer for saving."); return; }
 
 	if (!zipmem.empty()) {
 		mz_zip_archive inzip;
