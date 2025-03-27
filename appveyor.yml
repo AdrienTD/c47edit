@@ -12,18 +12,18 @@ install:
 - cmd: >-
     cd c:\tools\vcpkg
 
-    set triplet=x64-windows-release
-    vcpkg install                 ^
-      miniz:%triplet%             ^
-      nlohmann-json:%triplet%     ^
-      stb:%triplet%               ^
-      libsquish:%triplet%         ^
-      glew:%triplet%              ^
-      assimp:%triplet%            ^
-      fmt:%triplet%
+    set triplet=x64-windows
+
+    vcpkg install
+    miniz:%triplet%
+    nlohmann-json:%triplet%
+    stb:%triplet%
+    libsquish:%triplet%
+    glew:%triplet%
+    assimp:%triplet%
+    fmt:%triplet%
 
     vcpkg integrate install
-cache: c:\tools\vcpkg\installed\
 before_build:
 - cmd: set CL=/DAPPVEYOR /DAPP_VERSION#\"%APPVEYOR_BUILD_VERSION%\"
 build:
